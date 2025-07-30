@@ -1,96 +1,116 @@
 import React, { useState } from "react";
-import "./Navbar.css";
+import { FaUser, FaShoppingCart } from "react-icons/fa";
 import Account from "../../pages/Account";
+import "./Navbar.css";
 
 const Navbar = () => {
   const [showAccount, setShowAccount] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [showProductsDropdown, setShowProductsDropdown] = useState(false);
-  const [openSubMenu, setOpenSubMenu] = useState("");
+  const [showLivingDropdown, setShowLivingDropdown] = useState(false);
+  const [showAboutDropdown, setShowAboutDropdown] = useState(false);
+  const cartItemCount = 3; // Replace this with dynamic state later
 
   const toggleAccount = () => setShowAccount((prev) => !prev);
   const closeAccount = () => setShowAccount(false);
-  const toggleMobileMenu = () => setIsMobileMenuOpen((prev) => !prev);
-
-  const toggleProductsDropdown = () => {
-    setShowProductsDropdown((prev) => !prev);
-    setOpenSubMenu(""); // Close submenus
-  };
-
-  const toggleSubMenu = (menu) => {
-    setOpenSubMenu((prev) => (prev === menu ? "" : menu));
-  };
 
   return (
     <>
-      <nav className={`navbar ${showAccount ? "blurred" : ""}`}>
-        <div className="navbar-top">
-          <div className="logo">𝐒𝐇𝐀𝐇𝐔 𝐌𝐔𝐌𝐁𝐀𝐈</div>
-          <button className="hamburger" onClick={toggleMobileMenu}>
-            ☰
-          </button>
-          <input type="text" placeholder="Search" className="search-bar" />
-          <div className="nav-icons">
-            <span onClick={toggleAccount}>ACCOUNT</span>
-            <a href="/">Cart</a>
+      <nav className={`navbar-container ${showAccount ? "blur-sm" : ""}`}>
+        <div className="navbar-top-section">
+          <div className="brand-logo">𝐒𝐇𝐀𝐇𝐔 𝐌𝐔𝐌𝐁𝐀𝐈</div>
+          <input
+            type="text"
+            placeholder="Search"
+            className="search-input"
+          />
+          <div className="nav-links">
+            <span onClick={toggleAccount} className="nav-link">
+              <FaUser size={20} title="Account" />
+            </span>
+            <div className="nav-link cart-icon-wrapper">
+              <a href="/">
+                <FaShoppingCart size={20} title="Cart" />
+                <span className="cart-badge">{cartItemCount}</span>
+              </a>
+            </div>
           </div>
         </div>
 
-        <div className={`navbar-bottom ${isMobileMenuOpen ? "open" : ""}`}>
-          <ul className="nav-menu">
-            <li><a href="/">Home</a></li>
+        <div className="navbar-bottom-section">
+          <ul className="nav-list">
+            <li><a href="/" className="nav-link">Home</a></li>
 
-            <li className="dropdown">
-              <a href="/" onClick={(e) => { e.preventDefault(); toggleProductsDropdown(); }}>
-                Products
-              </a>
-
-              {showProductsDropdown && (
-                <ul className="dropdown-menu show">
-                  <li><a href="/">Furniture</a></li>
-
-                  <li className="dropdown-sub">
-                    <a href="/" onClick={(e) => { e.preventDefault(); toggleSubMenu("men"); }}>
-                      Men
-                    </a>
-                    {openSubMenu === "men" && (
-                      <ul className="dropdown-menu-sub show">
-                        <li><a href="/">Shirts</a></li>
-                        <li><a href="/">Pants</a></li>
-                        <li><a href="/">Shoes</a></li>
-                      </ul>
-                    )}
-                  </li>
-
-                  <li className="dropdown-sub">
-                    <a href="/" onClick={(e) => { e.preventDefault(); toggleSubMenu("women"); }}>
-                      Women
-                    </a>
-                    {openSubMenu === "women" && (
-                      <ul className="dropdown-menu-sub show">
-                        <li><a href="/">Dresses</a></li>
-                        <li><a href="/">Tops</a></li>
-                        <li><a href="/">Shoes</a></li>
-                      </ul>
-                    )}
-                  </li>
-
-                  <li><a href="/">Jewelry & Watches</a></li>
-                  <li><a href="/">Fragrances</a></li>
-                </ul>
+            <li
+              className="nav-item"
+              onMouseEnter={() => setShowLivingDropdown(true)}
+              onMouseLeave={() => setShowLivingDropdown(false)}
+            >
+              <span className="nav-link">Products</span>
+              {showLivingDropdown && (
+                <div className="dropdown-menu">
+                  <div className="dropdown-column">
+                    <h3 className="dropdown-heading">OUR STORIES</h3>
+                    <ul className="dropdown-list">
+                      <li><a href="/" className="dropdown-link">Our Products</a></li>
+                    </ul>
+                  </div>
+                  <div className="dropdown-column">
+                    <h3 className="dropdown-heading">CATEGORIES</h3>
+                    <ul className="dropdown-list">
+                      <li><a href="/" className="dropdown-link">Blankets and Pillows</a></li>
+                      <li><a href="/" className="dropdown-link">Tableware</a></li>
+                      <li><a href="/" className="dropdown-link">Furniture and Lighting</a></li>
+                    </ul>
+                  </div>
+                </div>
               )}
             </li>
 
-            <li><a href="/">Special Editions</a></li>
-            <li><a href="/">About SHAHU</a></li>
+            <li><a href="/" className="nav-link">Men</a></li>
+            <li><a href="/" className="nav-link">Women</a></li>
+
+            <li
+              className="nav-item"
+              onMouseEnter={() => setShowAboutDropdown(true)}
+              onMouseLeave={() => setShowAboutDropdown(false)}
+            >
+              <span className="nav-link">About SHAHU</span>
+              {showAboutDropdown && (
+                <div className="dropdown-menu">
+                  <div className="dropdown-column">
+                    <h3 className="dropdown-heading">OUR PHILOSOPHY</h3>
+                    <ul className="dropdown-list">
+                      <li><a href="/" className="dropdown-link">Our Philosophy</a></li>
+                    </ul>
+                  </div>
+                  <div className="dropdown-column">
+                    <h3 className="dropdown-heading">LEGACY</h3>
+                    <ul className="dropdown-list">
+                      <li><a href="/" className="dropdown-link">Founder's Story</a></li>
+                      <li><a href="/" className="dropdown-link">Heritage Timeline</a></li>
+                      <li><a href="/" className="dropdown-link">Our Studios</a></li>
+                    </ul>
+                  </div>
+                  <div className="dropdown-column">
+                    <h3 className="dropdown-heading">CRAFT</h3>
+                    <ul className="dropdown-list">
+                      <li><a href="/" className="dropdown-link">Contemporary artisans</a></li>
+                      <li><a href="/" className="dropdown-link">Services</a></li>
+                      <li><a href="/" className="dropdown-link">Contact us</a></li>
+                    </ul>
+                  </div>
+                </div>
+              )}
+            </li>
           </ul>
         </div>
       </nav>
 
       {showAccount && (
-        <div className="account-modal-overlay" onClick={closeAccount}>
-          <div className="account-modal" onClick={(e) => e.stopPropagation()}>
-            <button className="close-btn" onClick={closeAccount}>×</button>
+        <div className="modal-overlay" onClick={closeAccount}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <button className="modal-close-button" onClick={closeAccount}>
+              &times;
+            </button>
             <Account />
           </div>
         </div>

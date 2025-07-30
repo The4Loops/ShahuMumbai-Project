@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import '../styles/Account.css';
+import { FcGoogle } from 'react-icons/fc';
 
 const Account = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -8,6 +9,11 @@ const Account = () => {
   const toggleForm = () => {
     setIsLogin(!isLogin);
     setShowPayment(false); // reset payment details toggle on switch
+  };
+
+  const handleGoogleLogin = () => {
+    // Placeholder for real Google login logic (Firebase/Auth0/etc.)
+    alert('Google login clicked!');
   };
 
   return (
@@ -26,10 +32,19 @@ const Account = () => {
               <input type="email" placeholder="Email" required />
               <input type="password" placeholder="Password" required />
               <button type="submit">Login</button>
+              
+              <div className="divider">or</div>
+
+              <button type="button" className="google-login-btn" onClick={handleGoogleLogin}>
+                <FcGoogle size={20} style={{ marginRight: '8px' }} />
+                Continue with Google
+              </button>
             </form>
           ) : (
             <form className="auth-form">
               <input type="text" placeholder="Full Name" required />
+              <input type="text" placeholder="Phone no." required />
+              <input type="textarea" placeholder="Address" required />
               <input type="email" placeholder="Email" required />
               <input type="password" placeholder="Password" required />
 
