@@ -1,0 +1,132 @@
+/* .homepage {
+  background: #fefcf8;
+  color: #333;
+  font-family: Arial, sans-serif;
+}
+
+.hero-slider {
+  position: relative;
+  height: 80vh;
+  overflow: hidden;
+}
+
+.slide-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.slide-caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.caption-box {
+  background: rgba(255, 255, 255, 0.7);
+  padding: 20px;
+  text-align: center;
+}
+
+.featured-products {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 24px;
+  padding: 40px 20px;
+}
+
+.product img {
+  width: 100%;
+}
+
+.season-highlights {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.look-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  padding: 40px 20px;
+  align-items: center;
+}
+
+.look-img {
+  max-width: 100%;
+  flex: 1 1 300px;
+}
+
+.look-items {
+  flex: 1 1 300px;
+}
+
+.look-scroll {
+  display: flex;
+  gap: 16px;
+  overflow-x: auto;
+  margin-top: 16px;
+}
+
+.look-item {
+  min-width: 120px;
+  text-align: center;
+}
+
+.promo-banners {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 20px;
+  padding: 40px 20px;
+  position: relative;
+}
+
+.promo {
+  position: relative;
+}
+
+.promo img {
+  width: 100%;
+}
+
+.promo-text {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  color: white;
+}
+
+.art-cta {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.art-cta img {
+  max-width: 100%;
+  margin-bottom: 12px;
+}
+
+.services {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 20px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.editorial {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  padding: 40px 20px;
+}
+
+.editorial-card img {
+  width: 100%;
+  margin-bottom: 8px;
+} */

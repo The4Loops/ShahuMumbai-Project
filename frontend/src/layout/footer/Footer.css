@@ -1,0 +1,120 @@
+:root {
+  --vintage-cream: #FBE9D0;
+  --vintage-rose: #C97B84;
+}
+
+.retro-footer {
+  background-color: var(--vintage-cream);
+  color: var(--vintage-rose);
+  padding: 2rem 1rem;
+  font-family: 'Courier New', Georgia, serif;
+  border-top: 3px solid var(--vintage-rose);
+}
+
+.footer-content {
+  max-width: 1200px;
+  margin: auto;
+}
+
+.footer-logo {
+  font-size: 2rem;
+  font-weight: bold;
+  text-align: center;
+  color: var(--vintage-rose);
+  margin-bottom: 1rem;
+  font-family: 'Playfair Display', serif;
+}
+
+.footer-columns {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-around;
+  margin-bottom: 2rem;
+  gap: 1rem;
+}
+
+.footer-column {
+  min-width: 150px;
+  margin-bottom: 1rem;
+}
+
+.footer-column h4 {
+  font-size: 1rem;
+  border-bottom: 2px dotted var(--vintage-rose);
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
+  color: var(--vintage-rose);
+}
+
+.footer-column a {
+  display: block;
+  color: var(--vintage-rose);
+  text-decoration: none;
+  padding: 0.25rem 0;
+  font-size: 0.95rem;
+  transition: color 0.3s ease;
+}
+
+.footer-column a:hover {
+  color: white;
+  background-color: var(--vintage-rose);
+  padding-left: 0.3rem;
+}
+
+.footer-bottom {
+  text-align: center;
+  font-size: 0.85rem;
+  border-top: 1px dashed var(--vintage-rose);
+  padding-top: 1rem;
+  color: var(--vintage-rose);
+}
+
+/* === Newsletter === */
+.newsletter-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.newsletter-form input {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--vintage-rose);
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.newsletter-form button {
+  background-color: var(--vintage-rose);
+  color: var(--vintage-cream);
+  border: none;
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+.newsletter-form button:hover {
+  background-color: #b06976;
+}
+
+/* === Social Icons === */
+.social-icons {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.5rem;
+}
+
+.social-icons a {
+  color: var(--vintage-rose);
+  font-size: 1.2rem;
+  transition: color 0.3s ease;
+}
+
+.social-icons a:hover {
+  color: #fff;
+  background-color: var(--vintage-rose);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+}

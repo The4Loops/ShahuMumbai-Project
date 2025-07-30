@@ -1,0 +1,171 @@
+/* Container */
+.auth-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50vh;
+  padding: 0;
+}
+
+/* Main Box */
+.auth-box {
+  background: transparent;
+  width: 100%;
+  max-width: 400px;
+  border-radius: 12px;
+  overflow: hidden;
+  transition: all 0.3s ease-in-out;
+}
+
+/* Header */
+.auth-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: transparent;
+  color: black;
+  padding: 1rem 1.5rem;
+}
+
+.auth-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.auth-header button {
+  background: none;
+  border: none;
+  color: black;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.auth-header button:hover {
+  opacity: 0.8;
+}
+
+/* Wrapper */
+.form-wrapper {
+  padding: 2rem 1.5rem;
+  animation-duration: 0.4s;
+  animation-fill-mode: both;
+}
+
+/* Forms */
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.auth-form input {
+  padding: 0.75rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 1rem;
+}
+
+.auth-form button {
+  padding: 0.75rem;
+  border: none;
+  background-color: #C97B84;
+  color: black;
+  font-size: 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
+
+.auth-form button:hover {
+  background-color: #5549d3;
+}
+
+/* Optional Payment Checkbox */
+.checkbox-row {
+  font-size: 0.9rem;
+  margin-top: 0.5rem;
+  color: #333;
+}
+
+.checkbox-row input {
+  margin-right: 6px;
+  transform: scale(1.1);
+  cursor: pointer;
+}
+
+/* Payment Section Animation */
+.payment-section {
+  overflow: hidden;
+  transition: max-height 0.4s ease, opacity 0.4s ease;
+  max-height: 0;
+  opacity: 0;
+  margin-top: 0.5rem;
+}
+
+.payment-section.expand {
+  max-height: 500px;
+  opacity: 1;
+}
+
+.payment-section input {
+  margin-top: 0.5rem;
+  padding: 0.65rem;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  width: 100%;
+  font-size: 1rem;
+}
+
+/* Animations for form toggle */
+@keyframes slideLeft {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideRight {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.slide-in-left {
+  animation-name: slideLeft;
+}
+
+.slide-in-right {
+  animation-name: slideRight;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .auth-box {
+    padding: 1rem;
+  }
+
+  .auth-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .auth-header h2 {
+    font-size: 1.25rem;
+  }
+
+  .auth-form input,
+  .payment-section input {
+    font-size: 0.95rem;
+  }
+}
