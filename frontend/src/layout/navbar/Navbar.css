@@ -1,5 +1,5 @@
 :root {
-  --vintage-cream: #FBE9D0;
+  --vintage-cream: #fff4e9;
   --vintage-rose: #C97B84;
   --vintage-hover: #f4d8c5;
 }
@@ -36,7 +36,7 @@
   background: none;
   border: none;
   font-size: 28px;
-  color: var(--vintage-rose);
+  color: #e5dace;
   cursor: pointer;
   display: none;
   user-select: none;
