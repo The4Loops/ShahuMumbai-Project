@@ -3,12 +3,39 @@ import React, { useState } from 'react';
 import ProductCard from '../components/ProductCard';
 import Layout from '../layout/Layout';
 
-
 const dummyData = [
-  { id: 1, name: 'Product 1', category: 'Men', price: 1200, description: 'Rustic shirt', image: require('../assets/images/product_images/dummy-shirt.jpg') },
-  { id: 2, name: 'Product 2', category: 'Women', price: 2400, description: 'Blue pants', image: require('../assets/images/product_images/dummyPants.jpg') },
-  { id: 3, name: 'Vintage Bag', category: 'Accessories', price: 2499, description: 'Handcrafted fabric bag with Indian flair.', image: require('../assets/images/product_images/dummyHandbag.jpeg') },
-  { id: 4, name: 'Product 4', category: 'Women', price: 1350, description: 'Brown shoes', image: require('../assets/images/product_images/dummyShoes.jpg') }
+  {
+    id: 1,
+    name: 'Product 1',
+    category: 'Men',
+    price: 1200,
+    description: 'Rustic shirt',
+    image: '/assets/images/product_images/dummy-shirt.jpg',
+  },
+  {
+    id: 2,
+    name: 'Product 2',
+    category: 'Women',
+    price: 2400,
+    description: 'Blue pants',
+    image: '/assets/images/product_images/dummyPants.jpg',
+  },
+  {
+    id: 3,
+    name: 'Vintage Bag',
+    category: 'Accessories',
+    price: 2499,
+    description: 'Handcrafted fabric bag with Indian flair.',
+    image: '/assets/images/product_images/dummyHandbag.jpeg',
+  },
+  {
+    id: 4,
+    name: 'Product 4',
+    category: 'Women',
+    price: 1350,
+    description: 'Brown shoes',
+    image: '/assets/images/product_images/dummyShoes.jpg',
+  },
 ];
 
 const Products = () => {
@@ -19,7 +46,7 @@ const Products = () => {
     if (!filter) {
       setFilteredData(dummyData);
     } else {
-      const result = dummyData.filter(item => item.category === filter);
+      const result = dummyData.filter((item) => item.category === filter);
       setFilteredData(result);
     }
   };

@@ -9,11 +9,19 @@ module.exports = {
       minkBrown: '#6B4226',
       softCream: '#f9f5f0',
       mutedSage: '#A3B18A',
+      beige: '#fdf9f4',
+      rose: '#c9a79c',
+      dusty: '#b88c85',
+      mocha: '#4a2d2e',
     },
     animation: {
       'fade-in': 'fadeIn 0.2s ease-in-out',
         'slide-in-left': 'slideLeft 0.4s ease-out',
         'slide-in-right': 'slideRight 0.4s ease-out',
+    },
+    fontFamily: {
+      serif: ['"Playfair Display"', 'serif'],
+      sans: ['"Open Sans"', 'sans-serif'],
     },
     keyframes: {
       fadeIn: {

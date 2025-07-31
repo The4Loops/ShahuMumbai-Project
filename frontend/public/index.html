@@ -5,15 +5,15 @@
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
 
-    <!-- ✅ Updated CSP to allow images from via.placeholder.com and placehold.co -->
-    <meta http-equiv="Content-Security-Policy" content="
-      default-src 'self';
-      script-src 'self' https://cdnjs.cloudflare.com;
-      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-      font-src 'self' https://fonts.gstatic.com;
-      img-src 'self' data: https://via.placeholder.com https://placehold.co;
-    ">
-
+    <!-- ✅ Updated CSP to allow media from data URIs -->
+  <meta http-equiv="Content-Security-Policy" content="
+  default-src 'self';
+  script-src 'self' https://cdnjs.cloudflare.com;
+  style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+  font-src 'self' https://fonts.gstatic.com;
+  img-src 'self' data: https://via.placeholder.com https://placehold.co https://www.transparenttextures.com;
+  media-src 'self' data:;
+">
     <meta name="description" content="Web site created using create-react-app" />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
