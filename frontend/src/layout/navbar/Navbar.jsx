@@ -186,7 +186,12 @@ const Navbar = () => {
           <DesktopDropdown
             label="Products"
             isOpen={dropdown.products}
-            setOpen={(state) => setDropdown((prev) => ({ ...prev, products: state }))}
+            setOpen={(state) => 
+              setDropdown({
+                products: state,
+                about: false,
+              })  
+            }
             refEl={productsRef}
             content={renderProductsContent}
           />
@@ -197,7 +202,11 @@ const Navbar = () => {
           <DesktopDropdown
             label="About SHAHU"
             isOpen={dropdown.about}
-            setOpen={(state) => setDropdown((prev) => ({ ...prev, about: state }))}
+            setOpen={(state) => setDropdown({
+                products: false,
+                about: state,
+              })
+            }
             refEl={aboutRef}
             content={renderAboutContent}
           />

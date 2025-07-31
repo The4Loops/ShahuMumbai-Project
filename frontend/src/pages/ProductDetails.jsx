@@ -9,7 +9,52 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const dummyData = [
   {
+    id: '1',
+    name: 'Vintage Bag',
+    price: 2499,
+    description: 'Handcrafted fabric bag with Indian flair.',
+    designer: 'Shahu Mumbai',
+    category: 'Accessories',
+    images: [
+      '/assets/images/product_images/dummyHandbag.jpeg',
+      '/assets/images/product_images/dummyHandbag1.jpeg',
+      '/assets/images/product_images/dummyHandbag2.jpeg',
+      '/assets/images/product_images/dummyHandbag3.jpeg',
+      '/assets/images/product_images/dummyHandbag4.jpeg',
+    ],
+  },
+  {
+    id: '2',
+    name: 'Vintage Bag',
+    price: 2499,
+    description: 'Handcrafted fabric bag with Indian flair.',
+    designer: 'Shahu Mumbai',
+    category: 'Accessories',
+    images: [
+      '/assets/images/product_images/dummyHandbag.jpeg',
+      '/assets/images/product_images/dummyHandbag1.jpeg',
+      '/assets/images/product_images/dummyHandbag2.jpeg',
+      '/assets/images/product_images/dummyHandbag3.jpeg',
+      '/assets/images/product_images/dummyHandbag4.jpeg',
+    ],
+  },
+  {
     id: '3',
+    name: 'Vintage Bag',
+    price: 2499,
+    description: 'Handcrafted fabric bag with Indian flair.',
+    designer: 'Shahu Mumbai',
+    category: 'Accessories',
+    images: [
+      '/assets/images/product_images/dummyHandbag.jpeg',
+      '/assets/images/product_images/dummyHandbag1.jpeg',
+      '/assets/images/product_images/dummyHandbag2.jpeg',
+      '/assets/images/product_images/dummyHandbag3.jpeg',
+      '/assets/images/product_images/dummyHandbag4.jpeg',
+    ],
+  },
+  {
+    id: '4',
     name: 'Vintage Bag',
     price: 2499,
     description: 'Handcrafted fabric bag with Indian flair.',

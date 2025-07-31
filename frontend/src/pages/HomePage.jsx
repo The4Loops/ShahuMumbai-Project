@@ -36,7 +36,7 @@ function HomePage() {
         </section>
 
         {/* Featured Categories */}
-        <section className=" bg-transparent  px-6 md:px-16 my-8 py-16">
+        <section className=" bg-[#f9f5f0] px-6 md:px-16 my-2 py-16">
           <h2 className="text-3xl font-serif font-semibold text-center mb-12 text-[#4a2d2e]">Featured Categories</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {["Fashion", "Furniture", "Home", "Beauty"].map((category, index) => (
