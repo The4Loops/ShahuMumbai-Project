@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import ProductCard from '../components/ProductCard';
 import Layout from '../layout/Layout';
 
+
 const dummyData = [
   {
     id: 1,
