@@ -11,7 +11,7 @@ const dummyData = [
     category: 'Men',
     price: 1200,
     description: 'Rustic shirt',
-    image: '/assets/images/product_images/dummy-shirt.jpg',
+    image: require('../assets/images/product_images/DummyShirt.jpg'),
   },
   {
     id: 2,
@@ -19,7 +19,7 @@ const dummyData = [
     category: 'Women',
     price: 2400,
     description: 'Blue pants',
-    image: '/assets/images/product_images/dummyPants.jpg',
+    image: require('../assets/images/product_images/DummyPants.jpg'),
   },
   {
     id: 3,
@@ -27,7 +27,7 @@ const dummyData = [
     category: 'Accessories',
     price: 2499,
     description: 'Handcrafted fabric bag with Indian flair.',
-    image: '/assets/images/product_images/dummyHandbag.jpeg',
+    image: require('../assets/images/product_images/DummyHandbag.jpeg'),
   },
   {
     id: 4,
@@ -35,7 +35,7 @@ const dummyData = [
     category: 'Women',
     price: 1350,
     description: 'Brown shoes',
-    image: '/assets/images/product_images/dummyShoes.jpg',
+    image: require('../assets/images/product_images/DummyShoes.jpg'),
   },
 ];
 

@@ -1,6 +1,7 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
+import DummyShoes from '../assets/images/product_images/DummyShoes.jpg';
 
 function HomePage() {
   return (
@@ -29,7 +30,7 @@ function HomePage() {
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 1 }}
-            src='/assets/images/product_images/dummyShoes.jpg'
+            src={DummyShoes}
             alt="Ecommerce Hero"
             className="w-full md:w-1/2 max-w-md mx-auto rounded-xl shadow-lg"
           />

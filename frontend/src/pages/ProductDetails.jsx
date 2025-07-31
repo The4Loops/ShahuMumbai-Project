@@ -54,11 +54,11 @@ const dummyData = [
     category: 'Accessories',
     color: 'Red',
     images: [
-      '/assets/images/product_images/dummyHandbag.jpeg',
-      '/assets/images/product_images/dummyHandbag1.jpeg',
-      '/assets/images/product_images/dummyHandbag2.jpeg',
-      '/assets/images/product_images/dummyHandbag3.jpeg',
-      '/assets/images/product_images/dummyHandbag4.jpeg',
+      '/assets/images/product_images/DummyHandbag.jpeg',
+      '/assets/images/product_images/DummyHandbag1.jpeg',
+      '/assets/images/product_images/DummyHandbag2.jpeg',
+      '/assets/images/product_images/DummyHandbag3.jpeg',
+      '/assets/images/product_images/DummyHandbag4.jpeg',
     ],
   },
   {
@@ -70,11 +70,11 @@ const dummyData = [
     category: 'Accessories',
     color: 'Red',
     images: [
-      '/assets/images/product_images/dummyHandbag.jpeg',
-      '/assets/images/product_images/dummyHandbag1.jpeg',
-      '/assets/images/product_images/dummyHandbag2.jpeg',
-      '/assets/images/product_images/dummyHandbag3.jpeg',
-      '/assets/images/product_images/dummyHandbag4.jpeg',
+      '/assets/images/product_images/DummyHandbag.jpeg',
+      '/assets/images/product_images/DummyHandbag1.jpeg',
+      '/assets/images/product_images/DummyHandbag2.jpeg',
+      '/assets/images/product_images/DummyHandbag3.jpeg',
+      '/assets/images/product_images/DummyHandbag4.jpeg',
     ],
   },
 ];
