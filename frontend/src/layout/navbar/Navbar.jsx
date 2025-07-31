@@ -6,6 +6,9 @@ const Navbar = () => {
   const [showAccount, setShowAccount] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [mobileDropdown, setMobileDropdown] = useState({ products: false, about: false });
+  const [showLivingDropdown, setShowLivingDropdown] = useState(false);
+  const [showAboutDropdown, setShowAboutDropdown] = useState(false);
+
   const cartItemCount = 3;
 
   const toggleAccount = () => setShowAccount((prev) => !prev);
@@ -21,17 +24,19 @@ const Navbar = () => {
 
   return (
     <>
-      {/* Navbar */}
       <nav className={`fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif ${showAccount ? "blur-sm" : ""}`}>
+        {/* Top Bar */}
         <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
-          <div className="text-[1.5rem] sm:text-[1.8rem] font-bold text-[#6B4226] tracking-wide">𝐒𝐇𝐀𝐇𝐔 𝐌𝐔𝐌𝐁𝐀𝐈</div>
+          <div className="text-[1.5rem] sm:text-[1.8rem] font-bold text-[#6B4226] tracking-wide">
+            𝐒𝐇𝐀𝐇𝐔 𝐌𝐔𝐌𝐁𝐀𝐈
+          </div>
 
-          {/* Mobile menu icon */}
+          {/* Mobile Menu Icon */}
           <div className="lg:hidden text-[#6B4226] text-xl cursor-pointer" onClick={toggleMobileMenu}>
             {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
           </div>
 
-          {/* Desktop search & icons */}
+          {/* Desktop Icons */}
           <div className="hidden lg:flex flex-1 items-center justify-center gap-8">
             <input
               type="text"
@@ -54,21 +59,82 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Desktop Nav */}
-        <div className="hidden lg:flex justify-center gap-8 py-3 px-8 bg-[#f9f5f0] border-t border-[#e0d8d1]">
-          <a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Home</a>
-          <a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Products</a>
-          <a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Men</a>
-          <a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Women</a>
-          <a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">About SHAHU</a>
-        </div>
+        {/* Desktop Menu */}
+        <ul className="hidden lg:flex justify-center gap-8 py-3 px-8 bg-[#f9f5f0] border-t border-[#e0d8d1]">
+          <li><a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Home</a></li>
+
+          {/* Desktop Products Dropdown */}
+          <li
+            className="relative group"
+            onMouseEnter={() => setShowLivingDropdown(true)}
+            onMouseLeave={() => setShowLivingDropdown(false)}
+          >
+            <span className="hover:text-[#D4A5A5] text-[#6B4226] font-medium cursor-pointer">
+              Products
+            </span>
+            <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white p-6 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[360px] transition-all duration-300 transform ${
+              showLivingDropdown ? "opacity-100 translate-y-2 pointer-events-auto" : "opacity-0 translate-y-1 pointer-events-none"
+            }`}>
+              <div className="min-w-[160px]">
+                <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">OUR STORIES</h3>
+                <ul className="space-y-1">
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Our Products</a></li>
+                </ul>
+              </div>
+              <div className="min-w-[180px] mt-4">
+                <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">CATEGORIES</h3>
+                <ul className="space-y-1">
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Blankets and Pillows</a></li>
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Tableware</a></li>
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Furniture and Lighting</a></li>
+                </ul>
+              </div>
+            </div>
+          </li>
+
+          <li><a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Men</a></li>
+          <li><a href="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">Women</a></li>
+
+          {/* Desktop About Dropdown */}
+          <li
+            className="relative group"
+            onMouseEnter={() => setShowAboutDropdown(true)}
+            onMouseLeave={() => setShowAboutDropdown(false)}
+          >
+            <span className="hover:text-[#D4A5A5] text-[#6B4226] font-medium cursor-pointer">About SHAHU</span>
+            <div className={`absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white p-6 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[360px] transition-all duration-300 transform ${
+              showAboutDropdown ? "opacity-100 translate-y-2 pointer-events-auto" : "opacity-0 translate-y-1 pointer-events-none"
+            }`}>
+              <div className="min-w-[180px]">
+                <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">OUR PHILOSOPHY</h3>
+                <ul className="space-y-1">
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Our Philosophy</a></li>
+                </ul>
+              </div>
+              <div className="min-w-[180px] mt-4">
+                <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">LEGACY</h3>
+                <ul className="space-y-1">
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Founder's Story</a></li>
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Heritage Timeline</a></li>
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Our Studios</a></li>
+                </ul>
+              </div>
+              <div className="min-w-[180px] mt-4">
+                <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">CRAFT</h3>
+                <ul className="space-y-1">
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Contemporary artisans</a></li>
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Services</a></li>
+                  <li><a href="/" className="text-gray-700 hover:text-[#D4A5A5]">Contact us</a></li>
+                </ul>
+              </div>
+            </div>
+          </li>
+        </ul>
 
         {/* Mobile Side Menu */}
-        <div
-          className={`fixed top-0 left-0 h-full w-4/5 max-w-xs bg-white z-50 shadow-xl transform transition-transform duration-300 ${
-            isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
-          }`}
-        >
+        <div className={`fixed top-0 left-0 h-full w-4/5 max-w-xs bg-white z-50 shadow-xl transform transition-transform duration-300 ${
+          isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"
+        }`}>
           <div className="p-6">
             <input
               type="text"
@@ -78,7 +144,6 @@ const Navbar = () => {
             <ul className="space-y-4 text-[#6B4226] font-medium">
               <li><a href="/" onClick={toggleMobileMenu}>Home</a></li>
 
-              {/* Products Dropdown */}
               <li>
                 <button className="w-full flex justify-between items-center" onClick={() => toggleMobileDropdown('products')}>
                   Products <span>{mobileDropdown.products ? "▲" : "▼"}</span>
@@ -96,7 +161,6 @@ const Navbar = () => {
               <li><a href="/" onClick={toggleMobileMenu}>Men</a></li>
               <li><a href="/" onClick={toggleMobileMenu}>Women</a></li>
 
-              {/* About Dropdown */}
               <li>
                 <button className="w-full flex justify-between items-center" onClick={() => toggleMobileDropdown('about')}>
                   About SHAHU <span>{mobileDropdown.about ? "▲" : "▼"}</span>
@@ -130,7 +194,7 @@ const Navbar = () => {
           </div>
         </div>
 
-        {/* Backdrop */}
+        {/* Backdrop for Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-40 z-40" onClick={toggleMobileMenu}></div>
         )}
