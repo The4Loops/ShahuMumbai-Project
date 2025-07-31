@@ -3,6 +3,7 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
+require('./cron/autounlock')();
 
 const supabase = require('./config/supabaseClient');
 
