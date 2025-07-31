@@ -7,7 +7,7 @@ function Layout({ children }) {
     <div className="flex flex-col min-h-screen bg-white text-black font-serif">
       <Navbar />
 
-      <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto py-8">
+      <main className="flex-1 w-full px-4 sm:px-6 lg:px-8 max-w-7xl mt-32 mx-auto py-8">
         {children}
       </main>
 

@@ -1,7 +1,25 @@
 import React, { useState } from 'react';
 
+const TextInput = ({ type = 'text', name, placeholder, value, onChange, error, autoComplete }) => (
+  <>
+    <input
+      type={type}
+      name={name}
+      autoComplete={autoComplete}
+      placeholder={placeholder}
+      value={value}
+      onChange={onChange}
+      aria-invalid={!!error}
+      aria-describedby={`${name}-error`}
+      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
+    />
+    {error && <p id={`${name}-error`} className="text-sm text-red-500">{error}</p>}
+  </>
+);
+
 const AuthForm = () => {
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     fullName: '',
     email: '',
@@ -9,6 +27,11 @@ const AuthForm = () => {
     confirmPassword: '',
   });
   const [errors, setErrors] = useState({});
+
+  const resetForm = () => {
+    setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
+    setErrors({});
+  };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -37,11 +60,16 @@ const AuthForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
 
-    console.log('Form submitted', formData);
+    setIsSubmitting(true);
+
+    setTimeout(() => {
+      console.log('Form submitted', formData);
+      setIsSubmitting(false);
+    }, 1000);
   };
 
   return (
@@ -54,8 +82,7 @@ const AuthForm = () => {
           <button
             onClick={() => {
               setIsRegistering(!isRegistering);
-              setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
-              setErrors({});
+              resetForm();
             }}
             className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
           >
@@ -63,7 +90,10 @@ const AuthForm = () => {
           </button>
         </div>
 
-        <button className="flex items-center justify-center gap-2 bg-white border border-gray-300 py-2 text-sm font-medium rounded-md hover:bg-gray-100 transition-colors mb-4 w-full">
+        <button
+          type="button"
+          className="flex items-center justify-center gap-2 bg-white border border-gray-300 py-2 text-sm font-medium rounded-md hover:bg-gray-100 transition-colors mb-4 w-full"
+        >
           <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
           {isRegistering ? 'Sign up with Google' : 'Sign in with Google'}
         </button>
@@ -76,62 +106,56 @@ const AuthForm = () => {
 
         <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
           {isRegistering && (
-            <>
-              <input
-                type="text"
-                name="fullName"
-                autoComplete="name"
-                placeholder="Full Name"
-                value={formData.fullName}
-                onChange={handleChange}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
-              />
-              {errors.fullName && <p className="text-sm text-red-500">{errors.fullName}</p>}
-            </>
+            <TextInput
+              name="fullName"
+              placeholder="Full Name"
+              value={formData.fullName}
+              onChange={handleChange}
+              error={errors.fullName}
+              autoComplete="name"
+            />
           )}
-          <input
+
+          <TextInput
             type="email"
             name="email"
-            autoComplete="email"
             placeholder="Email"
             value={formData.email}
             onChange={handleChange}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
+            error={errors.email}
+            autoComplete="email"
           />
-          {errors.email && <p className="text-sm text-red-500">{errors.email}</p>}
 
-          <input
+          <TextInput
             type="password"
             name="password"
-            autoComplete={isRegistering ? "new-password" : "current-password"}
             placeholder="Password"
             value={formData.password}
             onChange={handleChange}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
+            error={errors.password}
+            autoComplete={isRegistering ? 'new-password' : 'current-password'}
           />
-          {errors.password && <p className="text-sm text-red-500">{errors.password}</p>}
 
           {isRegistering && (
-            <>
-              <input
-                type="password"
-                name="confirmPassword"
-                autoComplete="new-password"
-                placeholder="Confirm Password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
-              />
-              {errors.confirmPassword && (
-                <p className="text-sm text-red-500">{errors.confirmPassword}</p>
-              )}
-            </>
+            <TextInput
+              type="password"
+              name="confirmPassword"
+              placeholder="Confirm Password"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              error={errors.confirmPassword}
+              autoComplete="new-password"
+            />
           )}
+
           <button
             type="submit"
-            className="bg-gray-900 text-white font-semibold py-2 rounded-md hover:bg-gray-800 transition-colors"
+            disabled={isSubmitting}
+            className={`bg-gray-900 text-white font-semibold py-2 rounded-md transition-colors ${
+              isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-800'
+            }`}
           >
-            {isRegistering ? 'Register' : 'Login'}
+            {isSubmitting ? 'Submitting...' : isRegistering ? 'Register' : 'Login'}
           </button>
         </form>
 
