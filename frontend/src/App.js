@@ -7,6 +7,7 @@ import ProductDetails from './pages/ProductDetails'
 import React from 'react'
 import Cart from './pages/Cart';
 import About from './pages/About';
+import AdminPanel from './pages/AdminPanel';
 
 function App() {
   return (
@@ -19,6 +20,7 @@ function App() {
          <Route path="/cart" element={<Cart />} />
          <Route path="/about" element={<About />} />
         <Route path="/product/:id" element={<ProductDetails />} />
+        <Route path="/admin" element={<AdminPanel />} />
       </Routes>
     </div>
   );
