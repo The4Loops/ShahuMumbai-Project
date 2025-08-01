@@ -6,12 +6,9 @@ import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
-import ProductCard from '../components/ProductCard';
 import RelatedCard from '../components/RelatedCard';
 
-
-
-
+// Dummy Product Data
 const dummyData = [
   {
     id: '1',
@@ -22,63 +19,57 @@ const dummyData = [
     category: 'Accessories',
     color: 'Red',
     images: [
-      '/assets/images/product_images/dummyHandbag.jpeg',
-      '/assets/images/product_images/dummyHandbag1.jpeg',
-      '/assets/images/product_images/dummyHandbag2.jpeg',
-      '/assets/images/product_images/dummyHandbag3.jpeg',
-      '/assets/images/product_images/dummyHandbag4.jpeg',
+      '/assets/images/product_images/handbag1.jpeg',
+      '/assets/images/product_images/handbag2.jpeg',
+      '/assets/images/product_images/handbag3.jpeg',
+      '/assets/images/product_images/handbag4.jpeg',
+      '/assets/images/product_images/handbag5.jpeg',
     ],
   },
   {
     id: '2',
-    name: 'Vintage Bag',
-    price: 2499,
-    description: 'Handcrafted fabric bag with Indian flair.',
-    designer: 'Shahu Mumbai',
+    name: 'Classic Pouch',
+    price: 1499,
+    description: 'Minimalist yet elegant pouch.',
+    designer: 'Anaya Styles',
     category: 'Accessories',
-    color: 'Red',
+    color: 'Beige',
     images: [
-      '/assets/images/product_images/dummyHandbag.jpeg',
-      '/assets/images/product_images/dummyHandbag1.jpeg',
-      '/assets/images/product_images/dummyHandbag2.jpeg',
-      '/assets/images/product_images/dummyHandbag3.jpeg',
-      '/assets/images/product_images/dummyHandbag4.jpeg',
+      '/assets/images/product_images/pouch1.jpeg',
+      '/assets/images/product_images/pouch2.jpeg',
+      '/assets/images/product_images/pouch3.jpeg',
     ],
   },
   {
     id: '3',
-    name: 'Vintage Bag',
-    price: 2499,
-    description: 'Handcrafted fabric bag with Indian flair.',
-    designer: 'Shahu Mumbai',
+    name: 'Ethnic Clutch',
+    price: 1799,
+    description: 'Richly designed clutch perfect for festive wear.',
+    designer: 'Niva Arts',
     category: 'Accessories',
-    color: 'Red',
+    color: 'Gold',
     images: [
-      '/assets/images/product_images/DummyHandbag.jpeg',
-      '/assets/images/product_images/DummyHandbag1.jpeg',
-      '/assets/images/product_images/DummyHandbag2.jpeg',
-      '/assets/images/product_images/DummyHandbag3.jpeg',
-      '/assets/images/product_images/DummyHandbag4.jpeg',
+      '/assets/images/product_images/clutch1.jpeg',
+      '/assets/images/product_images/clutch2.jpeg',
     ],
   },
   {
     id: '4',
-    name: 'Vintage Bag',
-    price: 2499,
-    description: 'Handcrafted fabric bag with Indian flair.',
-    designer: 'Shahu Mumbai',
+    name: 'Modern Tote',
+    price: 2999,
+    description: 'Large and trendy tote bag for everyday use.',
+    designer: 'UrbanWeave',
     category: 'Accessories',
-    color: 'Red',
+    color: 'Black',
     images: [
-      '/assets/images/product_images/DummyHandbag.jpeg',
-      '/assets/images/product_images/DummyHandbag1.jpeg',
-      '/assets/images/product_images/DummyHandbag2.jpeg',
-      '/assets/images/product_images/DummyHandbag3.jpeg',
-      '/assets/images/product_images/DummyHandbag4.jpeg',
+      '/assets/images/product_images/tote1.jpeg',
+      '/assets/images/product_images/tote2.jpeg',
+      '/assets/images/product_images/tote3.jpeg',
     ],
   },
 ];
 
+// Carousel Arrows
 const NextArrow = ({ onClick }) => (
   <div className="absolute right-4 top-1/2 transform -translate-y-1/2 cursor-pointer z-10" onClick={onClick}>
     <FaChevronRight size={24} className="text-[#6B4226]" />
@@ -121,14 +112,14 @@ const ProductDetails = () => {
     <Layout>
       <div className="min-h-screen px-6 py-16 pt-[130px] bg-[#f9f5f0] font-serif">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
-          {/* Image Carousel */}
+          {/* Product Image Carousel */}
           <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-2 pb-8">
             <Slider {...sliderSettings} ref={sliderRef}>
               {product.images.map((img, index) => (
                 <div key={index} className="px-2">
                   <img
                     src={process.env.PUBLIC_URL + img}
-                    alt={`${product.name} ${index + 1}`}
+                    alt={`${product.name} view ${index + 1}`}
                     className="h-[400px] w-full object-cover rounded-md border border-[#D4A5A5] shadow-sm"
                     onError={(e) => {
                       e.target.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
@@ -147,13 +138,12 @@ const ProductDetails = () => {
                 >
                   <img
                     src={process.env.PUBLIC_URL + img}
-                    alt={`Thumbnail ${index + 1}`}
+                    alt={`${product.name} thumbnail ${index + 1}`}
                     className="w-20 h-20 object-cover rounded-md"
                   />
                 </button>
               ))}
             </div>
-
           </div>
 
           {/* Product Info */}
@@ -178,30 +168,30 @@ const ProductDetails = () => {
               </button>
             </div>
           </div>
-          </div>
-          {/* Related Products Section */}
-          <div className="mt-20 px-4 max-w-[1440px] mx-auto font-serif">
-            <h2 className="text-2xl font-bold text-[#6B4226] mb-8 text-center">You May Also Like</h2>
+        </div>
 
-            <div className="flex flex-wrap justify-center gap-12">
-              {dummyData
-                .filter((p) => p.id !== id)
-                .slice(0, 4)
-                .map((related, index) => (
-                  <div key={index} className="w-[270px]">
-                    <RelatedCard
-                      product={{
-                        id: related.id,
-                        name: related.name,
-                        price: related.price,
-                        image: related.images?.[0] || related.image,
-                        category: related.category,
-                      }}
-                    />
-                  </div>
-                ))}
-            </div>
+        {/* Related Products */}
+        <div className="mt-20 px-4 max-w-[1440px] mx-auto font-serif">
+          <h2 className="text-2xl font-bold text-[#6B4226] mb-8 text-center">You May Also Like</h2>
+          <div className="flex flex-wrap justify-center gap-12">
+            {dummyData
+              .filter((p) => p.id !== id)
+              .slice(0, 4)
+              .map((related, index) => (
+                <div key={index} className="w-[270px]">
+                  <RelatedCard
+                    product={{
+                      id: related.id,
+                      name: related.name,
+                      price: related.price,
+                      image: related.images?.[0] || '/assets/images/placeholder.png',
+                      category: related.category,
+                    }}
+                  />
+                </div>
+              ))}
           </div>
+        </div>
       </div>
     </Layout>
   );

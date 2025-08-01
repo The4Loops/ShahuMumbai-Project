@@ -6,6 +6,7 @@ import Products from './pages/Products';
 import ProductDetails from './pages/ProductDetails'
 import React from 'react'
 import Cart from './pages/Cart';
+import About from './pages/About';
 
 function App() {
   return (
@@ -16,6 +17,7 @@ function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/products" element={<Products />} />
          <Route path="/cart" element={<Cart />} />
+         <Route path="/about" element={<About />} />
         <Route path="/product/:id" element={<ProductDetails />} />
       </Routes>
     </div>

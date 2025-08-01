@@ -21,11 +21,11 @@ const PRODUCTS = [
 ];
 
 const ABOUT = [
-  { section: "Our Philosophy", items: [{ label: "Our Philosophy", href: "/" }] },
+  { section: "About Us", items: [{ label: "Our Story", href: "/about" }] },
   {
     section: "Legacy",
     items: [
-      { label: "Founder's Story", href: "/" },
+      { label: "Our Philosophy", href: "/" },
       { label: "Heritage Timeline", href: "/" },
       { label: "Our Studios", href: "/" },
     ],
