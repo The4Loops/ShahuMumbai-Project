@@ -109,10 +109,7 @@ exports.login = async (req, res) => {
       .from("users")
       .select("*")
       .eq("email", email)
-      .single();
-
-    if (error || !user)
-      return res.status(400).json({ error: "Invalid email or password" });
+      .maybeSingle();
 
     // Step 2: Check if user is locked
     if (user.userlocked === "Y") {
@@ -127,10 +124,10 @@ exports.login = async (req, res) => {
 
     if (!isPasswordValid) {
       // Increment invalid attempts
-      const newAttemptCount = (user.InvalidAttempt || 0) + 1;
+      const newAttemptCount = (user.invalidattempt || 0) + 1;
 
       const updates = {
-        InvalidAttempt: newAttemptCount,
+        invalidattempt: newAttemptCount,
       };
 
       // If attempts > 3 → lock the account
@@ -145,11 +142,18 @@ exports.login = async (req, res) => {
           "Account Locked Due to Multiple Failed Logins",
           `<p>Dear ${user.full_name},</p>
      <p>Your account has been locked after multiple failed login attempts.</p>
-     <p>Please contact the administrator to unlock your account.</p>`
+     <p>And it will be locked out after 5 min.</p>`
         );
       }
 
-      await supabase.from("Users").update(updates).eq("id", user.id);
+      const { error: updateError } = await supabase
+        .from("users")
+        .update(updates)
+        .eq("id", user.id);
+
+         if (updateError) {
+        console.error("Failed to update invalid attempts:", updateError.message);
+      }
 
       return res.status(401).json({
         error:
@@ -160,10 +164,14 @@ exports.login = async (req, res) => {
     }
 
     // Step 4: Reset InvalidAttempt count on successful login
-    await supabase
+     const { error: resetError } = await supabase
       .from("users")
-      .update({ InvalidAttempt: 0 })
+      .update({ invalidattempt: 0 })
       .eq("id", user.id);
+
+      if (resetError) {
+      console.error("Failed to reset invalid attempts:", resetError.message);
+    }
 
     // Step 5: Generate JWT
     const token = jwt.sign(

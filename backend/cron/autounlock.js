@@ -1,13 +1,13 @@
 const cron = require('node-cron');
 const supabase = require('../config/supabaseClient');
 
-const unlockAfterHours = 2;
+const unlockAfterMinutes = 5;
 
 const autoUnlockUsers = async () => {
-  const threshold = new Date(Date.now() - unlockAfterHours * 60 * 60 * 1000).toISOString();
+  const threshold = new Date(Date.now() - unlockAfterMinutes * 60 * 1000).toISOString();
 
   const { data: lockedUsers, error } = await supabase
-    .from('Users')
+    .from('users')
     .select('*')
     .eq('userlocked', 'Y')
     .lte('lockeddate', threshold);
@@ -19,7 +19,7 @@ const autoUnlockUsers = async () => {
 
   for (const user of lockedUsers) {
     const { error: updateErr } = await supabase
-      .from('Users')
+      .from('users')
       .update({
         userlocked: 'N',
         lockeddate: null,
@@ -36,6 +36,6 @@ const autoUnlockUsers = async () => {
 };
 
 module.exports = () => {
-  // Runs every 10 minutes
-  cron.schedule('*/10 * * * *', autoUnlockUsers);
+  // Runs every 1 minute
+  cron.schedule('* * * * *', autoUnlockUsers);
 };
