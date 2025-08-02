@@ -17,36 +17,40 @@ const AdminPanel = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen pt-[120px] bg-[#f9f5f0] px-6 py-12 font-serif">
+      <div className="min-h-screen bg-[#f9f5f0] px-6 py-12 font-serif">
         <div className="max-w-6xl mx-auto">
           <h1 className="text-4xl font-bold text-[#6B4226] mb-10 text-center">Admin Panel</h1>
 
-          {/* Tabs */}
-          <div className="flex justify-center gap-6 mb-8">
-            {TABS.map((tab) => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-5 py-2 rounded-md font-semibold transition shadow ${
-                  activeTab === tab
-                    ? 'bg-[#D4A5A5] text-white'
-                    : 'bg-white border border-[#D4A5A5] text-[#6B4226]'
-                }`}
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+          <div className="flex gap-8">
+            {/* Side Menu */}
+            <div className="w-64 bg-white p-6 rounded-lg shadow border border-[#D4A5A5]">
+              <div className="flex flex-col gap-4">
+                {TABS.map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`text-left px-4 py-2 rounded-md font-medium transition ${
+                      activeTab === tab
+                        ? 'bg-[#D4A5A5] text-white shadow'
+                        : 'text-[#6B4226] hover:bg-[#f3dede]'
+                    }`}
+                  >
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          {/* Tab Content */}
-          <div className="bg-white p-8 rounded-lg shadow-md border border-[#D4A5A5]">
-            {activeTab === 'Add Product' && <AddProduct />}
-            {activeTab === 'Sales Report' && <SalesReport />}
-            {activeTab === 'Add Admin' && <AddAdmin />}
-            {activeTab === 'Inventory Tracker' && <InventoryTracker />}
-            {activeTab === 'Banner Manager' && <BannerManager />}
-            {activeTab === 'Order Dashboard' && <OrderDashboard />}
-            {activeTab === 'Analytics' && <Analytics />}
+            {/* Tab Content */}
+            <div className="flex-1 bg-white p-8 rounded-lg shadow-md border border-[#D4A5A5]">
+              {activeTab === 'Add Product' && <AddProduct />}
+              {activeTab === 'Sales Report' && <SalesReport />}
+              {activeTab === 'Add Admin' && <AddAdmin />}
+              {activeTab === 'Inventory Tracker' && <InventoryTracker />}
+              {activeTab === 'Banner Manager' && <BannerManager />}
+              {activeTab === 'Order Dashboard' && <OrderDashboard />}
+              {activeTab === 'Analytics' && <Analytics />}
+            </div>
           </div>
         </div>
       </div>
