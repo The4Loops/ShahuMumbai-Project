@@ -11,6 +11,9 @@ import AdminPanel from "./admin/AdminPanel";
 import Callback from "./supabase/Callback";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import ContactUs from './pages/ContactUs';
+import ServicePage from "./pages/Service";
+
 
 function App() {
   return (
@@ -31,6 +34,8 @@ function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />
+        <Route path="/Service" element={<ServicePage />} />
+        <Route path="/contactus" element={<ContactUs />} />
         <Route path="/auth/callback" element={<Callback />} />
         <Route path="/about" element={<About />} />
         <Route path="/product/:id" element={<ProductDetails />} />
