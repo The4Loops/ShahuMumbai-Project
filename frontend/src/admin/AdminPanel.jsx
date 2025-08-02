@@ -89,19 +89,19 @@ const SalesReport = () => {
     {
       id: 1,
       name: 'Modern Tote',
-      image: '/assets/images/product_images/tote1.jpeg',
+      image: require('../assets/images/product_images/dummyShirt.jpg'),
       sales: 54,
     },
     {
       id: 2,
       name: 'Vintage Bag',
-      image: '/assets/images/product_images/handbag1.jpeg',
+      image: require('../assets/images/product_images/dummyPants.jpg'),
       sales: 39,
     },
     {
       id: 3,
       name: 'Ethnic Clutch',
-      image: '/assets/images/product_images/clutch1.jpeg',
+      image: require('../assets/images/product_images/DummyHandbag.jpeg'),
       sales: 29,
     },
   ];
