@@ -13,6 +13,10 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import ContactUs from './pages/ContactUs';
 import ServicePage from "./pages/Service";
+import OurPhilosophy from "./pages/OurPhilosophy";
+import HeritageTimeline from "./pages/HeritageTimeline";
+import OurStudios from "./pages/OurStudios";
+import ContemporaryArtisans from "./pages/ContemporaryArtisans";
 
 
 function App() {
@@ -36,6 +40,10 @@ function App() {
         <Route path="/cart" element={<Cart />} />
         <Route path="/Service" element={<ServicePage />} />
         <Route path="/contactus" element={<ContactUs />} />
+        <Route path="/ourphilosophy" element={<OurPhilosophy />} />
+        <Route path="/heritagetimeline" element={<HeritageTimeline />} />
+        <Route path="/ourstudios" element={<OurStudios />} />
+        <Route path="/contemporaryartisans" element={<ContemporaryArtisans />} />
         <Route path="/auth/callback" element={<Callback />} />
         <Route path="/about" element={<About />} />
         <Route path="/product/:id" element={<ProductDetails />} />

@@ -25,15 +25,15 @@ const ABOUT = [
   {
     section: "Legacy",
     items: [
-      { label: "Our Philosophy", href: "/" },
-      { label: "Heritage Timeline", href: "/" },
-      { label: "Our Studios", href: "/" },
+      { label: "Our Philosophy", href: "/ourphilosophy" },
+      { label: "Heritage Timeline", href: "/heritagetimeline" },
+      { label: "Our Studios", href: '/ourstudios' },
     ],
   },
   {
     section: "Craft",
     items: [
-      { label: "Contemporary artisans", href: "/" },
+      { label: "Contemporary artisans", href: "/contemporaryartisans" },
       { label: "Services", href: "/service" },
       { label: "Contact us", href: "/contactus" },
     ],
