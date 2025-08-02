@@ -6,19 +6,19 @@ import Layout from '../layout/Layout';
 const dummyData = [
   {
     id: 1,
-    name: 'Product 1',
+    name: 'Bandhani Shirt',
     category: 'Men',
     price: 1200,
     description: 'Rustic shirt',
-    image: require('../assets/images/product_images/DummyShirt.jpg'),
+    image: require('../assets/images/product_images/dummyShirt.jpg'),
   },
   {
     id: 2,
-    name: 'Product 2',
+    name: 'Ethnic Trousers',
     category: 'Women',
     price: 2400,
     description: 'Blue pants',
-    image: require('../assets/images/product_images/DummyPants.jpg'),
+    image: require('../assets/images/product_images/dummyPants.jpg'),
   },
   {
     id: 3,
@@ -34,7 +34,7 @@ const dummyData = [
     category: 'Women',
     price: 1350,
     description: 'Brown shoes',
-    image: require('../assets/images/product_images/DummyShoes.jpg'),
+    image: require('../assets/images/product_images/dummyShoes.jpg'),
   },
 ];
 
