@@ -12,7 +12,10 @@ const app = express();
 
 // Middleware
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+   origin:process.env.REACT_APP_API_BASE_URL,
+  credentials: true    
+}));
 app.use(express.json());
 
 app.use(helmet.contentSecurityPolicy({
@@ -22,9 +25,8 @@ app.use(helmet.contentSecurityPolicy({
     styleSrc: ["'self'", "https://fonts.googleapis.com"],
     fontSrc: ["https://fonts.gstatic.com"],
     imgSrc: ["'self'", "data:"],
-    connectSrc: ["'self'"],
-    objectSrc: ["'none'"],
-    frameAncestors: ["'none'"]
+    connectSrc: ["'self'",process.env.REACT_Server_API_BASE_URL],
+    objectSrc: ["'none'"]
   }
 }));
 app.disable('x-powered-by');

@@ -1,6 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState } from "react";
+import api from "../supabase/axios";
 
-const TextInput = ({ type = 'text', name, placeholder, value, onChange, error, autoComplete }) => (
+const TextInput = ({
+  type = "text",
+  name,
+  placeholder,
+  value,
+  onChange,
+  error,
+  autoComplete,
+}) => (
   <>
     <input
       type={type}
@@ -13,7 +22,11 @@ const TextInput = ({ type = 'text', name, placeholder, value, onChange, error, a
       aria-describedby={`${name}-error`}
       className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
     />
-    {error && <p id={`${name}-error`} className="text-sm text-red-500">{error}</p>}
+    {error && (
+      <p id={`${name}-error`} className="text-sm text-red-500">
+        {error}
+      </p>
+    )}
   </>
 );
 
@@ -21,40 +34,42 @@ const AuthForm = () => {
   const [isRegistering, setIsRegistering] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
-    fullName: '',
-    email: '',
-    password: '',
-    confirmPassword: '',
+    fullName: "",
+    email: "",
+    password: "",
+    confirmPassword: "",
   });
   const [errors, setErrors] = useState({});
+  const [otpSent, setOtpSent] = useState(false);
+  const [otp, setOtp] = useState("");
 
   const resetForm = () => {
-    setFormData({ fullName: '', email: '', password: '', confirmPassword: '' });
+    setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
     setErrors({});
   };
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setErrors({ ...errors, [e.target.name]: '' });
+    setErrors({ ...errors, [e.target.name]: "" });
   };
 
   const validate = () => {
     const newErrors = {};
     if (isRegistering && !formData.fullName.trim()) {
-      newErrors.fullName = 'Full name is required';
+      newErrors.fullName = "Full name is required";
     }
     if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors.email = "Email is required";
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Email is invalid';
+      newErrors.email = "Email is invalid";
     }
     if (!formData.password) {
-      newErrors.password = 'Password is required';
+      newErrors.password = "Password is required";
     } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
+      newErrors.password = "Password must be at least 6 characters";
     }
     if (isRegistering && formData.password !== formData.confirmPassword) {
-      newErrors.confirmPassword = 'Passwords do not match';
+      newErrors.confirmPassword = "Passwords do not match";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -66,10 +81,52 @@ const AuthForm = () => {
 
     setIsSubmitting(true);
 
-    setTimeout(() => {
-      console.log('Form submitted', formData);
+    try {
+      if (isRegistering) {
+        if (!otpSent) {
+          // Step 1: Send OTP
+          await api.post(`/api/auth/register/send-otp`, {
+            email: formData.email,
+            full_name: formData.fullName,
+            password: formData.password,
+          });
+          setOtpSent(true);
+          alert("OTP sent to your email.");
+        } else {
+          // Step 2: Verify OTP and Register
+          await api.post(`/api/auth/verify-otp-register`, {
+            email: formData.email,
+            full_name: formData.fullName,
+            password: formData.password,
+            otp: otp,
+          });
+          alert("Registration successful. You can now login.");
+          setIsRegistering(false);
+          resetForm();
+          setOtpSent(false);
+          setOtp("");
+        }
+      } else {
+        // Login Flow
+        const res = await api.post(`/api/auth/login`, {
+          email: formData.email,
+          password: formData.password,
+        });
+        localStorage.setItem("token", res.data.token);
+        alert("Login successful!");
+        // Navigate to home/dashboard
+      }
+    } catch (error) {
+      alert(error.response?.data?.error || "An error occurred.");
+    } finally {
       setIsSubmitting(false);
-    }, 1000);
+    }
+  };
+
+  const handleGoogleSSO = () => {
+    // Redirect user to Supabase SSO Google URL
+    window.location.href =
+      "https://tnmbwlmyankpmkasqbjd.supabase.co/auth/v1/authorize?provider=google";
   };
 
   return (
@@ -77,25 +134,28 @@ const AuthForm = () => {
       <div className="bg-white p-6 sm:p-8 rounded-lg w-full max-w-sm shadow-md">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-            {isRegistering ? 'Register' : 'Sign In'}
+            {isRegistering ? "Register" : "Sign In"}
           </h2>
           <button
             onClick={() => {
               setIsRegistering(!isRegistering);
               resetForm();
+              setOtpSent(false);
+              setOtp('');
             }}
             className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
           >
-            {isRegistering ? 'Have an account? Sign In' : 'Create Account'}
+            {isRegistering ? "Have an account? Sign In" : "Create Account"}
           </button>
         </div>
 
         <button
           type="button"
+          onClick={handleGoogleSSO}
           className="flex items-center justify-center gap-2 bg-white border border-gray-300 py-2 text-sm font-medium rounded-md hover:bg-gray-100 transition-colors mb-4 w-full"
         >
           <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
-          {isRegistering ? 'Sign up with Google' : 'Sign in with Google'}
+          {isRegistering ? "Sign up with Google" : "Sign in with Google"}
         </button>
 
         <div className="relative text-center my-3 text-sm text-gray-500">
@@ -133,7 +193,7 @@ const AuthForm = () => {
             value={formData.password}
             onChange={handleChange}
             error={errors.password}
-            autoComplete={isRegistering ? 'new-password' : 'current-password'}
+            autoComplete={isRegistering ? "new-password" : "current-password"}
           />
 
           {isRegistering && (
@@ -148,14 +208,26 @@ const AuthForm = () => {
             />
           )}
 
+          {isRegistering && otpSent && (
+            <TextInput
+              name="otp"
+              placeholder="Enter OTP"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value)}
+              error={otp ? '' : 'OTP is required'}
+            />
+          )}
+
           <button
             type="submit"
             disabled={isSubmitting}
             className={`bg-gray-900 text-white font-semibold py-2 rounded-md transition-colors ${
-              isSubmitting ? 'opacity-60 cursor-not-allowed' : 'hover:bg-gray-800'
+              isSubmitting
+                ? "opacity-60 cursor-not-allowed"
+                : "hover:bg-gray-800"
             }`}
           >
-            {isSubmitting ? 'Submitting...' : isRegistering ? 'Register' : 'Login'}
+             {isSubmitting ? 'Submitting...' : isRegistering ? (otpSent ? 'Verify OTP' : 'Send OTP') : 'Login'}
           </button>
         </form>
 

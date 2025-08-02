@@ -10,7 +10,7 @@ const dummyData = [
     category: 'Men',
     price: 1200,
     description: 'Rustic shirt',
-    image: require('../assets/images/product_images/dummyShirt.jpg'),
+    image: require('../assets/images/product_images/DummyShirt.jpg'),
   },
   {
     id: 2,
@@ -18,7 +18,7 @@ const dummyData = [
     category: 'Women',
     price: 2400,
     description: 'Blue pants',
-    image: require('../assets/images/product_images/dummyPants.jpg'),
+    image: require('../assets/images/product_images/DummyPants.jpg'),
   },
   {
     id: 3,
@@ -34,7 +34,7 @@ const dummyData = [
     category: 'Women',
     price: 1350,
     description: 'Brown shoes',
-    image: require('../assets/images/product_images/dummyShoes.jpg'),
+    image: require('../assets/images/product_images/DummyShoes.jpg'),
   },
 ];
 
