@@ -5,8 +5,9 @@ const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 require('./cron/autounlock')();
 const authRoutes = require('./routes/authRoutes');
+const productRoutes = require('./routes/productRoutes');
+const categoryRoutes = require('./routes/categoryRoutes');
 
-const supabase = require('./config/supabaseClient');
 
 const app = express();
 
@@ -33,6 +34,8 @@ app.disable('x-powered-by');
 
 // Routes
 app.use('/api/auth',authRoutes);
+app.use('/api',productRoutes);
+app.use('/api',categoryRoutes)
 
 // Rate Limiting
 const limiter = rateLimit({
