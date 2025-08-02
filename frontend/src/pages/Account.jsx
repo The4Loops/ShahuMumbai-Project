@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import api from "../supabase/axios";
+import supabase from '../supabase/SupaBase';
 
 const TextInput = ({
   type = "text",
@@ -94,7 +95,7 @@ const AuthForm = () => {
           alert("OTP sent to your email.");
         } else {
           // Step 2: Verify OTP and Register
-          await api.post(`/api/auth/verify-otp-register`, {
+          await api.post(`/api/auth/register/verify`, {
             email: formData.email,
             full_name: formData.fullName,
             password: formData.password,
@@ -123,10 +124,15 @@ const AuthForm = () => {
     }
   };
 
-  const handleGoogleSSO = () => {
-    // Redirect user to Supabase SSO Google URL
-    window.location.href =
-      "https://tnmbwlmyankpmkasqbjd.supabase.co/auth/v1/authorize?provider=google";
+  const handleGoogleSSO = async() => {
+   const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${process.env.REACT_APP_API_BASE_URL}/auth/callback`
+    }
+  });
+
+  if (error) console.error('SSO login failed:', error.message);
   };
 
   return (

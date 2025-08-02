@@ -8,6 +8,7 @@ import React from 'react'
 import Cart from './pages/Cart';
 import About from './pages/About';
 import AdminPanel from './admin/AdminPanel';
+import Callback from './supabase/Callback'; 
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/products" element={<Products />} />
          <Route path="/cart" element={<Cart />} />
+         <Route path="/auth/callback" element={<Callback />} />
          <Route path="/about" element={<About />} />
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/admin" element={<AdminPanel />} />

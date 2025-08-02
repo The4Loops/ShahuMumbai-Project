@@ -4,11 +4,11 @@ const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 require('dotenv').config();
 require('./cron/autounlock')();
+const authRoutes = require('./routes/authRoutes');
 
 const supabase = require('./config/supabaseClient');
 
 const app = express();
-
 
 // Middleware
 app.use(helmet());
@@ -32,7 +32,7 @@ app.use(helmet.contentSecurityPolicy({
 app.disable('x-powered-by');
 
 // Routes
-app.use('/api/auth', require('./routes/authRoutes'));
+app.use('/api/auth',authRoutes);
 
 // Rate Limiting
 const limiter = rateLimit({

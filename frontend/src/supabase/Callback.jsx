@@ -1,33 +1,43 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import supabase from './supabaseClient';
+import axios from 'axios';
+import supabase from './SupaBase';
 
 const Callback = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchSession = async () => {
-      const { data, error } = await supabase.auth.getSession();
-      if (error || !data.session) {
-        console.error('Session error:', error?.message);
-        return;
-      }
+      try {
+        const { data, error } = await supabase.auth.getSession();
 
-      const token = data.session.access_token;
-
-      const res = await fetch('http://localhost:5000/api/auth/sso-login', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
+        if (error || !data.session) {
+          console.error('Session error:', error?.message);
+          return;
         }
-      });
 
-      const result = await res.json();
-      if (result.token) {
-        localStorage.setItem('token', result.token); // Store backend JWT
-        navigate('/home');
-      } else {
-        console.error('SSO failed:', result.error);
+        const token = data.session.access_token;
+
+        // Axios POST Request to backend SSO login API
+        const res = await axios.post(
+          '/api/auth/ssoLogin',
+          {},
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            },
+            withCredentials: true // If needed for cookies
+          }
+        );
+
+        if (res.data?.token) {
+          localStorage.setItem('token', res.data.token); // Store backend JWT
+          navigate('/home');
+        } else {
+          console.error('SSO failed:', res.data?.error || 'Unknown error');
+        }
+      } catch (err) {
+        console.error('SSO Login Error:', err.message);
       }
     };
 

@@ -20,9 +20,22 @@ exports.sendOtp = async (req, res) => {
       return res.status(400).json({ error: "Email already registered" });
     }
 
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res
+        .status(500)
+        .json({ error: "Email credentials not configured" });
+    }
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    await supabase.from("ShortMessage").insert([{ email, otp }]);
+    const { error } = await supabase
+      .from("shortmessage")
+      .insert([{ email, otp }]);
+
+    if (error) {
+      console.error("Insert OTP Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
 
     // Send OTP via email
     const transporter = nodemailer.createTransport({
@@ -52,7 +65,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     const { full_name, email, password, otp, ssologin = "N" } = req.body;
 
     const { data: otpRecord } = await supabase
-      .from("ShortMessage")
+      .from("shortmessage")
       .select("*")
       .eq("email", email)
       .order("created_at", { ascending: false })
@@ -65,7 +78,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
-    const { error } = await supabase.from("Users").insert([
+    const { error } = await supabase.from("users").insert([
       {
         full_name,
         email,
@@ -78,7 +91,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     if (error) return res.status(400).json({ error: error.message });
 
     // Clean up OTP
-    await supabase.from("ShortMessage").delete().eq("email", email);
+    await supabase.from("shortmessage").delete().eq("email", email);
 
     res.status(201).json({ message: "User registered successfully" });
   } catch (err) {
@@ -93,7 +106,7 @@ exports.login = async (req, res) => {
 
     // Step 1: Fetch user by email
     const { data: user, error } = await supabase
-      .from("Users")
+      .from("users")
       .select("*")
       .eq("email", email)
       .single();
@@ -148,7 +161,7 @@ exports.login = async (req, res) => {
 
     // Step 4: Reset InvalidAttempt count on successful login
     await supabase
-      .from("Users")
+      .from("users")
       .update({ InvalidAttempt: 0 })
       .eq("id", user.id);
 
