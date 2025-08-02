@@ -34,8 +34,8 @@ const ABOUT = [
     section: "Craft",
     items: [
       { label: "Contemporary artisans", href: "/" },
-      { label: "Services", href: "/" },
-      { label: "Contact us", href: "/" },
+      { label: "Services", href: "/service" },
+      { label: "Contact us", href: "/contactus" },
     ],
   },
 ];
@@ -145,7 +145,7 @@ const Navbar = () => {
   return (
     <>
       <nav className={clsx(
-        "fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif",
+        "fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md justify-evenly font-serif",
         { "blur-sm": showAccount }
       )}>
         <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
