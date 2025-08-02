@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import api from "../supabase/axios";
-import supabase from '../supabase/SupaBase';
+import supabase from "../supabase/SupaBase";
+import { toast } from "react-toastify";
+import {jwtDecode} from "jwt-decode";
+import { useNavigate } from "react-router-dom";
 
 const TextInput = ({
   type = "text",
@@ -43,6 +46,7 @@ const AuthForm = () => {
   const [errors, setErrors] = useState({});
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
+  const navigate = useNavigate();
 
   const resetForm = () => {
     setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
@@ -92,7 +96,8 @@ const AuthForm = () => {
             password: formData.password,
           });
           setOtpSent(true);
-          alert("OTP sent to your email.");
+          toast.dismiss();
+          toast.success("OTP sent to your email.");
         } else {
           // Step 2: Verify OTP and Register
           await api.post(`/api/auth/register/verify`, {
@@ -101,7 +106,8 @@ const AuthForm = () => {
             password: formData.password,
             otp: otp,
           });
-          alert("Registration successful. You can now login.");
+          toast.dismiss();
+          toast.success("Registration successful. You can now login.");
           setIsRegistering(false);
           resetForm();
           setOtpSent(false);
@@ -113,26 +119,46 @@ const AuthForm = () => {
           email: formData.email,
           password: formData.password,
         });
-        localStorage.setItem("token", res.data.token);
-        alert("Login successful!");
-        // Navigate to home/dashboard
+        const token = res.data.token;
+        localStorage.setItem("token", token);
+
+        // Decode token to get role
+        const decoded = jwtDecode(token);
+        console.log("Decoded JWT:", decoded);
+        const userRole = decoded.role; // Assuming 'role' is in JWT payload
+
+        toast.dismiss();
+        toast.success("Login successful!");
+
+        // Redirect based on role
+        if (userRole === "admin") {
+          navigate("/admin");
+        } else if (userRole === "user") {
+          navigate("/home");
+        } else {
+          toast.error("Invalid role, contact admin.");
+        }
       }
     } catch (error) {
-      alert(error.response?.data?.error || "An error occurred.");
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "An error occurred.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleGoogleSSO = async() => {
-   const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: `${process.env.REACT_APP_API_BASE_URL}/auth/callback`
-    }
-  });
+  const handleGoogleSSO = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${process.env.REACT_APP_API_BASE_URL}/auth/callback`,
+      },
+    });
 
-  if (error) console.error('SSO login failed:', error.message);
+    if (error) {
+      toast.dismiss();
+      toast.error("SSO login failed:", error.message);
+    }
   };
 
   return (
@@ -147,7 +173,7 @@ const AuthForm = () => {
               setIsRegistering(!isRegistering);
               resetForm();
               setOtpSent(false);
-              setOtp('');
+              setOtp("");
             }}
             className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
           >
@@ -220,7 +246,7 @@ const AuthForm = () => {
               placeholder="Enter OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              error={otp ? '' : 'OTP is required'}
+              error={otp ? "" : "OTP is required"}
             />
           )}
 
@@ -233,7 +259,13 @@ const AuthForm = () => {
                 : "hover:bg-gray-800"
             }`}
           >
-             {isSubmitting ? 'Submitting...' : isRegistering ? (otpSent ? 'Verify OTP' : 'Send OTP') : 'Login'}
+            {isSubmitting
+              ? "Submitting..."
+              : isRegistering
+              ? otpSent
+                ? "Verify OTP"
+                : "Send OTP"
+              : "Login"}
           </button>
         </form>
 

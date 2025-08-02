@@ -195,37 +195,56 @@ exports.ssoLogin = async (req, res) => {
       data: { user },
       error,
     } = await supabase.auth.getUser(token);
+
     if (error || !user)
       return res.status(401).json({ error: "Invalid Supabase token" });
 
     // Check if user exists in your DB
-    const { data: existingUser } = await supabase
+    const { data: existingUser, error: userFetchError } = await supabase
       .from("users")
       .select("*")
       .eq("email", user.email)
-      .single();
+      .maybeSingle();
 
-    if (!existingUser) {
-      await supabase.from("users").insert([
-        {
-          full_name: user.user_metadata.full_name || user.email,
-          email: user.email,
-          password: "",
-          role: "user",
-          ssologin: "Y",
-        },
-      ]);
+    if (userFetchError) {
+      return res.status(500).json({ error: userFetchError.message });
     }
 
-    // Create your app JWT
+    let userRole = 'user'; 
+
+    if (!existingUser) {
+      // New User -> Create with ssologin = Y
+      const { error: insertError } = await supabase.from("users").insert([{
+        full_name: user.user_metadata.full_name || user.email,
+        email: user.email,
+        password: "",
+        role: "user",
+        ssologin: "Y",
+      }]);
+
+      if (insertError) {
+        return res.status(500).json({ error: insertError.message });
+      }
+
+      userRole = 'user';
+
+    } else {
+      if (existingUser.ssologin !== 'Y') {
+        return res.status(403).json({ error: "SSO login is not allowed for this user." });
+      }
+
+       userRole = existingUser.role; 
+    }
+
     const appToken = jwt.sign(
-      { id: user.id, email: user.email, role: "user" },
+      { id: user.id, email: user.email, role: userRole  },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );
 
-    res.json({ token: appToken });
+    return res.status(200).json({ token: appToken });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 };
+
