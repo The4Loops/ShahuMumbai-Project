@@ -7,7 +7,7 @@ import ProductDetails from './pages/ProductDetails'
 import React from 'react'
 import Cart from './pages/Cart';
 import About from './pages/About';
-import AdminPanel from './pages/AdminPanel';
+import AdminPanel from './admin/AdminPanel';
 
 function App() {
   return (
