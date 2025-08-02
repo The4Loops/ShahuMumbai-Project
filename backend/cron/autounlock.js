@@ -23,7 +23,7 @@ const autoUnlockUsers = async () => {
       .update({
         userlocked: 'N',
         lockeddate: null,
-        InvalidAttempt: 0
+        invalidattempt: 0
       })
       .eq('id', user.id);
 
