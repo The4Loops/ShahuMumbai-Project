@@ -19,11 +19,10 @@ const dummyData = [
     category: 'Accessories',
     color: 'Red',
     images: [
-      '/assets/images/product_images/handbag1.jpeg',
-      '/assets/images/product_images/handbag2.jpeg',
-      '/assets/images/product_images/handbag3.jpeg',
-      '/assets/images/product_images/handbag4.jpeg',
-      '/assets/images/product_images/handbag5.jpeg',
+      require('../assets/images/product_images/DummyHandbag1.jpeg'),
+      require('../assets/images/product_images/DummyHandbag2.jpeg'),
+      require('../assets/images/product_images/DummyHandbag3.jpeg'),
+      require('../assets/images/product_images/DummyHandbag4.jpeg'),
     ],
   },
   {
@@ -35,9 +34,10 @@ const dummyData = [
     category: 'Accessories',
     color: 'Beige',
     images: [
-      '/assets/images/product_images/pouch1.jpeg',
-      '/assets/images/product_images/pouch2.jpeg',
-      '/assets/images/product_images/pouch3.jpeg',
+      require('../assets/images/product_images/DummyHandbag1.jpeg'),
+      require('../assets/images/product_images/DummyHandbag2.jpeg'),
+      require('../assets/images/product_images/DummyHandbag3.jpeg'),
+      require('../assets/images/product_images/DummyHandbag4.jpeg'),
     ],
   },
   {
@@ -49,8 +49,10 @@ const dummyData = [
     category: 'Accessories',
     color: 'Gold',
     images: [
-      '/assets/images/product_images/clutch1.jpeg',
-      '/assets/images/product_images/clutch2.jpeg',
+      require('../assets/images/product_images/DummyHandbag1.jpeg'),
+      require('../assets/images/product_images/DummyHandbag2.jpeg'),
+      require('../assets/images/product_images/DummyHandbag3.jpeg'),
+      require('../assets/images/product_images/DummyHandbag4.jpeg'),
     ],
   },
   {
@@ -62,9 +64,10 @@ const dummyData = [
     category: 'Accessories',
     color: 'Black',
     images: [
-      '/assets/images/product_images/tote1.jpeg',
-      '/assets/images/product_images/tote2.jpeg',
-      '/assets/images/product_images/tote3.jpeg',
+      require('../assets/images/product_images/DummyHandbag1.jpeg'),
+      require('../assets/images/product_images/DummyHandbag2.jpeg'),
+      require('../assets/images/product_images/DummyHandbag3.jpeg'),
+      require('../assets/images/product_images/DummyHandbag4.jpeg'),
     ],
   },
 ];
@@ -118,7 +121,7 @@ const ProductDetails = () => {
               {product.images.map((img, index) => (
                 <div key={index} className="px-2">
                   <img
-                    src={process.env.PUBLIC_URL + img}
+                    src={img}
                     alt={`${product.name} view ${index + 1}`}
                     className="h-[400px] w-full object-cover rounded-md border border-[#D4A5A5] shadow-sm"
                     onError={(e) => {
@@ -137,7 +140,7 @@ const ProductDetails = () => {
                   className="focus:outline-none border-2 border-transparent hover:border-[#D4A5A5] rounded-md transition"
                 >
                   <img
-                    src={process.env.PUBLIC_URL + img}
+                    src={img}
                     alt={`${product.name} thumbnail ${index + 1}`}
                     className="w-20 h-20 object-cover rounded-md"
                   />
