@@ -148,36 +148,45 @@ const Navbar = () => {
         "fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif",
         { "blur-sm": showAccount }
       )}>
-        <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4">
-          <Link to="/" className="text-[1.5rem] sm:text-[1.8rem] font-bold text-[#6B4226] tracking-wide">
+        <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 w-full">
+
+          {/* Left: Logo */}
+          <Link to="/" className="text-[1.5rem] sm:text-[1.8rem] font-bold text-[#6B4226] tracking-wide whitespace-nowrap">
             𝐒𝐇𝐀𝐇𝐔 𝐌𝐔𝐌𝐁𝐀𝐈
           </Link>
 
-          <div className="lg:hidden text-[#6B4226] text-xl cursor-pointer" onClick={() => setIsMobileMenuOpen((p) => !p)}>
-            {isMobileMenuOpen ? <FaTimes /> : <FaBars />}
-          </div>
-
-          <div className="hidden lg:flex flex-1 items-center justify-center gap-8">
+          {/* Center: Search Bar */}
+          <div className="hidden lg:block absolute left-1/2 top-1/3 transform -translate-x-1/2 -translate-y-1/2">
             <input
               type="text"
               placeholder="Search"
-              className="w-full max-w-[400px] px-4 py-2 rounded-full border border-gray-300 bg-white focus:outline-none focus:border-[#D4A5A5]"
+              className="w-[300px] sm:w-[400px] px-4 py-2 rounded-full border border-gray-300 bg-white focus:outline-none focus:border-[#D4A5A5]"
             />
-            <div className="flex items-center gap-5 text-[#6B4226]">
-              <span onClick={() => setShowAccount((p) => !p)} className="cursor-pointer hover:text-[#D4A5A5]" role="button" tabIndex={0}>
-                <FaUser size={20} title="Account" />
-              </span>
-              <div className="relative">
-                <Link to="/cart" className="hover:text-[#D4A5A5] relative">
-                  <FaShoppingCart size={20} title="Cart" />
-                  <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
-                    {cartItemCount}
-                  </span>
-                </Link>
-              </div>
+          </div>
+
+          {/* Right: Icons */}
+          <div className="hidden lg:flex items-center gap-5 text-[#6B4226]">
+            <span
+              onClick={() => setShowAccount((p) => !p)}
+              className="cursor-pointer hover:text-[#D4A5A5]"
+              role="button"
+              tabIndex={0}
+            >
+              <FaUser size={20} title="Account" />
+            </span>
+            <div className="relative">
+              <Link to="/cart" className="hover:text-[#D4A5A5] relative">
+                <FaShoppingCart size={20} title="Cart" />
+                <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                  {cartItemCount}
+                </span>
+              </Link>
             </div>
           </div>
         </div>
+
+
+
 
         {/* Desktop Menu */}
         <ul className="hidden lg:flex justify-center gap-8 py-3 px-8 bg-[#f9f5f0] border-t border-[#e0d8d1]">

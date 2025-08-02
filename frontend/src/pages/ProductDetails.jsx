@@ -19,7 +19,7 @@ const dummyData = [
     category: 'Accessories',
     color: 'Red',
     images: [
-      require('../assets/images/product_images/DummyShirt.jpg'),
+      require('../assets/images/product_images/dummyShirt.jpg'),
       require('../assets/images/product_images/dummyShirt1.jpg'),
       require('../assets/images/product_images/dummyShirt2.jpg'),
       require('../assets/images/product_images/dummyShirt3.jpg'),
@@ -34,7 +34,7 @@ const dummyData = [
     category: 'Accessories',
     color: 'Beige',
     images: [
-      require('../assets/images/product_images/DummyPants.jpg'),
+      require('../assets/images/product_images/dummyPants.jpg'),
       require('../assets/images/product_images/dummyPants1.jpg'),
       require('../assets/images/product_images/dummyPants2.jpg'),
       require('../assets/images/product_images/dummyPants3.jpg'),
@@ -65,7 +65,7 @@ const dummyData = [
     category: 'Accessories',
     color: 'Black',
     images: [
-      require('../assets/images/product_images/DummyShoes.jpg'),
+      require('../assets/images/product_images/dummyShoes.jpg'),
       require('../assets/images/product_images/dummyShoes1.jpg'),
       require('../assets/images/product_images/dummyShoes2.jpg'),
       require('../assets/images/product_images/dummyShoes3.jpg'),
