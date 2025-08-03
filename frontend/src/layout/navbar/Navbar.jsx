@@ -212,6 +212,13 @@ const Navbar = () => {
     []
   );
 
+  const handleLogout=()=>{
+    localStorage.clear();
+    navigate("/");
+    setDropdown({ products: false, about: false, account: false});
+    setMobileMenuOpen(false);
+  }
+
   return (
     <nav className="fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif">
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 w-full">
@@ -306,6 +313,14 @@ const Navbar = () => {
                       >
                         Wishlist
                       </Link>
+                    </li>
+                    <li>
+                      <button
+                        onClick={() =>handleLogout()}
+                        className="hover:text-[#D4A5A5] text-gray-700"
+                      >
+                        Logout
+                      </button>
                     </li>
                   </ul>
                 </div>
