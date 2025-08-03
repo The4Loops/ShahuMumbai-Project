@@ -9,32 +9,32 @@ const Footer = () => {
         <div className="w-full flex flex-wrap justify-between gap-8 mb-8">
           <div className="flex-1 min-w-[160px]">
             <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">Services</h4>
-            <a href="/" className="block text-sm mb-2 hover:bg-black hover:text-white pl-2 transition-all">Customer Service</a>
-            <a href="/" className="block text-sm mb-2 hover:bg-black hover:text-white pl-2 transition-all">FAQs</a>
+            <a href="/" className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors">Customer Service</a>
+            <a href="/" className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors">FAQs</a>
           </div>
           <div className="flex-1 min-w-[160px]">
             <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">Orders</h4>
-            <a href="/" className="block text-sm mb-2 hover:bg-black hover:text-white pl-2 transition-all">Track Order</a>
-            <a href="/" className="block text-sm mb-2 hover:bg-black hover:text-white pl-2 transition-all">Returns</a>
+            <a href="/" className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors">Track Order</a>
+            <a href="/" className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors">Returns</a>
           </div>
           <div className="flex-1 min-w-[160px]">
             <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">Legal</h4>
-            <a href="/" className="block text-sm mb-2 hover:bg-black hover:text-white pl-2 transition-all">Privacy</a>
-            <a href="/" className="block text-sm mb-2 hover:bg-black hover:text-white pl-2 transition-all">Terms</a>
+            <a href="/" className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors">Privacy</a>
+            <a href="/" className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors">Terms</a>
           </div>
           <div className="flex-1 min-w-[160px]">
             <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">Follow Us</h4>
-            <div className="flex gap-4 mt-2 justify-start">
-              <a href="/" aria-label="Facebook" className="text-xl hover:bg-black hover:text-white p-2 rounded transition-all">
-                <FaFacebookF />
-              </a>
-              <a href="/" aria-label="Instagram" className="text-xl hover:bg-black hover:text-white p-2 rounded transition-all">
-                <FaInstagram />
-              </a>
-              <a href="/" aria-label="YouTube" className="text-xl hover:bg-black hover:text-white p-2 rounded transition-all">
-                <FaYoutube />
-              </a>
-            </div>
+           <div className="flex gap-4 mt-2 justify-start">
+            <a href="/" aria-label="Facebook" className="text-xl text-[#000] hover:text-[#1877F2] transition-colors">
+              <FaFacebookF />
+            </a>
+            <a href="/" aria-label="Instagram" className="text-xl text-[#000] hover:text-[#E1306C] transition-colors">
+              <FaInstagram />
+            </a>
+            <a href="/" aria-label="YouTube" className="text-xl text-[#000] hover:text-[#FF0000] transition-colors">
+              <FaYoutube />
+            </a>
+          </div>
           </div>
           <div className="flex-1 min-w-[160px]">
             <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">Newsletter</h4>
