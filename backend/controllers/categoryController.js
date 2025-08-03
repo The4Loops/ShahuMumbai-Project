@@ -67,7 +67,7 @@ exports.updateCategory = async (req, res) => {
         const { data, error } = await supabase
             .from('categories')
             .update({ name })
-            .eq('categoryId', id)
+            .eq('categoryid', id)
             .select();
 
         if (error || !data.length) return res.status(400).json({ message: 'Error updating category', error });
@@ -90,7 +90,7 @@ exports.deleteCategory = async (req, res) => {
         const { data, error } = await supabase
             .from('categories')
             .delete()
-            .eq('categoryId', id)
+            .eq('categoryid', id)
             .select();
 
         if (error || !data.length) return res.status(400).json({ message: 'Error deleting category', error });

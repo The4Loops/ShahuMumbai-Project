@@ -19,30 +19,30 @@ exports.createProduct = async (req, res) => {
     const {
       name,
       description,
-      shortDescription,
-      categoryId,
-      brandDesigner,
+      shortdescription,
+      categoryid,
+      branddesigner,
       price,
-      discountPrice,
+      discountprice,
       stock,
-      isActive,
-      isFeatured,
-      uploadedDate,
+      isactive,
+      isfeatured,
+      uploadeddate,
     } = req.body;
 
     const { data, error } = await supabase.from("products").insert([
       {
         name,
         description,
-        shortDescription,
-        categoryId,
-        brandDesigner,
+        shortdescription,
+        categoryid,
+        branddesigner,
         price,
-        discountPrice,
+        discountprice,
         stock,
-        isActive,
-        isFeatured,
-        uploadedDate,
+        isactive,
+        isfeatured,
+        uploadeddate,
       },
     ]);
 
@@ -67,7 +67,7 @@ exports.getAllProducts = async (req, res) => {
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .eq("isActive", true);
+      .eq("isactive", true);
 
     if (error) {
       return res
