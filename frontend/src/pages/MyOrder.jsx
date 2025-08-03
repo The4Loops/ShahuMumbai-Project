@@ -177,7 +177,7 @@ const MyOrders = () => {
 
   return (
     <Layout>
-    <div className="min-h-screen bg-gray-50 p-4 md:p-10">
+    <div className="min-h-screen bg-#fdf9f4 p-4 md:p-10">
       <div className="text-center mb-8">
         <FaBox className="text-blue-500 text-4xl mx-auto mb-4" />
         <h1 className="text-2xl md:text-3xl font-semibold">Your Orders</h1>

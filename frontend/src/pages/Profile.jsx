@@ -1,28 +1,272 @@
-import React from "react";
-import Layout from "../layout/Layout";
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { MdEmail, MdPhone } from "react-icons/md";
 import { jwtDecode } from "jwt-decode";
+import { useNavigate, Link } from "react-router-dom";
+import Layout from "../layout/Layout";
 
-const Profile = () => {
-  const token = localStorage.getItem("token");
+// Toggle Switch Component
+const Toggle = ({ enabled, onChange, disabled }) => (
+  <button
+    onClick={onChange}
+    disabled={disabled}
+    className={`w-12 h-6 flex items-center rounded-full p-1 transition-colors duration-300 ${
+      enabled ? "bg-green-500" : "bg-gray-300"
+    } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+  >
+    <div
+      className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${
+        enabled ? "translate-x-6" : "translate-x-0"
+      }`}
+    />
+  </button>
+);
 
-  if (!token) return <p>Please login to view your profile.</p>;
+function Profile() {
+  const emptyProfile = {
+    name: "",
+    email: "",
+    phone: "",
+    about: "",
+    role: "",
+    preferences: {
+      newsletter: false,
+      emailNotifications: false,
+      publicProfile: false,
+    },
+    image: null,
+  };
 
-  let decoded = {};
-  try {
-    decoded = jwtDecode(token);
-  } catch (e) {
-    return <p>Invalid token. Please login again.</p>;
-  }
+  const [profile, setProfile] = useState(emptyProfile);
+  const [saved, setSaved] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const storedProfile = localStorage.getItem("profile");
+    if (storedProfile) {
+      setProfile(JSON.parse(storedProfile));
+    } else if (token) {
+      try {
+        const decoded = jwtDecode(token);
+        setProfile((prev) => ({
+          ...prev,
+          name: decoded.full_name || "",
+          email: decoded.email || "",
+          phone: decoded.phone || "",
+          role: decoded.role || "",
+        }));
+      } catch (e) {
+        console.error("Invalid token");
+      }
+    }
+  }, []);
+
+  const handleChange = (e) => {
+    setProfile({ ...profile, [e.target.name]: e.target.value });
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setProfile((prev) => ({ ...prev, image: reader.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleToggleEdit = () => {
+    if (isEditing) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+      localStorage.setItem("profile", JSON.stringify(profile));
+    }
+    setIsEditing(!isEditing);
+  };
+
+  const handleLogout = () => {
+    if (window.confirm("Are you sure you want to log out?")) {
+      localStorage.removeItem("token");
+      localStorage.removeItem("profile");
+      navigate("/");
+    }
+  };
+
+  const getInitials = (name) =>
+    name
+      .split(" ")
+      .map((n) => n[0])
+      .join("")
+      .toUpperCase()
+      .slice(0, 3);
 
   return (
     <Layout>
-      <div className="max-w-md mx-auto mt-10 bg-white p-6 rounded shadow">
-        <h2 className="text-xl font-bold mb-4">Welcome, {decoded.full_name}</h2>
-        <p><strong>Email:</strong> {decoded.email}</p>
-        <p><strong>Role:</strong> {decoded.role}</p>
-      </div>
+      <motion.div
+        className="max-w-6xl mx-auto p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+      >
+        {/* Profile Summary */}
+        <div className="col-span-1 text-center bg-white rounded-2xl shadow p-6 sm:col-span-1">
+          <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4">
+            {profile.image ? (
+              <img
+                src={profile.image}
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-gray-200 flex items-center justify-center text-xl font-bold text-gray-600">
+                {getInitials(profile.name || "U")}
+              </div>
+            )}
+            {isEditing && (
+              <label className="absolute bottom-0 right-0 bg-black text-white rounded-full p-1 cursor-pointer text-xs">
+                📷
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageChange}
+                  className="hidden"
+                />
+              </label>
+            )}
+          </div>
+          <h2 className="text-lg sm:text-xl font-semibold">{profile.name || "Unnamed User"}</h2>
+          <span className="text-xs sm:text-sm bg-gray-100 px-2 py-1 rounded-full mt-2 inline-block">
+            {profile.role || "Collector"}
+          </span>
+          <p className="text-sm text-gray-500 mt-1">San Francisco, CA</p>
+          <p className="text-xs text-gray-400 mt-1">Member since March 2021</p>
+        </div>
+
+        {/* Personal Info */}
+        <div className="col-span-1 md:col-span-1 lg:col-span-2 bg-white rounded-2xl shadow p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-2">
+            <h3 className="text-lg sm:text-xl font-semibold">Personal Information</h3>
+            <button
+              onClick={handleToggleEdit}
+              className="bg-black text-white px-4 py-1 rounded text-sm w-full sm:w-auto"
+            >
+              {isEditing ? "Save Changes" : "Edit Profile"}
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              name="name"
+              placeholder="Full Name"
+              value={profile.name}
+              onChange={handleChange}
+              disabled={!isEditing}
+              className="border px-4 py-2 rounded w-full disabled:bg-gray-100"
+            />
+            <div className="flex items-center border px-4 py-2 rounded w-full disabled:bg-gray-100">
+              <MdEmail className="mr-2" />
+              <input
+                name="email"
+                placeholder="Email"
+                value={profile.email}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className="w-full bg-transparent outline-none disabled:bg-gray-100"
+              />
+            </div>
+            <div className="flex items-center border px-4 py-2 rounded w-full">
+              <MdPhone className="mr-2" />
+              <input
+                name="phone"
+                placeholder="Phone"
+                value={profile.phone}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className="w-full bg-transparent outline-none disabled:bg-gray-100"
+              />
+            </div>
+          </div>
+          <textarea
+            name="about"
+            placeholder="Tell us about yourself..."
+            value={profile.about}
+            onChange={handleChange}
+            disabled={!isEditing}
+            className="mt-4 w-full border px-4 py-2 rounded disabled:bg-gray-100"
+          />
+          {saved && <p className="text-green-600 mt-2">Changes saved!</p>}
+        </div>
+
+        {/* Activity Stats */}
+        <div className="col-span-1 bg-white rounded-2xl shadow p-6">
+          <h3 className="text-lg sm:text-xl font-semibold mb-4">Activity Stats</h3>
+          <ul className="text-sm text-gray-700 space-y-2">
+            <li>Items Purchased: <strong>0</strong></li>
+            <li>Wishlist Items: <strong>0</strong></li>
+            <li>Reviews Written: <strong>0</strong></li>
+          </ul>
+        </div>
+
+        {/* Preferences */}
+        <div className="col-span-1 md:col-span-2 bg-white rounded-2xl shadow p-6">
+          <h3 className="text-lg sm:text-xl font-semibold mb-4">Preferences</h3>
+          <div className="space-y-4">
+            {[
+              ["Newsletter Subscription", "newsletter"],
+              ["Email Notifications", "emailNotifications"],
+              ["Public Profile", "publicProfile"],
+            ].map(([label, key]) => (
+              <div key={key} className="flex items-center justify-between">
+                <span>{label}</span>
+                <Toggle
+                  enabled={profile.preferences[key]}
+                  onChange={() =>
+                    isEditing &&
+                    setProfile((prev) => ({
+                      ...prev,
+                      preferences: {
+                        ...prev.preferences,
+                        [key]: !prev.preferences[key],
+                      },
+                    }))
+                  }
+                  disabled={!isEditing}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Social Links */}
+        <div className="col-span-1 bg-white rounded-2xl shadow p-6">
+          <h3 className="text-lg sm:text-xl font-semibold mb-4">Social Links</h3>
+          <ul className="text-sm text-blue-600 space-y-2">
+            <li>@username</li>
+            <li>@vintage_collector</li>
+          </ul>
+        </div>
+
+        {/* Account Actions */}
+        <div className="col-span-1 md:col-span-2 lg:col-span-3 bg-white rounded-2xl shadow p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+            <Link to="/wishlist" className="w-full sm:w-auto">
+              <button className="w-full border px-4 py-2 rounded">View Wishlist</button>
+            </Link>
+            <Link to="/orders" className="w-full sm:w-auto">
+              <button className="w-full border px-4 py-2 rounded">Order History</button>
+            </Link>
+          </div>
+          <button
+            onClick={handleLogout}
+            className="bg-red-500 text-white px-4 py-2 rounded w-full md:w-auto"
+          >
+            Logout
+          </button>
+        </div>
+      </motion.div>
     </Layout>
   );
-};
+}
 
 export default Profile;

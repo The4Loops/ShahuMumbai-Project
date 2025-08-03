@@ -9,14 +9,12 @@ const Cart = () => {
       name: "Wireless Headphones",
       price: 99.99,
       quantity: 1,
-      image: "https://placehold.co/100x100?text=Headphones",
     },
     {
       id: 2,
       name: "Smart Watch",
       price: 149.99,
       quantity: 2,
-      image: "https://placehold.co/100x100?text=Watch",
     },
   ]);
 
@@ -65,8 +63,6 @@ const Cart = () => {
       setIsPlacingOrder(true);
       setTimeout(() => {
         alert("Order placed successfully!");
-
-        // Reset everything
         setIsPlacingOrder(false);
         setForm({
           fullName: "",
@@ -124,11 +120,17 @@ const Cart = () => {
                         className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#E4C8B0] p-4 rounded-lg shadow bg-[#FAF4EF]"
                       >
                         <div className="flex items-center gap-4">
-                          <img
-                            src={item.image}
-                            alt={item.name}
-                            className="w-20 h-20 sm:w-24 sm:h-24 object-cover rounded-lg border border-[#D8BBA3]"
-                          />
+                          {/* Colored box with initials */}
+                          <div
+                            className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center rounded-lg border border-[#D8BBA3] bg-[#f5e9e0] text-[#6B4226] font-semibold text-sm sm:text-base"
+                          >
+                            {item.name
+                              .split(" ")
+                              .map((word) => word[0])
+                              .join("")
+                              .toUpperCase()}
+                          </div>
+
                           <div>
                             <h2 className="text-lg sm:text-xl font-semibold">{item.name}</h2>
                             <p className="text-[#6B4226] font-medium">
@@ -195,92 +197,29 @@ const Cart = () => {
               <div>
                 <h2 className="text-xl font-semibold mb-4">Order Details</h2>
                 <div className="space-y-4">
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={form.fullName}
-                    placeholder="Full Name *"
-                    className="w-full border p-2 rounded"
-                    onChange={handleFormChange}
-                  />
-                  <input
-                    type="email"
-                    name="email"
-                    value={form.email}
-                    placeholder="Email Address *"
-                    className="w-full border p-2 rounded"
-                    onChange={handleFormChange}
-                  />
-                  <input
-                    type="text"
-                    name="phone"
-                    value={form.phone}
-                    placeholder="Phone Number *"
-                    className="w-full border p-2 rounded"
-                    onChange={handleFormChange}
-                  />
-                  <input
-                    type="text"
-                    name="address"
-                    value={form.address}
-                    placeholder="Shipping Address *"
-                    className="w-full border p-2 rounded"
-                    onChange={handleFormChange}
-                  />
-                  <select
-                    name="paymentMethod"
-                    className="w-full border p-2 rounded"
-                    onChange={handleFormChange}
-                    value={form.paymentMethod}
-                  >
+                  <input type="text" name="fullName" value={form.fullName} placeholder="Full Name *" className="w-full border p-2 rounded" onChange={handleFormChange} />
+                  <input type="email" name="email" value={form.email} placeholder="Email Address *" className="w-full border p-2 rounded" onChange={handleFormChange} />
+                  <input type="text" name="phone" value={form.phone} placeholder="Phone Number *" className="w-full border p-2 rounded" onChange={handleFormChange} />
+                  <input type="text" name="address" value={form.address} placeholder="Shipping Address *" className="w-full border p-2 rounded" onChange={handleFormChange} />
+                  <select name="paymentMethod" className="w-full border p-2 rounded" onChange={handleFormChange} value={form.paymentMethod}>
                     <option value="" disabled>Select Payment Method *</option>
                     <option value="COD">Cash on Delivery</option>
                     <option value="UPI">UPI (Google Pay / PhonePe)</option>
                     <option value="Card">Credit/Debit Card</option>
                   </select>
-                  <textarea
-                    name="notes"
-                    value={form.notes}
-                    placeholder="Any special instructions? (Optional)"
-                    className="w-full border p-2 rounded"
-                    rows="3"
-                    onChange={handleFormChange}
-                  ></textarea>
+                  <textarea name="notes" value={form.notes} placeholder="Any special instructions? (Optional)" className="w-full border p-2 rounded" rows="3" onChange={handleFormChange}></textarea>
                 </div>
 
                 <div className="mt-6 flex justify-between gap-4">
-                  <MotionButton
-                    className="border border-[#A97474] px-4 py-2 rounded"
-                    onClick={() => setShowCheckout(false)}
-                  >
+                  <MotionButton className="border border-[#A97474] px-4 py-2 rounded" onClick={() => setShowCheckout(false)}>
                     Back to Cart
                   </MotionButton>
-                  <MotionButton
-                    className="bg-[#A97474] text-white px-6 py-2 rounded text-lg hover:bg-[#8c5c5c] transition w-full sm:w-auto"
-                    onClick={handlePlaceOrder}
-                    disabled={isPlacingOrder}
-                  >
+                  <MotionButton className="bg-[#A97474] text-white px-6 py-2 rounded text-lg hover:bg-[#8c5c5c] transition w-full sm:w-auto" onClick={handlePlaceOrder} disabled={isPlacingOrder}>
                     {isPlacingOrder ? (
                       <div className="flex items-center gap-2">
-                        <svg
-                          className="animate-spin h-5 w-5 text-white"
-                          xmlns="http://www.w3.org/2000/svg"
-                          fill="none"
-                          viewBox="0 0 24 24"
-                        >
-                          <circle
-                            className="opacity-25"
-                            cx="12"
-                            cy="12"
-                            r="10"
-                            stroke="currentColor"
-                            strokeWidth="4"
-                          ></circle>
-                          <path
-                            className="opacity-75"
-                            fill="currentColor"
-                            d="M4 12a8 8 0 018-8v8H4z"
-                          ></path>
+                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
                         </svg>
                         <span>Placing Order...</span>
                       </div>
@@ -301,22 +240,10 @@ const Cart = () => {
                   </div>
                 ))}
                 <div className="border-t mt-3 pt-3 text-lg">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>₹{total.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Shipping:</span>
-                    <span>₹{shipping.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Tax:</span>
-                    <span>₹{tax.toFixed(2)}</span>
-                  </div>
-                  <div className="flex justify-between font-bold text-xl mt-2">
-                    <span>Total:</span>
-                    <span>₹{grandTotal.toFixed(2)}</span>
-                  </div>
+                  <div className="flex justify-between"><span>Subtotal:</span><span>₹{total.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span>Shipping:</span><span>₹{shipping.toFixed(2)}</span></div>
+                  <div className="flex justify-between"><span>Tax:</span><span>₹{tax.toFixed(2)}</span></div>
+                  <div className="flex justify-between font-bold text-xl mt-2"><span>Total:</span><span>₹{grandTotal.toFixed(2)}</span></div>
                 </div>
               </div>
             </motion.div>
