@@ -17,7 +17,9 @@ import OurPhilosophy from "./pages/OurPhilosophy";
 import HeritageTimeline from "./pages/HeritageTimeline";
 import OurStudios from "./pages/OurStudios";
 import ContemporaryArtisans from "./pages/ContemporaryArtisans";
-
+import MyOrder from "./pages/MyOrder";
+import Wishlist from "./pages/Wishlist";
+import Profile from "./pages/Profile";
 
 function App() {
   return (
@@ -48,6 +50,9 @@ function App() {
         <Route path="/about" element={<About />} />
         <Route path="/product/:id" element={<ProductDetails />} />
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/myorder" element={<MyOrder />} />
+        <Route path="/wishlist" element={<Wishlist/>} />
+        <Route path="/profile" element={<Profile />} />
       </Routes>
     </div>
   );
