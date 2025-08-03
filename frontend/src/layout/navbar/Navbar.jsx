@@ -1,7 +1,14 @@
-import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
 import clsx from "clsx";
+import { jwtDecode } from "jwt-decode";
 
 const PRODUCTS = [
   { label: "Our Products", href: "/products" },
@@ -115,10 +122,16 @@ const Navbar = () => {
     account: false,
   });
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [mobileAccountOpen, setMobileAccountOpen] = useState(false);
 
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
-  const user = token ? { name: "Shahu" } : null;
+  var token = localStorage.getItem("token");
+  var userRole=null;
+
+  if (token) {
+  const decoded = jwtDecode(token);
+  userRole = token ? decoded.role : null;
+  }
   const cartItemCount = 3;
 
   const productsRef = useRef(null);
@@ -212,12 +225,12 @@ const Navbar = () => {
     []
   );
 
-  const handleLogout=()=>{
+  const handleLogout = () => {
     localStorage.clear();
     navigate("/");
-    setDropdown({ products: false, about: false, account: false});
+    setDropdown({ products: false, about: false, account: false });
     setMobileMenuOpen(false);
-  }
+  };
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif">
@@ -284,9 +297,6 @@ const Navbar = () => {
                   )}
                 >
                   <ul className="space-y-2">
-                    <li className="text-[#6B4226] font-semibold px-1">
-                      Welcome, {user.name}
-                    </li>
                     <li>
                       <button
                         onClick={() => handleProtectedClick("/profile")}
@@ -316,7 +326,7 @@ const Navbar = () => {
                     </li>
                     <li>
                       <button
-                        onClick={() =>handleLogout()}
+                        onClick={() => handleLogout()}
                         className="hover:text-[#D4A5A5] text-gray-700"
                       >
                         Logout
@@ -350,7 +360,10 @@ const Navbar = () => {
       {/* Desktop Nav */}
       <ul className="hidden lg:flex justify-center gap-8 py-3 px-8 bg-[#f9f5f0] border-t border-[#e0d8d1]">
         <li>
-          <Link to="/" className="hover:text-[#D4A5A5] text-[#6B4226] font-medium">
+          <Link
+            to="/"
+            className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
+          >
             Home
           </Link>
         </li>
@@ -418,22 +431,46 @@ const Navbar = () => {
           refEl={aboutRef}
           content={renderAboutContent}
         />
+        {userRole === "admin" && (
+          <li>
+            <Link
+              to="/admin"
+              className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
+            >
+              Admin
+            </Link>
+          </li>
+        )}
       </ul>
 
       {/* Mobile Nav */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-[#f9f5f0] border-t border-[#e0d8d1] px-6 py-6 space-y-5 text-[#6B4226] font-medium text-base">
-          <Link to="/" onClick={() => setMobileMenuOpen(false)} className="block hover:text-[#D4A5A5]">
+          <Link
+            to="/"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block hover:text-[#D4A5A5]"
+          >
             Home
           </Link>
 
-          {[["Products", PRODUCTS], ["Men", MEN], ["Women", WOMEN]].map(([label, items]) => (
+          {[
+            ["Products", PRODUCTS],
+            ["Men", MEN],
+            ["Women", WOMEN],
+          ].map(([label, items]) => (
             <details key={label} className="group">
-              <summary className="cursor-pointer hover:text-[#D4A5A5]">{label}</summary>
+              <summary className="cursor-pointer hover:text-[#D4A5A5]">
+                {label}
+              </summary>
               <ul className="pl-4 mt-1 space-y-1 text-sm font-normal">
                 {items.map(({ label: l, href }) => (
                   <li key={l}>
-                    <Link to={href} onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">
+                    <Link
+                      to={href}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="hover:text-[#D4A5A5]"
+                    >
                       {l}
                     </Link>
                   </li>
@@ -443,29 +480,53 @@ const Navbar = () => {
           ))}
 
           <details className="group">
-            <summary className="cursor-pointer hover:text-[#D4A5A5]">About SHAHU</summary>
+            <summary className="cursor-pointer hover:text-[#D4A5A5]">
+              About SHAHU
+            </summary>
             <ul className="pl-4 mt-1 space-y-1 text-sm font-normal">
               {ABOUT.flatMap(({ items }) => items).map(({ label, href }) => (
                 <li key={label}>
-                  <Link to={href} onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">
+                  <Link
+                    to={href}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="hover:text-[#D4A5A5]"
+                  >
                     {label}
                   </Link>
                 </li>
               ))}
             </ul>
           </details>
-
-          <Link to="/cart" onClick={() => setMobileMenuOpen(false)} className="block hover:text-[#D4A5A5]">
-            Cart ({cartItemCount})
-          </Link>
-
+          <br />
+          {userRole === "admin" && (
+            <Link
+              to="/admin"
+              className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
+            >
+              Admin
+            </Link>
+          )}
           <Link
-            to={token ? "/profile" : "/account"}
+            to="/cart"
             onClick={() => setMobileMenuOpen(false)}
             className="block hover:text-[#D4A5A5]"
           >
-            {token ? "My Profile" : "Login"}
+            Cart ({cartItemCount})
           </Link>
+
+          {!token ? (
+            <Link to="/account" onClick={() => setMobileMenuOpen(false)} className="block hover:text-[#D4A5A5]">Login / Register</Link>
+          ) : (
+            <details open={mobileAccountOpen} onToggle={() => setMobileAccountOpen(!mobileAccountOpen)}>
+              <summary className="cursor-pointer hover:text-[#D4A5A5]">Account</summary>
+              <ul className="pl-4 mt-2 space-y-2">
+                <li><Link to="/profile" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">My Profile</Link></li>
+                <li><Link to="/myorder" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">Track Order</Link></li>
+                <li><Link to="/wishlist" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">Wishlist</Link></li>
+                <li><button onClick={handleLogout} className="hover:text-[#D4A5A5]">Logout</button></li>
+              </ul>
+            </details>
+          )}
         </div>
       )}
     </nav>

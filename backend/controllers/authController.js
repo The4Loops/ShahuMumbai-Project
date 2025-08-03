@@ -177,6 +177,7 @@ exports.login = async (req, res) => {
     const token = jwt.sign(
       {
         id: user.id,
+        fullname: user.full_name,
         email: user.email,
         role: user.role,
       },
@@ -245,7 +246,7 @@ exports.ssoLogin = async (req, res) => {
     }
 
     const appToken = jwt.sign(
-      { id: user.id, email: user.email, role: userRole  },
+      { id: user.id,fullname:existingUser.full_name, email: user.email, role: userRole  },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );
