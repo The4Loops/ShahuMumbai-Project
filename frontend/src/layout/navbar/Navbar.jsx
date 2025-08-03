@@ -1,10 +1,4 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaShoppingCart } from "react-icons/fa";
 import clsx from "clsx";
@@ -92,7 +86,10 @@ const Navbar = () => {
     account: false,
   });
 
-  const user = { name: "Shahu" };
+  const navigate = useNavigate();
+
+  const token = localStorage.getItem("token"); // Check token presence
+  const user = token ? { name: "Shahu" } : null;
   const cartItemCount = 3;
 
   const productsRef = useRef(null);
@@ -115,6 +112,11 @@ const Navbar = () => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [handleClickOutside]);
+
+  const handleProtectedClick = (path) => {
+    setDropdown((prev) => ({ ...prev, account: false }));
+    navigate(path);
+  };
 
   const renderProductsContent = useMemo(
     () => (
@@ -150,46 +152,6 @@ const Navbar = () => {
     []
   );
 
-  const renderAccountContent = (
-    <ul className="space-y-2">
-      {user ? (
-        <>
-          <li className="text-[#6B4226] font-semibold px-1">
-            Welcome, {user.name}
-          </li>
-          <li>
-            <Link to="/account" onClick={() => setDropdown({ account: false })}>
-              My Account
-            </Link>
-          </li>
-          <li>
-            <Link to="/myorder" onClick={() => setDropdown({ account: false })}>
-              My Orders
-            </Link>
-          </li>
-          <li>
-            <Link to="/wishlist" onClick={() => setDropdown({ account: false })}>
-              Wishlist
-            </Link>
-          </li>
-        </>
-      ) : (
-        <>
-          <li>
-            <Link to="/login" onClick={() => setDropdown({ account: false })}>
-              Log In
-            </Link>
-          </li>
-          <li>
-            <Link to="/register" onClick={() => setDropdown({ account: false })}>
-              Register
-            </Link>
-          </li>
-        </>
-      )}
-    </ul>
-  );
-
   return (
     <nav className="fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif">
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 w-full">
@@ -209,16 +171,20 @@ const Navbar = () => {
         </div>
 
         <div className="hidden lg:flex items-center gap-5 text-[#6B4226]">
-          {/* Account Dropdown */}
+          {/* Account Dropdown or Redirect */}
           <li ref={accountRef} className="relative list-none">
             <button
-              onClick={() =>
-                setDropdown((prev) => ({
-                  products: false,
-                  about: false,
-                  account: !prev.account,
-                }))
-              }
+              onClick={() => {
+                if (!token) {
+                  navigate("/account"); // Redirect to /account if not logged in
+                } else {
+                  setDropdown((prev) => ({
+                    products: false,
+                    about: false,
+                    account: !prev.account,
+                  }));
+                }
+              }}
               className="hover:text-[#D4A5A5] flex items-center"
               aria-haspopup="true"
               aria-expanded={dropdown.account}
@@ -226,16 +192,46 @@ const Navbar = () => {
               <FaUser size={20} title="Account" />
             </button>
 
-            <div
-              className={clsx(
-                "absolute top-full right-0 mt-2 bg-white p-4 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[180px] transition-all duration-300 transform",
-                dropdown.account
-                  ? "opacity-100 translate-y-2 pointer-events-auto"
-                  : "opacity-0 translate-y-1 pointer-events-none"
-              )}
-            >
-              {renderAccountContent}
-            </div>
+            {token && (
+              <div
+                className={clsx(
+                  "absolute top-full right-0 mt-2 bg-white p-4 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[180px] transition-all duration-300 transform",
+                  dropdown.account
+                    ? "opacity-100 translate-y-2 pointer-events-auto"
+                    : "opacity-0 translate-y-1 pointer-events-none"
+                )}
+              >
+                <ul className="space-y-2">
+                  <li className="text-[#6B4226] font-semibold px-1">
+                    Welcome, {user.name}
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => handleProtectedClick("/profile")}
+                      className="hover:text-[#D4A5A5] text-gray-700"
+                    >
+                      My Profile
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => handleProtectedClick("/myorder")}
+                      className="hover:text-[#D4A5A5] text-gray-700"
+                    >
+                      Track Order
+                    </button>
+                  </li>
+                  <li>
+                    <Link
+                      to="/wishlist"
+                      onClick={() => setDropdown({ account: false })}
+                    >
+                      Wishlist
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+            )}
           </li>
 
           <div className="relative">
