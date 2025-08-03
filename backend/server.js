@@ -7,7 +7,7 @@ require('./cron/autounlock')();
 const authRoutes = require('./routes/authRoutes');
 const productRoutes = require('./routes/productRoutes');
 const categoryRoutes = require('./routes/categoryRoutes');
-
+const uploadRoutes = require('./routes/uploadRoutes');
 
 const app = express();
 
@@ -35,7 +35,8 @@ app.disable('x-powered-by');
 // Routes
 app.use('/api/auth',authRoutes);
 app.use('/api',productRoutes);
-app.use('/api',categoryRoutes)
+app.use('/api',categoryRoutes);
+app.use('/api', uploadRoutes);
 
 // Rate Limiting
 const limiter = rateLimit({
