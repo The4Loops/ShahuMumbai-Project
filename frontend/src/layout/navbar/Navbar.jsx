@@ -422,38 +422,49 @@ const Navbar = () => {
 
       {/* Mobile Nav */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-[#f9f5f0] border-t border-[#e0d8d1] px-6 py-4 space-y-4 text-[#6B4226]">
-          <Link to="/" onClick={() => setMobileMenuOpen(false)}>Home</Link>
+        <div className="lg:hidden bg-[#f9f5f0] border-t border-[#e0d8d1] px-6 py-6 space-y-5 text-[#6B4226] font-medium text-base">
+          <Link to="/" onClick={() => setMobileMenuOpen(false)} className="block hover:text-[#D4A5A5]">
+            Home
+          </Link>
 
           {[["Products", PRODUCTS], ["Men", MEN], ["Women", WOMEN]].map(([label, items]) => (
-            <div key={label}>
-              <details>
-                <summary className="cursor-pointer font-medium hover:text-[#D4A5A5]">{label}</summary>
-                <ul className="pl-4 space-y-1 mt-1">
-                  {items.map(({ label: l, href }) => (
-                    <li key={l}>
-                      <Link to={href} onClick={() => setMobileMenuOpen(false)}>{l}</Link>
-                    </li>
-                  ))}
-                </ul>
-              </details>
-            </div>
+            <details key={label} className="group">
+              <summary className="cursor-pointer hover:text-[#D4A5A5]">{label}</summary>
+              <ul className="pl-4 mt-1 space-y-1 text-sm font-normal">
+                {items.map(({ label: l, href }) => (
+                  <li key={l}>
+                    <Link to={href} onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">
+                      {l}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </details>
           ))}
 
-          <details>
-            <summary className="cursor-pointer font-medium hover:text-[#D4A5A5]">About SHAHU</summary>
-            <ul className="pl-4 space-y-1 mt-1">
+          <details className="group">
+            <summary className="cursor-pointer hover:text-[#D4A5A5]">About SHAHU</summary>
+            <ul className="pl-4 mt-1 space-y-1 text-sm font-normal">
               {ABOUT.flatMap(({ items }) => items).map(({ label, href }) => (
                 <li key={label}>
-                  <Link to={href} onClick={() => setMobileMenuOpen(false)}>{label}</Link>
+                  <Link to={href} onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">
+                    {label}
+                  </Link>
                 </li>
               ))}
             </ul>
           </details>
 
-          <Link to="/cart" onClick={() => setMobileMenuOpen(false)}>Cart ({cartItemCount})</Link>
-          <Link to={token ? "/profile" : "/account"} onClick={() => setMobileMenuOpen(false)}>
-            {token ? `Welcome, ${user.name}` : "Login"}
+          <Link to="/cart" onClick={() => setMobileMenuOpen(false)} className="block hover:text-[#D4A5A5]">
+            Cart ({cartItemCount})
+          </Link>
+
+          <Link
+            to={token ? "/profile" : "/account"}
+            onClick={() => setMobileMenuOpen(false)}
+            className="block hover:text-[#D4A5A5]"
+          >
+            {token ? "My Profile" : "Login"}
           </Link>
         </div>
       )}
