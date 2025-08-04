@@ -59,7 +59,7 @@ const AdminPanel = () => {
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Sidebar */}
             {(isSidebarOpen || !isMobile) && (
-              <div className="w-full lg:w-64 bg-white p-6 rounded-lg shadow border border-[#D4A5A5]">
+              <div className="w-full lg:w-80 bg-white p-6 rounded-lg shadow border border-[#D4A5A5]">
                 <div className="flex flex-col gap-4">
                   {TABS.map((tab) => (
                     <button
