@@ -1,257 +1,234 @@
 import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { FaTrashAlt } from "react-icons/fa";
+import { LuShieldCheck, LuTruck, LuRotateCcw } from "react-icons/lu";
 import Layout from "../layout/Layout";
-import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 
-const Cart = () => {
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 1,
-      name: "Wireless Headphones",
-      price: 99.99,
-      quantity: 1,
-    },
-    {
-      id: 2,
-      name: "Smart Watch",
-      price: 149.99,
-      quantity: 2,
-    },
-  ]);
+const initialItems = [
+  {
+    id: 1,
+    title: "Vintage Silk Scarf Collection",
+    category: "Accessories",
+    price: 89.99,
+    oldPrice: 129.99,
+    quantity: 2,
+    inStock: true,
+    discount: 31,
+  },
+  {
+    id: 2,
+    title: "Antique Leather Handbag",
+    category: "Bags",
+    price: 149.99,
+    oldPrice: 199.99,
+    quantity: 1,
+    inStock: true,
+    discount: 25,
+  },
+  {
+    id: 3,
+    title: "Victorian Pearl Brooch",
+    category: "Jewelry",
+    price: 75.0,
+    oldPrice: null,
+    quantity: 1,
+    inStock: true,
+  },
+];
 
-  const [showCheckout, setShowCheckout] = useState(false);
-  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+const categoryColors = {
+  Accessories: "bg-yellow-50",
+  Bags: "bg-rose-50",
+  Jewelry: "bg-indigo-50",
+};
 
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    phone: "",
-    address: "",
-    paymentMethod: "",
-    notes: "",
-  });
+function Cart() {
+  const [cartItems, setCartItems] = useState(initialItems);
+  const [promoCode, setPromoCode] = useState("");
+  const navigate = useNavigate();
 
-  const updateQuantity = (id, amount) => {
+  const handleQuantityChange = (id, delta) => {
     setCartItems((items) =>
       items.map((item) =>
         item.id === id
-          ? { ...item, quantity: Math.max(1, item.quantity + amount) }
+          ? { ...item, quantity: Math.max(1, item.quantity + delta) }
           : item
       )
     );
   };
 
-  const removeItem = (id) => {
+  const handleRemove = (id) => {
     setCartItems((items) => items.filter((item) => item.id !== id));
   };
 
-  const total = cartItems.reduce(
-    (sum, item) => sum + item.price * item.quantity,
+  const subtotal = cartItems.reduce(
+    (acc, item) => acc + item.price * item.quantity,
     0
   );
-  const shipping = 49;
-  const tax = 18;
-  const grandTotal = total + shipping + tax;
-
-  const handleFormChange = (e) => {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handlePlaceOrder = () => {
-    const { fullName, email, phone, address, paymentMethod } = form;
-    if (fullName && email && phone && address && paymentMethod) {
-      setIsPlacingOrder(true);
-      setTimeout(() => {
-        alert("Order placed successfully!");
-        setIsPlacingOrder(false);
-        setForm({
-          fullName: "",
-          email: "",
-          phone: "",
-          address: "",
-          paymentMethod: "",
-          notes: "",
-        });
-        setCartItems([]);
-        setShowCheckout(false);
-      }, 2000);
-    } else {
-      alert("Please fill all required fields.");
-    }
-  };
-
-  const MotionButton = ({ children, ...props }) => (
-    <motion.button
-      whileHover={{ scale: 1.05 }}
-      whileTap={{ scale: 0.95 }}
-      transition={{ type: "spring", stiffness: 300 }}
-      {...props}
-    >
-      {children}
-    </motion.button>
-  );
+  const tax = 36.08;
+  const total = subtotal + tax;
 
   return (
     <Layout>
-      <div className="p-4 sm:p-6 max-w-5xl mx-auto text-[#3C2A21]">
-        <h1 className="text-2xl sm:text-4xl font-bold mb-6 text-center">
-          {showCheckout ? "Complete Your Order" : "Your Cart"}
-        </h1>
+      <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto bg-[#f9f5f0] min-h-screen">
+        <h2 className="text-3xl font-bold mb-6 text-center">
+          🛒 Shopping Cart
+        </h2>
 
-        <AnimatePresence mode="wait">
-          {!showCheckout ? (
-            <motion.div
-              key="cart"
-              initial={{ opacity: 0, x: -50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 50 }}
-              transition={{ duration: 0.4 }}
-            >
-              {cartItems.length === 0 ? (
-                <p className="text-center text-lg text-[#6B4226]">
-                  Your cart is empty.
-                </p>
-              ) : (
-                <>
-                  <div className="grid gap-4">
-                    {cartItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border border-[#E4C8B0] p-4 rounded-lg shadow bg-[#FAF4EF]"
-                      >
-                        <div className="flex items-center gap-4">
-                          {/* Colored box with initials */}
-                          <div
-                            className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center rounded-lg border border-[#D8BBA3] bg-[#f5e9e0] text-[#6B4226] font-semibold text-sm sm:text-base"
-                          >
-                            {item.name
-                              .split(" ")
-                              .map((word) => word[0])
-                              .join("")
-                              .toUpperCase()}
-                          </div>
-
-                          <div>
-                            <h2 className="text-lg sm:text-xl font-semibold">{item.name}</h2>
-                            <p className="text-[#6B4226] font-medium">
-                              ₹{item.price.toFixed(2)}
-                            </p>
-                            <div className="flex items-center mt-2 gap-2">
-                              <button
-                                className="px-3 py-1 border border-[#C8A491] rounded hover:bg-[#F2E7DE]"
-                                onClick={() => updateQuantity(item.id, -1)}
-                              >
-                                -
-                              </button>
-                              <span className="px-3">{item.quantity}</span>
-                              <button
-                                className="px-3 py-1 border border-[#C8A491] rounded hover:bg-[#F2E7DE]"
-                                onClick={() => updateQuantity(item.id, 1)}
-                              >
-                                +
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex flex-col items-end">
-                          <p className="text-lg font-semibold text-[#6B4226]">
-                            ₹{(item.price * item.quantity).toFixed(2)}
-                          </p>
-                          <button
-                            className="mt-2 text-[#A14D4D] hover:text-[#832f2f] text-sm underline"
-                            onClick={() => removeItem(item.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-
-                  <div className="mt-6 p-4 border-t border-[#E4C8B0] flex justify-between text-xl font-semibold">
-                    <span>Total:</span>
-                    <span>₹{total.toFixed(2)}</span>
-                  </div>
-
-                  <div className="mt-6 flex justify-end">
-                    <MotionButton
-                      className="bg-[#A97474] text-white px-6 py-2 rounded text-lg hover:bg-[#8c5c5c] transition"
-                      onClick={() => setShowCheckout(true)}
-                    >
-                      Proceed to Checkout
-                    </MotionButton>
-                  </div>
-                </>
-              )}
-            </motion.div>
-          ) : (
-            <motion.div
-              key="checkout"
-              initial={{ opacity: 0, x: 50 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -50 }}
-              transition={{ duration: 0.4 }}
-              className="grid md:grid-cols-2 gap-8 bg-[#FFF8F4] p-6 rounded-lg border border-[#E4C8B0] shadow mt-4"
-            >
-              {/* Checkout Form */}
-              <div>
-                <h2 className="text-xl font-semibold mb-4">Order Details</h2>
-                <div className="space-y-4">
-                  <input type="text" name="fullName" value={form.fullName} placeholder="Full Name *" className="w-full border p-2 rounded" onChange={handleFormChange} />
-                  <input type="email" name="email" value={form.email} placeholder="Email Address *" className="w-full border p-2 rounded" onChange={handleFormChange} />
-                  <input type="text" name="phone" value={form.phone} placeholder="Phone Number *" className="w-full border p-2 rounded" onChange={handleFormChange} />
-                  <input type="text" name="address" value={form.address} placeholder="Shipping Address *" className="w-full border p-2 rounded" onChange={handleFormChange} />
-                  <select name="paymentMethod" className="w-full border p-2 rounded" onChange={handleFormChange} value={form.paymentMethod}>
-                    <option value="" disabled>Select Payment Method *</option>
-                    <option value="COD">Cash on Delivery</option>
-                    <option value="UPI">UPI (Google Pay / PhonePe)</option>
-                    <option value="Card">Credit/Debit Card</option>
-                  </select>
-                  <textarea name="notes" value={form.notes} placeholder="Any special instructions? (Optional)" className="w-full border p-2 rounded" rows="3" onChange={handleFormChange}></textarea>
-                </div>
-
-                <div className="mt-6 flex justify-between gap-4">
-                  <MotionButton className="border border-[#A97474] px-4 py-2 rounded" onClick={() => setShowCheckout(false)}>
-                    Back to Cart
-                  </MotionButton>
-                  <MotionButton className="bg-[#A97474] text-white px-6 py-2 rounded text-lg hover:bg-[#8c5c5c] transition w-full sm:w-auto" onClick={handlePlaceOrder} disabled={isPlacingOrder}>
-                    {isPlacingOrder ? (
-                      <div className="flex items-center gap-2">
-                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                        </svg>
-                        <span>Placing Order...</span>
-                      </div>
-                    ) : (
-                      "Place Order"
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Cart Items */}
+          <div className="flex-1 space-y-6">
+            {cartItems.map((item, index) => (
+              <motion.div
+                key={item.id}
+                className={`${
+                  categoryColors[item.category] || "bg-white"
+                } p-4 sm:p-6 rounded-lg shadow flex flex-col sm:flex-row justify-between items-start gap-4`}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.1 }}
+              >
+                <div className="flex-1">
+                  <p className="text-xs uppercase text-gray-500 mb-1">
+                    {item.category}
+                  </p>
+                  <h3 className="font-semibold text-lg">{item.title}</h3>
+                  <div className="flex items-center gap-2 mt-1 text-sm">
+                    <span className="text-red-500 font-semibold">
+                      ${item.price.toFixed(2)}
+                    </span>
+                    {item.oldPrice && (
+                      <span className="line-through text-gray-400">
+                        ${item.oldPrice.toFixed(2)}
+                      </span>
                     )}
-                  </MotionButton>
-                </div>
-              </div>
-
-              {/* Order Summary */}
-              <div className="bg-white border border-[#D8BBA3] p-4 rounded shadow">
-                <h3 className="text-xl font-semibold mb-4">Order Summary</h3>
-                {cartItems.map((item) => (
-                  <div key={item.id} className="flex justify-between mb-2">
-                    <span>{item.name} x {item.quantity}</span>
-                    <span>₹{(item.price * item.quantity).toFixed(2)}</span>
+                    {item.discount && (
+                      <span className="text-white bg-pink-500 px-2 py-0.5 text-xs rounded-full">
+                        -{item.discount}%
+                      </span>
+                    )}
                   </div>
-                ))}
-                <div className="border-t mt-3 pt-3 text-lg">
-                  <div className="flex justify-between"><span>Subtotal:</span><span>₹{total.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span>Shipping:</span><span>₹{shipping.toFixed(2)}</span></div>
-                  <div className="flex justify-between"><span>Tax:</span><span>₹{tax.toFixed(2)}</span></div>
-                  <div className="flex justify-between font-bold text-xl mt-2"><span>Total:</span><span>₹{grandTotal.toFixed(2)}</span></div>
+                  <div className="mt-3 flex items-center gap-2">
+                    <button
+                      className="px-3 py-1 border rounded bg-gray-100 hover:bg-gray-200"
+                      onClick={() => handleQuantityChange(item.id, -1)}
+                    >
+                      -
+                    </button>
+                    <span>{item.quantity}</span>
+                    <button
+                      className="px-3 py-1 border rounded bg-gray-100 hover:bg-gray-200"
+                      onClick={() => handleQuantityChange(item.id, 1)}
+                    >
+                      +
+                    </button>
+                  </div>
                 </div>
+                <div className="flex flex-col items-end justify-between gap-2">
+                  <span className="text-gray-700 font-medium text-md">
+                    ${(item.price * item.quantity).toFixed(2)}
+                  </span>
+                  <button
+                    onClick={() => handleRemove(item.id)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <FaTrashAlt />
+                  </button>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Order Summary */}
+          <motion.div
+            className="w-full lg:w-1/3 bg-gray-50 p-6 rounded-xl shadow-lg"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <h4 className="text-xl font-bold mb-4">Order Summary</h4>
+
+            {/* Promo Code */}
+            <div className="mb-4">
+              <label
+                htmlFor="promo"
+                className="block text-sm font-medium text-gray-600 mb-1"
+              >
+                Promo Code
+              </label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  id="promo"
+                  placeholder="Enter code"
+                  className="flex-1 border rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value)}
+                />
+                <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm">
+                  Apply
+                </button>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </div>
+
+            {/* Price Summary */}
+            <div className="space-y-2 text-sm text-gray-700">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>${subtotal.toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Shipping</span>
+                <span className="text-green-500 font-medium">Free</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Tax</span>
+                <span>${tax.toFixed(2)}</span>
+              </div>
+            </div>
+
+            <hr className="my-4" />
+            <div className="flex justify-between font-bold text-lg">
+              <span>Total</span>
+              <span>${total.toFixed(2)}</span>
+            </div>
+
+            <button
+              onClick={() => navigate("/checkout")}
+              className="mt-6 w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
+            >
+              Proceed to Checkout
+            </button>
+            <p className="text-center text-sm text-gray-500 mt-2">
+              Estimated delivery in 3–5 business days
+            </p>
+          </motion.div>
+        </div>
+
+        {/* Feature Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-12 bg-gray-100 rounded-xl px-4 py-6 sm:px-8 flex flex-col sm:flex-row justify-around items-center text-center gap-6"
+        >
+          <div className="flex flex-col items-center gap-2">
+            <LuShieldCheck className="text-green-600 text-2xl" />
+            <p className="font-medium text-sm">Secure Checkout</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <LuTruck className="text-blue-600 text-2xl" />
+            <p className="font-medium text-sm">Free Shipping Over $100</p>
+          </div>
+          <div className="flex flex-col items-center gap-2">
+            <LuRotateCcw className="text-purple-600 text-2xl" />
+            <p className="font-medium text-sm">30-Day Returns</p>
+          </div>
+        </motion.div>
       </div>
     </Layout>
   );
-};
+}
 
 export default Cart;

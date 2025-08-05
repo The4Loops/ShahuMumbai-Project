@@ -9,7 +9,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
 import clsx from "clsx";
 import { jwtDecode } from "jwt-decode";
-
+import Logo from "../../assets/ShahuLogo.png"; // Adjust the path as necessary
 const PRODUCTS = [
   { label: "Our Products", href: "/products" },
   { label: "Blankets and Pillows", href: "/" },
@@ -126,11 +126,11 @@ const Navbar = () => {
 
   const navigate = useNavigate();
   var token = localStorage.getItem("token");
-  var userRole=null;
+  var userRole = null;
 
   if (token) {
-  const decoded = jwtDecode(token);
-  userRole = token ? decoded.role : null;
+    const decoded = jwtDecode(token);
+    userRole = token ? decoded.role : null;
   }
   const cartItemCount = 3;
 
@@ -235,15 +235,16 @@ const Navbar = () => {
   return (
     <nav className="fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif">
       <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 w-full">
-        <Link
-          to="/"
-          className="text-[1.5rem] sm:text-[1.8rem] font-bold text-[#6B4226] tracking-wide whitespace-nowrap"
-        >
-          Shahu Mumbai
+        <Link to="/" className="flex items-center">
+          <img
+            src={Logo} // path assumes it's in the public/ folder
+            alt="Shahu Mumbai Logo"
+            className="h-12 w-auto object-contain"
+          />
         </Link>
 
         {/* Search Bar (Desktop Only) */}
-        <div className="hidden lg:block absolute left-1/2 top-1/3 transform -translate-x-1/2 -translate-y-1/2">
+        <div className="hidden lg:block absolute left-1/4 top-1/3 transform -translate-x-1/2 -translate-y-1/2">
           <input
             type="text"
             placeholder="Search"
@@ -506,24 +507,73 @@ const Navbar = () => {
               Admin
             </Link>
           )}
-          <Link
-            to="/cart"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block hover:text-[#D4A5A5]"
-          >
-            Cart ({cartItemCount})
-          </Link>
+          <div className="flex items-center gap-3 mt-4">
+            <Link
+              to="/cart"
+              onClick={() => setMobileMenuOpen(false)}
+              className="flex items-center gap-2 hover:text-[#D4A5A5]"
+            >
+              <FaShoppingCart />
+              <span>Cart ({cartItemCount})</span>
+            </Link>
+          </div>
 
           {!token ? (
-            <Link to="/account" onClick={() => setMobileMenuOpen(false)} className="block hover:text-[#D4A5A5]">Login / Register</Link>
+            <div className="flex items-center gap-3 mt-2">
+              <Link
+                to="/account"
+                onClick={() => setMobileMenuOpen(false)}
+                className="flex items-center gap-2 hover:text-[#D4A5A5]"
+              >
+                <FaUser />
+                <span>Login / Register</span>
+              </Link>
+            </div>
           ) : (
-            <details open={mobileAccountOpen} onToggle={() => setMobileAccountOpen(!mobileAccountOpen)}>
-              <summary className="cursor-pointer hover:text-[#D4A5A5]">Account</summary>
+            <details
+              open={mobileAccountOpen}
+              onToggle={() => setMobileAccountOpen(!mobileAccountOpen)}
+            >
+              <summary className="cursor-pointer hover:text-[#D4A5A5] flex items-center gap-2">
+                <FaUser />
+                Account
+              </summary>
               <ul className="pl-4 mt-2 space-y-2">
-                <li><Link to="/profile" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">My Profile</Link></li>
-                <li><Link to="/myorder" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">Track Order</Link></li>
-                <li><Link to="/wishlist" onClick={() => setMobileMenuOpen(false)} className="hover:text-[#D4A5A5]">Wishlist</Link></li>
-                <li><button onClick={handleLogout} className="hover:text-[#D4A5A5]">Logout</button></li>
+                <li>
+                  <Link
+                    to="/profile"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="hover:text-[#D4A5A5]"
+                  >
+                    My Profile
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/myorder"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="hover:text-[#D4A5A5]"
+                  >
+                    Track Order
+                  </Link>
+                </li>
+                <li>
+                  <Link
+                    to="/wishlist"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="hover:text-[#D4A5A5]"
+                  >
+                    Wishlist
+                  </Link>
+                </li>
+                <li>
+                  <button
+                    onClick={handleLogout}
+                    className="hover:text-[#D4A5A5]"
+                  >
+                    Logout
+                  </button>
+                </li>
               </ul>
             </details>
           )}

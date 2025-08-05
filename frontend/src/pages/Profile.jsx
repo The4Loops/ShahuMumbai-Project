@@ -1,9 +1,32 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { MdEmail, MdPhone } from "react-icons/md";
+import { FaTwitter, FaFacebook, FaInstagram, FaLinkedin } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { useNavigate, Link } from "react-router-dom";
 import Layout from "../layout/Layout";
+
+// ✅ Moved outside to avoid useEffect dependency warning
+const emptyProfile = {
+  name: "",
+  email: "",
+  phone: "",
+  about: "",
+  country: "",
+  role: "",
+  preferences: {
+    newsletter: false,
+    emailNotifications: false,
+    publicProfile: false,
+  },
+  socialLinks: {
+    twitter: "",
+    facebook: "",
+    instagram: "",
+    linkedin: "",
+  },
+  image: null,
+};
 
 // Toggle Switch Component
 const Toggle = ({ enabled, onChange, disabled }) => (
@@ -23,20 +46,6 @@ const Toggle = ({ enabled, onChange, disabled }) => (
 );
 
 function Profile() {
-  const emptyProfile = {
-    name: "",
-    email: "",
-    phone: "",
-    about: "",
-    role: "",
-    preferences: {
-      newsletter: false,
-      emailNotifications: false,
-      publicProfile: false,
-    },
-    image: null,
-  };
-
   const [profile, setProfile] = useState(emptyProfile);
   const [saved, setSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -45,8 +54,21 @@ function Profile() {
   useEffect(() => {
     const token = localStorage.getItem("token");
     const storedProfile = localStorage.getItem("profile");
+
     if (storedProfile) {
-      setProfile(JSON.parse(storedProfile));
+      const parsed = JSON.parse(storedProfile);
+      setProfile({
+        ...emptyProfile,
+        ...parsed,
+        preferences: {
+          ...emptyProfile.preferences,
+          ...(parsed.preferences || {}),
+        },
+        socialLinks: {
+          ...emptyProfile.socialLinks,
+          ...(parsed.socialLinks || {}),
+        },
+      });
     } else if (token) {
       try {
         const decoded = jwtDecode(token);
@@ -87,8 +109,8 @@ function Profile() {
   };
 
   const handleLogout = () => {
-      localStorage.clear();
-      navigate("/");
+    localStorage.clear();
+    navigate("/");
   };
 
   const getInitials = (name) =>
@@ -137,7 +159,18 @@ function Profile() {
           <span className="text-xs sm:text-sm bg-gray-100 px-2 py-1 rounded-full mt-2 inline-block">
             {profile.role || "Collector"}
           </span>
-          <p className="text-sm text-gray-500 mt-1">San Francisco, CA</p>
+          {isEditing ? (
+            <input
+              type="text"
+              name="country"
+              placeholder="Country"
+              value={profile.country}
+              onChange={handleChange}
+              className="mt-1 text-sm text-gray-500 bg-white border rounded px-2 py-1 w-full"
+            />
+          ) : (
+            <p className="text-sm text-gray-500 mt-1">{profile.country || "Unknown Location"}</p>
+          )}
           <p className="text-xs text-gray-400 mt-1">Member since March 2021</p>
         </div>
 
@@ -161,7 +194,7 @@ function Profile() {
               disabled={!isEditing}
               className="border px-4 py-2 rounded w-full disabled:bg-gray-100"
             />
-            <div className="flex items-center border px-4 py-2 rounded w-full disabled:bg-gray-100">
+            <div className="flex items-center border px-4 py-2 rounded w-full">
               <MdEmail className="mr-2" />
               <input
                 name="email"
@@ -238,10 +271,43 @@ function Profile() {
         {/* Social Links */}
         <div className="col-span-1 bg-white rounded-2xl shadow p-6">
           <h3 className="text-lg sm:text-xl font-semibold mb-4">Social Links</h3>
-          <ul className="text-sm text-blue-600 space-y-2">
-            <li>@username</li>
-            <li>@vintage_collector</li>
-          </ul>
+          <div className="space-y-3">
+            {[
+              { label: "Twitter", key: "twitter", icon: <FaTwitter /> },
+              { label: "Facebook", key: "facebook", icon: <FaFacebook /> },
+              { label: "Instagram", key: "instagram", icon: <FaInstagram /> },
+              { label: "LinkedIn", key: "linkedin", icon: <FaLinkedin /> },
+            ].map(({ label, key, icon }) => (
+              <div key={key} className="flex items-center gap-2">
+                {icon}
+                {isEditing ? (
+                  <input
+                    type="text"
+                    placeholder={`${label} URL`}
+                    value={profile.socialLinks[key]}
+                    onChange={(e) =>
+                      setProfile((prev) => ({
+                        ...prev,
+                        socialLinks: { ...prev.socialLinks, [key]: e.target.value },
+                      }))
+                    }
+                    className="border px-2 py-1 rounded w-full"
+                  />
+                ) : profile.socialLinks[key] ? (
+                  <a
+                    href={profile.socialLinks[key]}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 underline break-all"
+                  >
+                    {profile.socialLinks[key]}
+                  </a>
+                ) : (
+                  <span className="text-gray-400 italic">Not provided</span>
+                )}
+              </div>
+            ))}
+          </div>
         </div>
 
         {/* Account Actions */}
@@ -250,7 +316,7 @@ function Profile() {
             <Link to="/wishlist" className="w-full sm:w-auto">
               <button className="w-full border px-4 py-2 rounded">View Wishlist</button>
             </Link>
-            <Link to="/orders" className="w-full sm:w-auto">
+            <Link to="/myorder" className="w-full sm:w-auto">
               <button className="w-full border px-4 py-2 rounded">Order History</button>
             </Link>
           </div>

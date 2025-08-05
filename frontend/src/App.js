@@ -20,6 +20,7 @@ import ContemporaryArtisans from "./pages/ContemporaryArtisans";
 import MyOrder from "./pages/MyOrder";
 import Wishlist from "./pages/Wishlist";
 import Profile from "./pages/Profile";
+import Checkout from "./pages/Checkout";
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
         <Route path="/myorder" element={<MyOrder />} />
         <Route path="/wishlist" element={<Wishlist/>} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/checkout" element={<Checkout/>} />
       </Routes>
     </div>
   );
