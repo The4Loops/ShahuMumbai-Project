@@ -234,12 +234,12 @@ const Navbar = () => {
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-[#f9f5f0] border-b border-[#d6ccc2] shadow-md font-serif">
-      <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 py-4 w-full">
+      <div className="flex items-center justify-between px-4 sm:px-6 lg:px-8 h-24 w-full">
         <Link to="/" className="flex items-center">
           <img
-            src={Logo} // path assumes it's in the public/ folder
+            src={Logo}
             alt="Shahu Mumbai Logo"
-            className="h-12 w-auto object-contain"
+            className="h-20 object-contain"
           />
         </Link>
 
