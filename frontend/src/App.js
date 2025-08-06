@@ -21,8 +21,10 @@ import MyOrder from "./pages/MyOrder";
 import Wishlist from "./pages/Wishlist";
 import Profile from "./pages/Profile";
 import Checkout from "./pages/Checkout";
+import useAutoLogout from "./AutoLogout";
 
 function App() {
+  useAutoLogout(); // Initialize auto logout functionality
   return (
     <div>
       <ToastContainer
