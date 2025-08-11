@@ -6,13 +6,14 @@ const slugify = (text) =>
     .toString()
     .toLowerCase()
     .trim()
-    .replace(/[\s\_]+/g, "-")
-    .replace(/[^a-z0-9\-]/g, "")
-    .replace(/\-+/g, "-");
+    .replace(/[\s_]+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-");
 
 const AddBlogPost = () => {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
+  const [slugTouched, setSlugTouched] = useState(false);
   const [excerpt, setExcerpt] = useState("");
   const [content, setContent] = useState("");
   const [cover, setCover] = useState(null);
@@ -25,6 +26,7 @@ const AddBlogPost = () => {
   const [metaDescription, setMetaDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(null);
+  const [isMobile, setIsMobile] = useState(false);
 
   // (Optional) replace with real categories from API later
   const categories = useMemo(
@@ -32,12 +34,18 @@ const AddBlogPost = () => {
     []
   );
 
-  // auto-generate slug from title unless user has typed a custom slug
+  // Detect mobile
   useEffect(() => {
-    if (!slug || slug === slugify(slug)) {
-      setSlug(slugify(title));
-    }
-  }, [title]); // eslint-disable-line
+    const update = () => setIsMobile(window.innerWidth < 1024);
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, []);
+
+  // Auto-slug from title until user edits slug manually
+  useEffect(() => {
+    if (!slugTouched) setSlug(slugify(title));
+  }, [title, slugTouched]);
 
   const onPickCover = (e) => {
     const file = e.target.files?.[0];
@@ -99,6 +107,7 @@ const AddBlogPost = () => {
       // reset form
       setTitle("");
       setSlug("");
+      setSlugTouched(false);
       setExcerpt("");
       setContent("");
       setCover(null);
@@ -121,13 +130,18 @@ const AddBlogPost = () => {
     }
   };
 
+  const inputBase =
+    "w-full border border-[#D4A5A5] rounded-md px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]";
+
   return (
     <div className="font-serif">
-      <h2 className="text-2xl font-bold text-[#6B4226] mb-6">Add Blog Post</h2>
+      <h2 className="text-2xl lg:text-3xl font-bold text-[#6B4226] mb-4 lg:mb-6">
+        Add Blog Post
+      </h2>
 
       {message && (
         <div
-          className={`mb-6 rounded-md px-4 py-3 text-sm ${
+          className={`mb-4 lg:mb-6 rounded-md px-4 py-3 text-sm ${
             message.type === "success"
               ? "bg-green-100 text-green-800 border border-green-300"
               : "bg-red-100 text-red-800 border border-red-300"
@@ -137,9 +151,9 @@ const AddBlogPost = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
         {/* Main column */}
-        <div className="lg:col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-[#6B4226] mb-1">
@@ -149,7 +163,7 @@ const AddBlogPost = () => {
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
+              className={inputBase}
               placeholder="Enter a compelling headline"
             />
           </div>
@@ -162,25 +176,34 @@ const AddBlogPost = () => {
             <input
               type="text"
               value={slug}
-              onChange={(e) => setSlug(slugify(e.target.value))}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2"
+              onChange={(e) => {
+                setSlug(slugify(e.target.value));
+                setSlugTouched(true);
+              }}
+              className={inputBase}
               placeholder="auto-generated-from-title"
+              inputMode="latin"
             />
-            <p className="text-xs text-[#6B4226]/70 mt-1">
-              The slug is used in the URL (e.g., <i>/blog/{slug || "your-slug"}</i>).
+            <p className="text-xs text-[#6B4226]/70 mt-1 break-all">
+              URL: <i>/blog/{slug || "your-slug"}</i>
             </p>
           </div>
 
           {/* Excerpt */}
           <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-1">
-              Excerpt *
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm font-medium text-[#6B4226] mb-1">
+                Excerpt *
+              </label>
+              <span className="text-xs text-[#6B4226]/60">
+                {excerpt.length}/160
+              </span>
+            </div>
             <textarea
               value={excerpt}
-              onChange={(e) => setExcerpt(e.target.value)}
+              onChange={(e) => setExcerpt(e.target.value.slice(0, 160))}
               rows={3}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2"
+              className={inputBase}
               placeholder="Short summary shown on listing cards"
             />
           </div>
@@ -193,15 +216,15 @@ const AddBlogPost = () => {
             <textarea
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              rows={12}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2"
+              rows={isMobile ? 10 : 12}
+              className={inputBase}
               placeholder="Write your post content (Markdown supported if your backend parses it)"
             />
           </div>
         </div>
 
         {/* Side column */}
-        <div className="space-y-6">
+        <div className="space-y-4 lg:space-y-6">
           {/* Cover image */}
           <div>
             <label className="block text-sm font-medium text-[#6B4226] mb-2">
@@ -211,13 +234,13 @@ const AddBlogPost = () => {
               type="file"
               accept="image/*"
               onChange={onPickCover}
-              className="w-full"
+              className="w-full text-sm"
             />
             {coverPreview && (
               <img
                 src={coverPreview}
                 alt="Cover Preview"
-                className="mt-3 rounded-md border border-[#D4A5A5] max-h-48 object-cover w-full"
+                className="mt-3 rounded-md border border-[#D4A5A5] max-h-56 object-cover w-full"
               />
             )}
           </div>
@@ -230,7 +253,7 @@ const AddBlogPost = () => {
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 bg-white"
+              className={`${inputBase} bg-white`}
             >
               <option value="">Select a category</option>
               {categories.map((c) => (
@@ -250,7 +273,7 @@ const AddBlogPost = () => {
               type="text"
               value={tags}
               onChange={(e) => setTags(e.target.value)}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2"
+              className={inputBase}
               placeholder="e.g. coffee, brewing, guides"
             />
             <p className="text-xs text-[#6B4226]/70 mt-1">
@@ -259,7 +282,7 @@ const AddBlogPost = () => {
           </div>
 
           {/* Status & schedule */}
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-[#6B4226] mb-1">
                 Status
@@ -267,7 +290,7 @@ const AddBlogPost = () => {
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value)}
-                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 bg-white"
+                className={`${inputBase} bg-white`}
               >
                 <option value="DRAFT">Draft</option>
                 <option value="PUBLISHED">Published</option>
@@ -282,7 +305,7 @@ const AddBlogPost = () => {
                 type="datetime-local"
                 value={publishAt}
                 onChange={(e) => setPublishAt(e.target.value)}
-                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2"
+                className={inputBase}
               />
               <p className="text-xs text-[#6B4226]/70 mt-1">
                 Leave empty to publish immediately.
@@ -302,36 +325,41 @@ const AddBlogPost = () => {
               type="text"
               value={metaTitle}
               onChange={(e) => setMetaTitle(e.target.value)}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3"
+              className={inputBase + " mb-3"}
               placeholder="Override page title for SEO"
             />
-            <label className="block text-sm text-[#6B4226] mb-1">
-              Meta Description
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="block text-sm text-[#6B4226] mb-1">
+                Meta Description
+              </label>
+              <span className="text-xs text-[#6B4226]/60">
+                {metaDescription.length}/160
+              </span>
+            </div>
             <textarea
               rows={3}
               value={metaDescription}
-              onChange={(e) => setMetaDescription(e.target.value)}
-              className="w-full border border-[#D4A5A5] rounded-md px-3 py-2"
+              onChange={(e) => setMetaDescription(e.target.value.slice(0, 160))}
+              className={inputBase}
               placeholder="Short description for search engines"
             />
           </div>
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="mt-8 flex flex-wrap gap-3">
+      {/* Actions (desktop) */}
+      <div className="mt-6 lg:mt-8 hidden sm:flex flex-wrap gap-3">
         <button
           disabled={submitting}
           onClick={() => handleSubmit(false)}
-          className="px-5 py-2 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
+          className="px-5 py-2.5 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
         >
           Save as Draft
         </button>
         <button
           disabled={submitting}
           onClick={() => handleSubmit(true)}
-          className="px-5 py-2 rounded-md bg-[#D4A5A5] text-white hover:opacity-90 disabled:opacity-60"
+          className="px-5 py-2.5 rounded-md bg-[#D4A5A5] text-white hover:opacity-90 disabled:opacity-60"
         >
           Publish
         </button>
@@ -341,6 +369,7 @@ const AddBlogPost = () => {
           onClick={() => {
             setTitle("");
             setSlug("");
+            setSlugTouched(false);
             setExcerpt("");
             setContent("");
             setCover(null);
@@ -353,10 +382,56 @@ const AddBlogPost = () => {
             setMetaDescription("");
             setMessage(null);
           }}
-          className="px-5 py-2 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
+          className="px-5 py-2.5 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
         >
           Reset
         </button>
+      </div>
+
+      {/* Sticky action bar (mobile) */}
+      <div className="sm:hidden">
+        <div className="h-16" />
+        <div className="fixed left-0 right-0 bottom-0 z-20 bg-white/95 backdrop-blur border-t border-[#E6DCD2] px-4 py-[10px] flex items-center gap-2 justify-between"
+             style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}>
+          <button
+            disabled={submitting}
+            onClick={() => handleSubmit(false)}
+            className="flex-1 px-4 py-2 rounded-md border border-[#D4A5A5] text-[#6B4226] disabled:opacity-60"
+          >
+            Draft
+          </button>
+          <button
+            disabled={submitting}
+            onClick={() => handleSubmit(true)}
+            className="flex-[1.2] px-4 py-2 rounded-md bg-[#D4A5A5] text-white disabled:opacity-60"
+          >
+            Publish
+          </button>
+          <button
+            type="button"
+            disabled={submitting}
+            onClick={() => {
+              setTitle("");
+              setSlug("");
+              setSlugTouched(false);
+              setExcerpt("");
+              setContent("");
+              setCover(null);
+              setCoverPreview(null);
+              setCategory("");
+              setTags("");
+              setStatus("DRAFT");
+              setPublishAt("");
+              setMetaTitle("");
+              setMetaDescription("");
+              setMessage(null);
+            }}
+            className="px-3 py-2 rounded-md border border-[#E6DCD2] text-[#6B4226] disabled:opacity-60"
+            title="Reset"
+          >
+            Reset
+          </button>
+        </div>
       </div>
     </div>
   );
