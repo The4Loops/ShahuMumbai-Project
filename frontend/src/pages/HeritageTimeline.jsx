@@ -11,7 +11,7 @@ const timeline = [
  function HeritageTimeline() {
   return (
     <Layout>
-    <div className="bg-[#fff8f1] px-4 sm:px-10 py-16 text-[#2e2e2e] min-h-screen">
+    <div className="bg-[#F1E7E5] px-4 sm:px-10 py-16 text-[#2e2e2e] min-h-screen">
       <motion.div
         className="text-center mb-16"
         initial={{ opacity: 0, y: -20 }}

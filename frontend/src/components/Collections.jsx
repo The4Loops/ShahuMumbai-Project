@@ -20,7 +20,7 @@ function Collections() {
   ];
 
   return (
-    <section className="bg-[#fdfaf6] py-20 px-6 text-center">
+    <section className="bg-[#F1E7E5] py-20 px-6 text-center">
       <h2 className="text-3xl font-semibold mb-4">Our Collections</h2>
       <p className="text-gray-600 mb-10">Explore our carefully curated collections, each telling a unique story of style and heritage.</p>
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-6xl mx-auto">

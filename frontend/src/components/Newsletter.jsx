@@ -2,7 +2,7 @@ import React from 'react';
 
 function Newsletter() {
   return (
-    <section style={{ backgroundColor: '#fdf6e9' }} className="text-black py-20 px-6 text-center">
+    <section style={{ backgroundColor: '#F1E7E5' }} className="text-black py-20 px-6 text-center">
       <div className="max-w-xl mx-auto">
         <div className="text-4xl mb-4">📧</div>
         <h2 className="text-2xl font-semibold mb-2">Stay in the Loop</h2>

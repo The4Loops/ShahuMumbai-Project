@@ -115,7 +115,7 @@ const ProductDetails = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen px-6 py-16 pt-[130px] bg-[#f9f5f0] font-serif">
+      <div className="min-h-screen px-6 py-16 pt-[130px] bg-[#F1E7E5] font-serif">
         <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-10 items-start">
           {/* Product Image Carousel */}
           <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-2 pb-8">

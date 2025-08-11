@@ -177,7 +177,7 @@ Expected Delivery: ${order.tracking.expectedDelivery}
 
   return (
     <Layout>
-    <div className="p-4 md:p-6 bg-[#f9f5f0] min-h-screen">
+    <div className="p-4 md:p-6 bg-[#F1E7E5] min-h-screen">
       <h1 className="text-2xl font-semibold mb-4 text-[#1C1C1C]">My Orders</h1>
 
       <input

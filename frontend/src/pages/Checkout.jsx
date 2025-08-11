@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { FaLock } from "react-icons/fa";
+import { FaLock, FaCreditCard, FaUniversity, FaMobileAlt } from "react-icons/fa";
 import { MdEmail, MdPhone, MdPerson } from "react-icons/md";
 import Layout from "../layout/Layout";
 
@@ -38,7 +38,7 @@ function Checkout() {
     netbankingOtp: "",
   });
 
-  const [isModalOpen, setIsModalOpen] = useState(false); // ✅ Modal state
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [token, setToken] = useState("");
 
   const generateToken = () => {
@@ -67,14 +67,12 @@ function Checkout() {
 
   const handleSubmit = () => {
     if (!isValid()) {
-      // Optional: show a non-modal warning here instead of alert
       return;
     }
 
     setToken(generateToken());
-    setIsModalOpen(true); // ✅ Show modal
+    setIsModalOpen(true);
 
-    // Clear form
     setFormData({ name: "", email: "", phone: "" });
     setCredentials({
       cardNumber: "",
@@ -195,6 +193,14 @@ function Checkout() {
     }
   };
 
+  // Map payment method names to icons
+  const paymentIcons = {
+    "Credit Card": <FaCreditCard />,
+    "Debit Card": <FaCreditCard />,
+    UPI: <FaMobileAlt />,
+    "Net Banking": <FaUniversity />,
+  };
+
   return (
     <Layout>
       <div className="max-w-3xl mx-auto p-6 space-y-6 min-h-screen">
@@ -243,19 +249,17 @@ function Checkout() {
           </h3>
 
           <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-            {["Credit Card", "Debit Card", "UPI", "Net Banking"].map(
-              (method) => (
-                <button
-                  key={method}
-                  onClick={() => setPaymentMethod(method)}
-                  className={`border rounded px-3 py-2 hover:bg-gray-50 ${
-                    paymentMethod === method ? "bg-gray-200 font-bold" : ""
-                  }`}
-                >
-                  {method}
-                </button>
-              )
-            )}
+            {["Credit Card", "Debit Card", "UPI", "Net Banking"].map((method) => (
+              <button
+                key={method}
+                onClick={() => setPaymentMethod(method)}
+                className={`border rounded px-3 py-2 hover:bg-gray-50 flex items-center gap-2 ${
+                  paymentMethod === method ? "bg-gray-200 font-bold" : ""
+                }`}
+              >
+                {paymentIcons[method]} {method}
+              </button>
+            ))}
           </div>
 
           {paymentMethod && <div className="mt-4">{renderPaymentFields()}</div>}
@@ -293,9 +297,7 @@ function Checkout() {
               <h2 className="text-xl font-semibold text-green-600">
                 ✅ Payment Successful
               </h2>
-              <p className="text-gray-700">
-                Thank you for your purchase!
-              </p>
+              <p className="text-gray-700">Thank you for your purchase!</p>
               <p className="text-sm font-mono text-gray-600">
                 🧾 Transaction Token: <strong>{token}</strong>
               </p>

@@ -12,28 +12,39 @@ function Hero() {
   const [canAutoplay, setCanAutoplay] = useState(true);
 
   useEffect(() => {
-    // Disable autoplay on mobile (optional)
-    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-    setCanAutoplay(!isMobile);
+    // Feature-detect autoplay support
+    const testVideo = document.createElement("video");
+    testVideo.muted = true;
+    testVideo.playsInline = true;
+
+    testVideo
+      .play()
+      .then(() => setCanAutoplay(true))
+      .catch(() => setCanAutoplay(false));
   }, []);
 
   return (
-    <section className="relative min-h-screen w-full h-auto overflow-hidden bg-[#fdf6e9]">
-      {/* Parallax Video Background with Filters */}
-      <motion.video
+    <section className="relative min-h-screen w-auto h-auto overflow-hidden bg-[#fdf6e9]">
+      
+      {/* Parallax Video Background */}
+      <motion.div
         style={{ y }}
-        autoPlay={canAutoplay}
-        loop
-        muted
-        playsInline
-        className="absolute top-0 left-0 w-full h-full object-cover z-0 filter grayscale sepia"
+        className="absolute top-0 left-0 w-full h-auto z-0"
       >
-        <source src={video} type="video/mp4" />
-        Your browser does not support the video tag.
-      </motion.video>
+        <video
+          autoPlay={canAutoplay}
+          loop
+          muted
+          playsInline
+          aria-hidden="true"
+          className="w-full h-full object-cover filter grayscale sepia"
+        >
+          <source src={video} type="video/mp4" />
+        </video>
+      </motion.div>
 
       {/* Overlay */}
-      <div className="absolute top-0 left-0 w-full h-auto bg-black/40 z-10" />
+      <div className="absolute top-0 left-0 w-full h-full bg-black/40 z-10" />
 
       {/* Text Content */}
       <div className="relative z-20 flex items-center justify-center min-h-screen px-6 py-12">

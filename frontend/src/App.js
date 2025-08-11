@@ -22,6 +22,7 @@ import Wishlist from "./pages/Wishlist";
 import Profile from "./pages/Profile";
 import Checkout from "./pages/Checkout";
 import useAutoLogout from "./AutoLogout";
+import Blog from "./pages/Blog";
 
 function App() {
   useAutoLogout(); // Initialize auto logout functionality
@@ -57,6 +58,7 @@ function App() {
         <Route path="/wishlist" element={<Wishlist/>} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/checkout" element={<Checkout/>} />
+        <Route path="/blog" element={<Blog />} />
       </Routes>
     </div>
   );

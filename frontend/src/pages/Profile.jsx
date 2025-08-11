@@ -130,7 +130,7 @@ function Profile() {
         transition={{ duration: 0.5 }}
       >
         {/* Profile Summary */}
-        <div className="col-span-1 text-center bg-white rounded-2xl shadow p-6 sm:col-span-1">
+        <div className="col-span-1 text-center bg-#F1E7E5 rounded-2xl shadow p-6 sm:col-span-1">
           <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4">
             {profile.image ? (
               <img

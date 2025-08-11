@@ -29,7 +29,7 @@ function ContactPage() {
 
   return (
     <Layout>
-    <div className="bg-[#fff8f1] px-4 sm:px-8 md:px-16 lg:px-24 py-10 space-y-16 text-[#2e2e2e]">
+    <div className="bg-[#F1E7E5] px-4 sm:px-8 md:px-16 lg:px-24 py-10 space-y-16 text-[#2e2e2e]">
       {/* Header */}
       <motion.div
         className="text-center"

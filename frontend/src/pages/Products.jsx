@@ -53,7 +53,7 @@ const Products = () => {
 
   return (
     <Layout>
-      <div className="pt-[130px] pb-12 px-4 bg-[#F9F5F0] min-h-screen font-serif">
+      <div className="pt-[130px] pb-12 px-4 bg-[#EDE1DF] min-h-screen font-serif">
         {/* Banner */}
         <div
           className="bg-[#ede0d4] border-l-8 border-[#9c6644] rounded-lg mx-auto mb-8 px-8 py-6 max-w-[1000px] text-center"
