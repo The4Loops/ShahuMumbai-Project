@@ -182,8 +182,7 @@ function Checkout() {
               placeholder="Transaction Password / OTP"
             />
             <p className="text-xs text-gray-500 mt-1">
-              🔒 No sensitive bank details (like account number or IFSC) are
-              directly shared with the merchant.
+              🔒 No sensitive bank details (like account number or IFSC) are directly shared with the merchant.
             </p>
           </div>
         );
@@ -193,7 +192,6 @@ function Checkout() {
     }
   };
 
-  // Map payment method names to icons
   const paymentIcons = {
     "Credit Card": <FaCreditCard />,
     "Debit Card": <FaCreditCard />,
@@ -203,9 +201,9 @@ function Checkout() {
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto p-6 space-y-6 min-h-screen">
+      <div className="max-w-3xl mx-auto p-6 space-y-6">
         {/* Payment Form */}
-        <div className="border rounded-xl p-4 space-y-4">
+        <div className="border rounded-xl p-4 space-y-4 bg-white shadow-md">
           <h3 className="text-lg font-semibold mb-2">👤 Customer Information</h3>
           <div className="flex items-center border rounded px-3 py-2 gap-2">
             <MdPerson className="text-gray-400" />
@@ -243,7 +241,7 @@ function Checkout() {
         </div>
 
         {/* Secure Payment */}
-        <div className="border rounded-xl p-4 space-y-4">
+        <div className="border rounded-xl p-4 space-y-4 bg-white shadow-md">
           <h3 className="text-lg font-semibold mb-2 flex items-center gap-2">
             <FaLock className="text-green-600" /> Secure Payment
           </h3>

@@ -287,7 +287,10 @@ const Navbar = () => {
 </div>
 
       {/* Desktop Navigation */}
-      <ul className="hidden lg:flex items-center gap-8 py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1] w-full">
+      <div className="hidden lg:flex items-center py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1] w-full">
+      
+      {/* LEFT: Menu */}
+      <ul className="flex items-center gap-8 flex-[1]">
         <li>
           <Link
             to="/"
@@ -325,14 +328,20 @@ const Navbar = () => {
             </Link>
           </li>
         )}
-        <li className="ml-auto">
-          <input
-            type="text"
-            placeholder="Search"
-            aria-label="Search products"
-            className="w-[300px] sm:w-[400px] px-4 py-2 rounded-full border border-gray-300 bg-white focus:outline-none focus:border-[#D4A5A5]"
-          />
-        </li>
+      </ul>
+
+      {/* CENTER: Search */}
+      <div className="flex justify-center flex-[1]">
+        <input
+          type="text"
+          placeholder="Search"
+          aria-label="Search products"
+          className="w-[250px] px-3 py-1.5 rounded-full border border-gray-300 bg-white focus:outline-none focus:border-[#D4A5A5]"
+        />
+      </div>
+
+      {/* RIGHT: Icons */}
+      <ul className="flex items-center gap-6 justify-end flex-[1]">
         <li
           ref={refs.account}
           className="relative list-none"
@@ -364,66 +373,71 @@ const Navbar = () => {
             aria-haspopup="true"
             aria-expanded={dropdown.account}
           >
-            <FaUser size={20} title="Account" />
-          </button>
-          {token && (
-            <div
-              className={clsx(
-                "absolute top-full right-0 mt-2 bg-white p-4 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[180px] transition-all duration-300 transform",
-                dropdown.account
-                  ? "opacity-100 translate-y-2 pointer-events-auto"
-                  : "opacity-0 translate-y-1 pointer-events-none"
-              )}
-            >
-              <ul className="space-y-2">
-                <li>
-                  <button
-                    onClick={() => handleProtectedClick("/profile")}
-                    className="hover:text-[#D4A5A5] text-gray-700"
-                  >
-                    My Profile
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => handleProtectedClick("/myorder")}
-                    className="hover:text-[#D4A5A5] text-gray-700"
-                  >
-                    Track Order
-                  </button>
-                </li>
-                <li>
-                  <Link
-                    to="/wishlist"
-                    onClick={() =>
-                      setDropdown((prev) => ({ ...prev, account: false }))
-                    }
-                    className="hover:text-[#D4A5A5] text-gray-700"
-                  >
-                    Wishlist
-                  </Link>
-                </li>
-                <li>
-                  <button
-                    onClick={handleLogout}
-                    className="hover:text-[#D4A5A5] text-gray-700"
-                  >
-                    Logout
-                  </button>
-                </li>
-              </ul>
-            </div>
-          )}
-        </li>
-        <li className="relative">
-          <Link to="/cart" className="hover:text-[#D4A5A5] relative">
-            <FaShoppingCart size={20} title="Cart" />
-            <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
-              {cartItemCount}
-            </span>
-          </Link>
-        </li>
-      </ul>
+
+              <FaUser size={20} title="Account" />
+            </button>
+
+            {token && (
+              <div
+                className={clsx(
+                  "absolute top-full right-0 mt-2 bg-white p-4 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[180px] transition-all duration-300 transform",
+                  dropdown.account
+                    ? "opacity-100 translate-y-2 pointer-events-auto"
+                    : "opacity-0 translate-y-1 pointer-events-none"
+                )}
+              >
+                <ul className="space-y-2">
+                  <li>
+                    <button
+                      onClick={() => handleProtectedClick("/profile")}
+                      className="hover:text-[#D4A5A5] text-gray-700"
+                    >
+                      My Profile
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => handleProtectedClick("/myorder")}
+                      className="hover:text-[#D4A5A5] text-gray-700"
+                    >
+                      Track Order
+                    </button>
+                  </li>
+                  <li>
+                    <Link
+                      to="/wishlist"
+                      onClick={() =>
+                        setDropdown((prev) => ({ ...prev, account: false }))
+                      }
+                      className="hover:text-[#D4A5A5] text-gray-700"
+                    >
+                      Wishlist
+                    </Link>
+                  </li>
+                  <li>
+                    <button
+                      onClick={handleLogout}
+                      className="hover:text-[#D4A5A5] text-gray-700"
+                    >
+                      Logout
+                    </button>
+                  </li>
+                </ul>
+              </div>
+            )}
+          </li>
+
+          <li className="relative">
+            <Link to="/cart" className="hover:text-[#D4A5A5] relative">
+              <FaShoppingCart size={20} title="Cart" />
+              <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
+                {cartItemCount}
+              </span>
+            </Link>
+          </li>
+        </ul>
+      </div>
+
           {/* Mobile Navigation */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 text-[#6B4226] font-medium text-base overflow-y-auto max-h-[calc(100vh-96px)]">

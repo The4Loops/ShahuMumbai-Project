@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import React from 'react'
+import React from 'react';
 
 const items = [
   { title: 'Vintage Silk Scarf', price: '$89', oldPrice: '$120', tag: 'New', img: '🧣' },
@@ -10,25 +10,41 @@ const items = [
 
 function Featured() {
   return (
-    <section className="py-16 px-6 text-center">
-      <h2 className="text-3xl font-semibold mb-2">Featured Treasures</h2>
-      <p className="text-gray-600 mb-8">Handpicked vintage pieces that capture timeless style and craftsmanship.</p>
+    <section className="py-16 px-6 text-center bg-[#F1E7E5]">
+      <h2 className="text-3xl font-semibold mb-2 text-[#6B4226]">Featured Treasures</h2>
+      <p className="text-[#6B4226]/70 mb-8">
+        Handpicked vintage pieces that capture timeless style and craftsmanship.
+      </p>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 max-w-6xl mx-auto">
         {items.map((item, i) => (
           <motion.div
             key={i}
-            className="bg-white rounded-xl p-6 shadow hover:shadow-lg transition"
+            className="bg-white rounded-xl p-6 shadow hover:shadow-lg transition border border-[#E6DCD2]"
             whileHover={{ scale: 1.03 }}
           >
-            {item.tag && <span className="text-xs bg-pink-100 text-pink-600 px-2 py-1 rounded-full">{item.tag}</span>}
+            {item.tag && (
+              <span className="text-xs bg-[#F3DEDE] text-[#6B4226] px-2 py-1 rounded-full">
+                {item.tag}
+              </span>
+            )}
             <div className="text-6xl my-4">{item.img}</div>
-            <h3 className="text-lg font-medium">{item.title}</h3>
-            <p className="text-green-700 font-semibold">{item.price} <span className="text-sm text-gray-400 line-through">{item.oldPrice}</span></p>
+            <h3 className="text-lg font-medium text-[#6B4226]">{item.title}</h3>
+            <p className="text-[#6B4226] font-semibold">
+              {item.price}{' '}
+              <span className="text-sm text-[#6B4226]/50 line-through">
+                {item.oldPrice}
+              </span>
+            </p>
           </motion.div>
         ))}
       </div>
-      <button className="mt-8 bg-green-700 text-white px-6 py-2 rounded-lg">View All Products</button>
+
+      <button className="mt-8 bg-[#D4A5A5] text-white px-6 py-2 rounded-lg hover:opacity-90 transition">
+        View All Products
+      </button>
     </section>
   );
 }
+
 export default Featured;

@@ -8,6 +8,7 @@ import OrderDashboard from './OrderDashboard';
 import Analytics from './Analytics';
 import AddCategory from './AddCategory';
 import AddAdmin from './AddAdmin';
+import AddBlogPost from './AddBlogPost';
 import { FaBars, FaTimes } from 'react-icons/fa';
 
 const TABS = [
@@ -19,6 +20,7 @@ const TABS = [
   'Order Dashboard',
   'Analytics',
   'Add Category',
+  'Add Blog Post',
 ];
 
 const AdminPanel = () => {
@@ -91,6 +93,7 @@ const AdminPanel = () => {
               {activeTab === 'Order Dashboard' && <OrderDashboard />}
               {activeTab === 'Analytics' && <Analytics />}
               {activeTab === 'Add Category' && <AddCategory />}
+              {activeTab === 'Add Blog Post' && <AddBlogPost />}
             </div>
           </div>
         </div>

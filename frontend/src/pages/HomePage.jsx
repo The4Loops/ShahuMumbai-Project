@@ -9,9 +9,9 @@ function HomePage() {
   return (
     <Layout>
       <Hero />
+      <Newsletter collapsible defaultOpen={false} />
       <Featured />
       <Collections />
-      <Newsletter />
     </Layout>
   );
 }
