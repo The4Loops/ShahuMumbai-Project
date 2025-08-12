@@ -158,10 +158,14 @@ exports.getProductById = async (req, res) => {
       .select(
         `
         *,
-        product_images (
+        product_images!product_id (
           id,
           image_url,
           is_hero
+        ),
+        categories!categoryid (
+          categoryid,
+          name
         )
       `
       )

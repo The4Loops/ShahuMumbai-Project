@@ -7,7 +7,6 @@ import BannerManager from './BannerManager';
 import OrderDashboard from './OrderDashboard';
 import Analytics from './Analytics';
 import AddCategory from './AddCategory';
-import AddAdmin from './AddAdmin';
 import AddBlogPost from './AddBlogPost';
 import UserManagement from './UsreManagement';
 import TeamManagement from './TeamManagement'; // ✅ New import
@@ -16,7 +15,6 @@ import { FaBars, FaTimes } from 'react-icons/fa';
 const TABS = [
   'Add Product',
   'Sales Report',
-  'Add Admin',
   'Inventory Tracker',
   'Banner Manager',
   'Order Dashboard',
@@ -136,7 +134,6 @@ const AdminPanel = () => {
             <div className="w-full bg-white p-4 sm:p-6 rounded-lg shadow-md border border-[#D4A5A5]">
               {activeTab === 'Add Product' && <AddProduct />}
               {activeTab === 'Sales Report' && <SalesReport />}
-              {activeTab === 'Add Admin' && <AddAdmin />}
               {activeTab === 'Inventory Tracker' && <InventoryTracker />}
               {activeTab === 'Banner Manager' && <BannerManager />}
               {activeTab === 'Order Dashboard' && <OrderDashboard />}

@@ -52,7 +52,7 @@ function App() {
         <Route path="/contemporaryartisans" element={<ContemporaryArtisans />} />
         <Route path="/auth/callback" element={<Callback />} />
         <Route path="/about" element={<About />} />
-        <Route path="/product/:id" element={<ProductDetails />} />
+        <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/myorder" element={<MyOrder />} />
         <Route path="/wishlist" element={<Wishlist/>} />

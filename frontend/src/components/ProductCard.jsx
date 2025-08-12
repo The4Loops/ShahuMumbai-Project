@@ -7,7 +7,7 @@ const ProductCard = ({ product }) => {
   return (
     <div className="bg-[#F9F5F0] border border-[#D4A5A5] rounded-xl shadow-[0_4px_10px_rgba(139,115,105,0.15)] p-5 relative overflow-hidden group transition-transform duration-300 hover:-translate-y-1">
 
-       <Link to={`/product/${id}`} className="group">
+       <Link to={`/products/${id}`} className="group">
       {/* Top Decorative Accent */}
       <div className="absolute top-0 left-0 w-full h-[6px] bg-[#F9F5F0] group-hover:bg-[#C39898] transition-colors duration-300" />
 
