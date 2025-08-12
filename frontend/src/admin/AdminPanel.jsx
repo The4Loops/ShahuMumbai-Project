@@ -9,6 +9,8 @@ import Analytics from './Analytics';
 import AddCategory from './AddCategory';
 import AddAdmin from './AddAdmin';
 import AddBlogPost from './AddBlogPost';
+import UserManagement from './UsreManagement';
+import TeamManagement from './TeamManagement'; // ✅ New import
 import { FaBars, FaTimes } from 'react-icons/fa';
 
 const TABS = [
@@ -21,6 +23,8 @@ const TABS = [
   'Analytics',
   'Add Category',
   'Add Blog Post',
+  'User Management',
+  'Team Management', // ✅ New tab
 ];
 
 const AdminPanel = () => {
@@ -35,7 +39,6 @@ const AdminPanel = () => {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  // Close drawer with ESC
   useEffect(() => {
     const onKeyDown = (e) => {
       if (e.key === 'Escape') setIsSidebarOpen(false);
@@ -71,7 +74,6 @@ const AdminPanel = () => {
           <div className="flex items-center justify-between mb-6 lg:mb-10">
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#6B4226]">Admin Panel</h1>
 
-            {/* Mobile Toggle Button */}
             {isMobile && (
               <button
                 className="text-[#6B4226] text-2xl border border-[#D4A5A5] px-3 py-2 rounded-md"
@@ -83,7 +85,6 @@ const AdminPanel = () => {
             )}
           </div>
 
-          {/* Mobile Tab Picker (quick jump without opening drawer) */}
           {isMobile && (
             <div className="mb-4">
               <label className="sr-only" htmlFor="tabPicker">Select admin section</label>
@@ -101,20 +102,16 @@ const AdminPanel = () => {
           )}
 
           <div className="flex flex-col lg:flex-row gap-6 lg:gap-8 relative">
-            {/* Sidebar (desktop static) */}
             <div className="hidden lg:block w-full lg:w-80 bg-white p-6 rounded-lg shadow border border-[#D4A5A5] h-fit sticky top-24">
               {Sidebar}
             </div>
 
-            {/* Off-canvas Sidebar (mobile) */}
             {isMobile && isSidebarOpen && (
               <>
-                {/* Backdrop */}
                 <div
                   className="fixed inset-0 bg-black/40 z-40"
                   onClick={() => setIsSidebarOpen(false)}
                 />
-                {/* Drawer */}
                 <aside
                   className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#D4A5A5]
                              rounded-r-xl"
@@ -136,7 +133,6 @@ const AdminPanel = () => {
               </>
             )}
 
-            {/* Tab Content */}
             <div className="w-full bg-white p-4 sm:p-6 rounded-lg shadow-md border border-[#D4A5A5]">
               {activeTab === 'Add Product' && <AddProduct />}
               {activeTab === 'Sales Report' && <SalesReport />}
@@ -147,6 +143,8 @@ const AdminPanel = () => {
               {activeTab === 'Analytics' && <Analytics />}
               {activeTab === 'Add Category' && <AddCategory />}
               {activeTab === 'Add Blog Post' && <AddBlogPost />}
+              {activeTab === 'User Management' && <UserManagement />}
+              {activeTab === 'Team Management' && <TeamManagement />} {/* ✅ New content */}
             </div>
           </div>
         </div>
