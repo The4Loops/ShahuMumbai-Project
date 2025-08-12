@@ -7,4 +7,8 @@ router.post('/register/verify', authController.verifyOtpAndRegister);
 router.post('/login', authController.login);
 router.post('/ssoLogin',authController.ssoLogin);
 
+router.post("/admin/create-user", authController.adminCreateUser);
+router.get("/admin/users", authController.getAllUsers);
+
+
 module.exports = router;
