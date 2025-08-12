@@ -1,6 +1,6 @@
 import React from "react";
 import { motion } from "framer-motion";
-import { AiOutlineHeart, AiOutlineShoppingCart, AiOutlineDelete } from "react-icons/ai";
+import { AiOutlineShoppingCart, AiOutlineDelete } from "react-icons/ai";
 import Layout from "../layout/Layout";
 
 const wishlistItems = [
@@ -54,35 +54,74 @@ const wishlistItems = [
   },
 ];
 
+// Animation variants
+const fadeUpVariant = {
+  hidden: { opacity: 0, y: 20 },
+  visible: (i) => ({
+    opacity: 1,
+    y: 0,
+    transition: { delay: i * 0.15, duration: 0.5, ease: "easeOut" },
+  }),
+};
+
 const Wishlist = () => {
   const inStockItems = wishlistItems.filter((item) => item.inStock);
+  const totalValue = wishlistItems
+    .reduce((total, item) => total + item.price, 0)
+    .toFixed(2);
 
   return (
     <Layout>
       <div className="p-6">
-        <div className="text-2xl font-bold mb-4">Your Favorite Items</div>
-
-        <div className="flex flex-wrap gap-4 mb-6">
-          <div className="bg-gray-100 p-4 rounded-lg w-40 text-center">
-            <div className="text-lg font-semibold">{wishlistItems.length}</div>
-            <div className="text-sm">Total Items</div>
+        {/* Header Row */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
+          <div>
+            <h1 className="text-2xl font-bold">Your Favorite Items</h1>
+            <p className="text-gray-500 text-sm">
+              {wishlistItems.length} items saved for later
+            </p>
           </div>
-          <div className="bg-gray-100 p-4 rounded-lg w-40 text-center">
-            <div className="text-lg font-semibold">{inStockItems.length}</div>
-            <div className="text-sm">In Stock</div>
-          </div>
-          <div className="bg-gray-100 p-4 rounded-lg w-40 text-center">
-            <div className="text-lg font-semibold">
-              ${wishlistItems.reduce((total, item) => total + item.price, 0).toFixed(2)}
-            </div>
-            <div className="text-sm">Total Value</div>
+          <div className="flex gap-3 mt-4 sm:mt-0">
+            <button className="flex items-center gap-2 border border-red-500 text-red-500 px-4 py-2 rounded hover:bg-red-50 text-sm font-medium">
+              <AiOutlineDelete size={16} /> Clear All
+            </button>
+            <button className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded hover:bg-gray-800 text-sm font-medium">
+              <AiOutlineShoppingCart size={16} /> Add All to Cart (
+              {inStockItems.length})
+            </button>
           </div>
         </div>
 
+        {/* Stats Row with animation */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+          {[
+            { label: "Total Items", value: wishlistItems.length },
+            { label: "In Stock", value: inStockItems.length },
+            { label: "Total Value", value: `$${totalValue}` },
+          ].map((stat, index) => (
+            <motion.div
+              key={stat.label}
+              className="border rounded-lg p-6 text-center"
+              variants={fadeUpVariant}
+              initial="hidden"
+              animate="visible"
+              custom={index}
+            >
+              <div className="text-xl font-bold">{stat.value}</div>
+              <div className="text-sm text-gray-500">{stat.label}</div>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Wishlist Grid with animation */}
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-          {wishlistItems.map((item) => (
+          {wishlistItems.map((item, index) => (
             <motion.div
               key={item.id}
+              variants={fadeUpVariant}
+              initial="hidden"
+              animate="visible"
+              custom={index + 3} // delay starts after stats
               whileHover={{ scale: 1.02 }}
               className="bg-white rounded-xl shadow-md overflow-hidden relative"
             >
@@ -91,17 +130,21 @@ const Wishlist = () => {
                   -{item.discount}%
                 </div>
               )}
-
               <div
                 className="w-full h-56"
                 style={{ backgroundColor: item.color }}
               />
-
               <div className="p-4">
-                <div className="text-xs text-gray-500 uppercase mb-1">{item.category}</div>
-                <div className="font-semibold text-sm mb-2 line-clamp-2">{item.title}</div>
+                <div className="text-xs text-gray-500 uppercase mb-1">
+                  {item.category}
+                </div>
+                <div className="font-semibold text-sm mb-2 line-clamp-2">
+                  {item.title}
+                </div>
                 <div className="mb-2">
-                  <span className="text-lg font-bold text-gray-800">${item.price.toFixed(2)}</span>
+                  <span className="text-lg font-bold text-gray-800">
+                    ${item.price.toFixed(2)}
+                  </span>
                   {item.originalPrice && (
                     <span className="line-through text-sm text-gray-400 ml-2">
                       ${item.originalPrice.toFixed(2)}
@@ -120,15 +163,15 @@ const Wishlist = () => {
                     }`}
                     disabled={!item.inStock}
                   >
-                    {item.inStock ? <AiOutlineShoppingCart size={14} /> : "Out of Stock"}
+                    {item.inStock ? (
+                      <AiOutlineShoppingCart size={14} />
+                    ) : (
+                      "Out of Stock"
+                    )}
                     {item.inStock && "Add to Cart"}
                   </button>
                 </div>
               </div>
-
-              <button className="absolute top-2 right-2">
-                <AiOutlineHeart size={18} className="text-pink-500 fill-pink-100" />
-              </button>
             </motion.div>
           ))}
         </div>

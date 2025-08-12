@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { FaLock, FaCreditCard, FaUniversity, FaMobileAlt } from "react-icons/fa";
-import { MdEmail, MdPhone, MdPerson } from "react-icons/md";
+import { MdEmail, MdPhone, MdPerson, MdHome } from "react-icons/md";
 import Layout from "../layout/Layout";
 
 const product = {
@@ -24,6 +24,7 @@ function Checkout() {
     name: "",
     email: "",
     phone: "",
+    address: "", // ✅ Added address field
   });
 
   const [paymentMethod, setPaymentMethod] = useState("");
@@ -56,11 +57,12 @@ function Checkout() {
   };
 
   const isValid = () => {
-    const { name, email, phone } = formData;
+    const { name, email, phone, address } = formData;
     return (
       name.trim().length > 0 &&
       /\S+@\S+\.\S+/.test(email) &&
       /^\+?\d{10,}$/.test(phone) &&
+      address.trim().length > 5 && // ✅ Require at least 6 characters for address
       paymentMethod
     );
   };
@@ -73,7 +75,7 @@ function Checkout() {
     setToken(generateToken());
     setIsModalOpen(true);
 
-    setFormData({ name: "", email: "", phone: "" });
+    setFormData({ name: "", email: "", phone: "", address: "" });
     setCredentials({
       cardNumber: "",
       expiry: "",
@@ -202,7 +204,7 @@ function Checkout() {
   return (
     <Layout>
       <div className="max-w-3xl mx-auto p-6 space-y-6">
-        {/* Payment Form */}
+        {/* Customer Information */}
         <div className="border rounded-xl p-4 space-y-4 bg-white shadow-md">
           <h3 className="text-lg font-semibold mb-2">👤 Customer Information</h3>
           <div className="flex items-center border rounded px-3 py-2 gap-2">
@@ -236,6 +238,18 @@ function Checkout() {
               className="flex-1 outline-none text-sm"
               type="tel"
               placeholder="+91 98765 43210"
+            />
+          </div>
+          {/* ✅ Address Field */}
+          <div className="flex items-center border rounded px-3 py-2 gap-2">
+            <MdHome className="text-gray-400" />
+            <input
+              name="address"
+              value={formData.address}
+              onChange={handleChange}
+              className="flex-1 outline-none text-sm"
+              type="text"
+              placeholder="Full Address (House No, Street, City, Pincode)"
             />
           </div>
         </div>

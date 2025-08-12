@@ -92,7 +92,7 @@ function ContactPage() {
             ></textarea>
             <button
               type="submit"
-              className="flex items-center justify-center gap-2 bg-[#e91e63] text-white px-4 py-2 rounded hover:bg-pink-700 transition"
+              className="flex items-center justify-center gap-2 bg-[#b88c85] text-white px-4 py-2 rounded hover:bg-pink-700 transition"
             >
               Send Message <FaPaperPlane size={16} />
             </button>
