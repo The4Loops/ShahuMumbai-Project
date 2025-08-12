@@ -13,7 +13,11 @@ const AddProduct = () => {
     setValue,
     watch,
     trigger,
-  } = useForm();
+  } = useForm({
+    defaultValues: {
+      categoryid: '', 
+    }
+  });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [heroImageIndex, setHeroImageIndex] = useState(null);
@@ -59,6 +63,7 @@ const AddProduct = () => {
 
   const price = watch('price');
   const discountprice = watch('discountprice');
+  const categoryid = watch('categoryid'); 
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
@@ -68,6 +73,9 @@ const AddProduct = () => {
       // Validate hero image selection
       if (selectedImages.length === 0) throw new Error('At least one image is required');
       if (heroImageIndex === null) throw new Error('Please select a hero image');
+
+      // Validate categoryid
+      if (!data.categoryid) throw new Error('Category is required');
 
       // Upload images (multipart)
       const formData = new FormData();
@@ -219,7 +227,7 @@ const AddProduct = () => {
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">Category *</label>
           <Select
-            options={(categories || []).map((c) => ({ value: c.id, label: c.name }))}
+            options={(categories || []).map((c) => ({ value: c.categoryid, label: c.name }))}
             onChange={(opt) => {
               setValue('categoryid', opt ? opt.value : '');
               trigger('categoryid');
@@ -229,11 +237,6 @@ const AddProduct = () => {
             isClearable
             styles={customSelectStyles}
             classNamePrefix="react-select"
-          />
-          {/* Hidden input to bind validation */}
-          <input
-            type="hidden"
-            {...register('categoryid', { required: 'Category is required' })}
           />
           {errors.categoryid && <p className="text-red-600 text-xs mt-1">{errors.categoryid.message}</p>}
         </div>

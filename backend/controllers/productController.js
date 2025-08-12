@@ -32,11 +32,27 @@ exports.createProduct = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!name || !description || !shortdescription || !categoryid || !branddesigner || !price || !stock || !images || images.length === 0) {
-      return res.status(400).json({ message: "All required fields and at least one image are required" });
+    if (
+      !name ||
+      !description ||
+      !shortdescription ||
+      !categoryid ||
+      !branddesigner ||
+      !price ||
+      !stock ||
+      !images ||
+      images.length === 0
+    ) {
+      return res
+        .status(400)
+        .json({
+          message: "All required fields and at least one image are required",
+        });
     }
-    if (!images.some(img => img.is_hero)) {
-      return res.status(400).json({ message: "At least one image must be set as hero image" });
+    if (!images.some((img) => img.is_hero)) {
+      return res
+        .status(400)
+        .json({ message: "At least one image must be set as hero image" });
     }
 
     // Insert product
@@ -61,11 +77,13 @@ exports.createProduct = async (req, res) => {
       .single();
 
     if (productError) {
-      return res.status(400).json({ message: "Error inserting product", error: productError });
+      return res
+        .status(400)
+        .json({ message: "Error inserting product", error: productError });
     }
 
     // Insert image URLs
-    const imageRecords = images.map(img => ({
+    const imageRecords = images.map((img) => ({
       product_id: product.id,
       image_url: img.url,
       is_hero: img.is_hero,
@@ -76,39 +94,57 @@ exports.createProduct = async (req, res) => {
       .insert(imageRecords);
 
     if (imageError) {
-      return res.status(400).json({ message: "Error inserting images", error: imageError });
+      return res
+        .status(400)
+        .json({ message: "Error inserting images", error: imageError });
     }
 
-    return res.status(201).json({ message: "Product created successfully", product });
+    return res
+      .status(201)
+      .json({ message: "Product created successfully", product });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
 // Get All Products
 exports.getAllProducts = async (req, res) => {
   try {
-    const { data, error } = await supabase
+    let query = supabase
       .from("products")
-      .select(`
+      .select(
+        `
         *,
-        product_images (
+        product_images!product_id (
           id,
           image_url,
           is_hero
+        ),
+        categories!categoryid (
+          categoryid,
+          name
         )
-      `)
+      `
+      )
       .eq("isactive", true);
+    
+    const { data, error } = await query;
 
     if (error) {
-      return res.status(400).json({ message: "Error fetching products", error });
+      return res
+        .status(400)
+        .json({ message: "Error fetching products", error });
     }
 
     return res.status(200).json(data);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -119,14 +155,16 @@ exports.getProductById = async (req, res) => {
 
     const { data, error } = await supabase
       .from("products")
-      .select(`
+      .select(
+        `
         *,
         product_images (
           id,
           image_url,
           is_hero
         )
-      `)
+      `
+      )
       .eq("id", id)
       .single();
 
@@ -137,7 +175,9 @@ exports.getProductById = async (req, res) => {
     return res.status(200).json(data);
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -193,7 +233,9 @@ exports.updateProduct = async (req, res) => {
       .single();
 
     if (productError || !product) {
-      return res.status(404).json({ message: "Product not found", error: productError });
+      return res
+        .status(404)
+        .json({ message: "Product not found", error: productError });
     }
 
     // Delete existing images
@@ -204,11 +246,16 @@ exports.updateProduct = async (req, res) => {
         .eq("product_id", id);
 
       if (deleteImageError) {
-        return res.status(400).json({ message: "Error deleting existing images", error: deleteImageError });
+        return res
+          .status(400)
+          .json({
+            message: "Error deleting existing images",
+            error: deleteImageError,
+          });
       }
 
       // Insert new image URLs
-      const imageRecords = images.map(img => ({
+      const imageRecords = images.map((img) => ({
         product_id: id,
         image_url: img.url,
         is_hero: img.is_hero,
@@ -219,14 +266,20 @@ exports.updateProduct = async (req, res) => {
         .insert(imageRecords);
 
       if (imageError) {
-        return res.status(400).json({ message: "Error inserting images", error: imageError });
+        return res
+          .status(400)
+          .json({ message: "Error inserting images", error: imageError });
       }
     }
 
-    return res.status(200).json({ message: "Product updated successfully", product });
+    return res
+      .status(200)
+      .json({ message: "Product updated successfully", product });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
 
@@ -247,10 +300,7 @@ exports.deleteProduct = async (req, res) => {
     const { id } = req.params;
 
     // Delete product (images will be deleted automatically due to ON DELETE CASCADE)
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("products").delete().eq("id", id);
 
     if (error) {
       return res.status(404).json({ message: "Product not found", error });
@@ -259,6 +309,8 @@ exports.deleteProduct = async (req, res) => {
     return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: "Server error", error: error.message });
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
   }
 };
