@@ -1,18 +1,14 @@
 import React from "react";
 
-const PrivacyPopup = ({ isOpen, onClose }) => {
-  if (!isOpen) return null;
-
+const PrivacyPopup = ({ onClose }) => {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="bg-white rounded-2xl shadow-lg max-w-3xl w-full max-h-[80vh] overflow-y-auto p-6 relative animate-fadeIn">
-        {/* Close Button */}
+     <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center z-50">
+      <div className="bg-white max-w-lg w-full p-6 rounded-lg relative">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-2xl font-bold text-gray-500 hover:text-gray-800"
-          aria-label="Close Privacy Policy"
+          className="absolute top-2 right-2 text-black font-bold"
         >
-          &times;
+          ✕
         </button>
 
         {/* Content */}

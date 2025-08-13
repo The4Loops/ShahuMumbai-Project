@@ -7,6 +7,7 @@ import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { IoMdShareAlt } from "react-icons/io";
+import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import RelatedCard from "../components/RelatedCard";
 import api from "../supabase/axios";
 
@@ -48,6 +49,22 @@ const QuantitySelect = ({ max = 10, value, onChange }) => (
   </select>
 );
 
+const StarRating = ({ value = 0, size = 18 }) => {
+  const full = Math.floor(value);
+  const stars = Array.from({ length: 5 }, (_, i) => (i < full ? "full" : "empty"));
+  return (
+    <span className="inline-flex items-center gap-0.5" aria-label={`Rating: ${value} out of 5`}>
+      {stars.map((t, i) =>
+        t === "full" ? (
+          <AiFillStar key={i} size={size} className="text-[#D4A5A5]" />
+        ) : (
+          <AiOutlineStar key={i} size={size} className="text-[#D4A5A5]" />
+        )
+      )}
+    </span>
+  );
+};
+
 const ProductDetails = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
@@ -56,6 +73,19 @@ const ProductDetails = () => {
   const [error, setError] = useState(null);
   const [qty, setQty] = useState(1);
   const sliderRef = useRef();
+
+  // Reviews state
+  const [reviews, setReviews] = useState([]);
+  const [avgRating, setAvgRating] = useState(0);
+  const [reviewCount, setReviewCount] = useState(0);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState(null);
+
+  // New review form
+  const [reviewName, setReviewName] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -78,8 +108,63 @@ const ProductDetails = () => {
         setLoading(false);
       }
     };
+
+    const fetchReviews = async () => {
+      try {
+        setReviewLoading(true);
+        setReviewError(null);
+        // Adjust to your API shape; expecting an array of {id, name, rating, comment, created_at}
+        const res = await api.get(`/api/products/${id}/reviews`);
+        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        setReviews(list);
+        const count = list.length;
+        const avg = count ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count : 0;
+        setReviewCount(count);
+        setAvgRating(Number(avg.toFixed(1)));
+      } catch (e) {
+        setReviewError("Failed to load reviews.");
+      } finally {
+        setReviewLoading(false);
+      }
+    };
+
     fetchProduct();
+    fetchReviews();
   }, [id]);
+
+  const submitReview = async (e) => {
+    e.preventDefault();
+    if (!reviewText.trim()) return;
+    try {
+      setSubmitting(true);
+      await api.post(`/api/products/${id}/reviews`, {
+        name: reviewName || "Anonymous",
+        rating: Number(reviewRating),
+        comment: reviewText.trim(),
+      });
+      // Optimistically add to list
+      const newItem = {
+        id: `temp-${Date.now()}`,
+        name: reviewName || "Anonymous",
+        rating: Number(reviewRating),
+        comment: reviewText.trim(),
+        created_at: new Date().toISOString(),
+      };
+      const next = [newItem, ...reviews];
+      setReviews(next);
+      setReviewCount(next.length);
+      const avg = next.reduce((s, r) => s + Number(r.rating || 0), 0) / next.length;
+      setAvgRating(Number(avg.toFixed(1)));
+      // Reset form
+      setReviewName("");
+      setReviewRating(5);
+      setReviewText("");
+    } catch (e) {
+      alert("Could not submit review. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return <p className="p-6 text-center text-[#6B4226]">Loading...</p>;
@@ -138,12 +223,14 @@ const ProductDetails = () => {
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
             <li>
-              <Link to={`/category/${product.categories?.name || "all"}`} className="hover:underline">
-                {product.categories?.name || "Category"}
+              <Link to="/products" className="hover:underline">
+                Our Products
               </Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
-            <li className="text-[#3E2C23] truncate max-w-[60%]" title={product.name}>{product.name}</li>
+            <li className="text-[#3E2C23] truncate max-w-[60%]" title={product.name}>
+              {product.name}
+            </li>
           </ol>
         </nav>
 
@@ -222,7 +309,13 @@ const ProductDetails = () => {
             <div className="lg:sticky lg:top-24 flex flex-col gap-4">
               <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-5">
                 <h1 className="text-2xl font-bold text-[#6B4226] mb-1">{product.name}</h1>
-                <p className="text-sm italic text-[#A3B18A]">Color: {product.color}</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <StarRating value={avgRating} />
+                  <span className="text-xs text-[#3E2C23]">
+                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+                <p className="text-sm italic text-[#A3B18A] mt-1">Color: {product.color}</p>
                 <p className="text-sm italic text-[#A3B18A]">Category: {product.categories?.name || "N/A"}</p>
 
                 <div className="mt-4">
@@ -236,8 +329,6 @@ const ProductDetails = () => {
                     <p className="text-3xl font-extrabold text-[#6B4226]">₹{mrp.toFixed(2)}</p>
                   )}
                 </div>
-
-                {/* Removed: shipping/returns hints */}
 
                 <div className="mt-5 flex items-center gap-3">
                   <QuantitySelect max={Math.min(10, Number(product.stock) || 10)} value={qty} onChange={setQty} />
@@ -270,8 +361,6 @@ const ProductDetails = () => {
                     Buy Now
                   </button>
                 </div>
-
-                {/* Removed: seller info line */}
               </div>
 
               {/* About this item */}
@@ -299,7 +388,9 @@ const ProductDetails = () => {
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
               <h2 className="text-xl font-bold text-[#6B4226] mb-3">Product Description</h2>
-              <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">{product.description || "No additional description provided."}</p>
+              <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
+                {product.description || "No additional description provided."}
+              </p>
               <div className="mt-4 text-md text-[#6B4226]">
                 Designer: <span className="font-semibold">{product.branddesigner}</span>
               </div>
@@ -320,6 +411,99 @@ const ProductDetails = () => {
                 </div>
               </dl>
             </div>
+          </div>
+        </section>
+
+        {/* Reviews */}
+        <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
+          <div className="lg:col-span-8">
+            <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-[#6B4226]">Customer Reviews</h2>
+                <div className="flex items-center gap-2">
+                  <StarRating value={avgRating} />
+                  <span className="text-sm text-[#3E2C23]">
+                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                  </span>
+                </div>
+              </div>
+
+              {reviewLoading ? (
+                <p className="text-[#6B4226]">Loading reviews…</p>
+              ) : reviewError ? (
+                <p className="text-red-500">{reviewError}</p>
+              ) : reviews.length === 0 ? (
+                <p className="text-[#3E2C23]">No reviews yet. Be the first to review!</p>
+              ) : (
+                <ul className="space-y-4">
+                  {reviews.map((r) => (
+                    <li key={r.id} className="border border-[#F1E7E5] rounded-lg p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <StarRating value={Number(r.rating) || 0} />
+                          <span className="text-sm text-[#6B4226] font-semibold">
+                            {r.name || "Anonymous"}
+                          </span>
+                        </div>
+                        <time className="text-xs text-[#3E2C23] opacity-70">
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}
+                        </time>
+                      </div>
+                      <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
+                        {r.comment}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+
+          <div className="lg:col-span-4">
+            <form onSubmit={submitReview} className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
+              <h3 className="text-lg font-bold text-[#6B4226] mb-3">Write a review</h3>
+
+              <label className="block text-sm text-[#3E2C23] mb-1">Your name (optional)</label>
+              <input
+                type="text"
+                value={reviewName}
+                onChange={(e) => setReviewName(e.target.value)}
+                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
+                placeholder="e.g., Arjun"
+              />
+
+              <label className="block text-sm text-[#3E2C23] mb-1">Rating</label>
+              <select
+                value={reviewRating}
+                onChange={(e) => setReviewRating(Number(e.target.value))}
+                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white"
+              >
+                {[5, 4, 3, 2, 1].map((n) => (
+                  <option key={n} value={n}>
+                    {n} - {n === 5 ? "Excellent" : n === 4 ? "Good" : n === 3 ? "Average" : n === 2 ? "Poor" : "Terrible"}
+                  </option>
+                ))}
+              </select>
+
+              <label className="block text-sm text-[#3E2C23] mb-1">Review</label>
+              <textarea
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                className="w-full min-h-[120px] border border-[#D4A5A5] rounded-md px-3 py-2 mb-4 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
+                placeholder="Share what you liked or what could be improved…"
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`w-full bg-[#6B4226] text-white px-6 py-3 rounded-md font-semibold shadow hover:opacity-90 transition ${
+                  submitting ? "opacity-60 cursor-not-allowed" : ""
+                }`}
+              >
+                {submitting ? "Submitting…" : "Submit Review"}
+              </button>
+            </form>
           </div>
         </section>
 

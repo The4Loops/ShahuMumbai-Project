@@ -1,8 +1,8 @@
 import React from "react";
 import { FaPhoneAlt, FaEnvelope, FaMapMarkerAlt } from "react-icons/fa";
 
-function CustomerServicePopup({ isOpen, onClose }) {
-  if (!isOpen) return null;
+function CustomerServicePopup({ onClose }) {
+
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">

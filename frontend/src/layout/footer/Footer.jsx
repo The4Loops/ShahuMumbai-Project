@@ -5,6 +5,8 @@ import CustomerServicePopup from "../CustomerService";
 import PrivacyPopup from "../Privacy";
 import TermsPopup from "../Terms";
 import ReturnsPopup from "../../pages/Returns";
+import MyOrders from "../../pages/MyOrder";
+import { Link } from "react-router-dom";
 
 const Footer = () => {
   const [showFAQ, setShowFAQ] = useState(false);
@@ -42,12 +44,11 @@ const Footer = () => {
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
                 Orders
               </h4>
-              <a
-                href="/"
+              <Link to={'/myorder'}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 Track Order
-              </a>
+              </Link>
               <button
                 onClick={() => setShowReturns(true)}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
@@ -67,6 +68,8 @@ const Footer = () => {
               >
                 Privacy
               </button>
+
+              {showPrivacy && <PrivacyPopup onClose={() => setShowPrivacy(false)} />}
               <button
                 onClick={() => setShowTerms(true)}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
