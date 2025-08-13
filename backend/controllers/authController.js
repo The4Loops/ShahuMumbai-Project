@@ -99,6 +99,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
         password: hashedPassword,
         role: "user",
         ssologin,
+        joined: new Date().toISOString(), // Set joined to current timestamp
       },
     ]);
 
@@ -125,6 +126,10 @@ exports.login = async (req, res) => {
       .eq("email", email)
       .maybeSingle();
 
+    if (!user || error) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
     // Step 2: Check if user is locked
     if (user.userlocked === "Y") {
       return res.status(403).json({
@@ -144,20 +149,10 @@ exports.login = async (req, res) => {
         invalidattempt: newAttemptCount,
       };
 
-      // If attempts > 3 → lock the account
+      // If attempts >= 3 → lock the account
       if (newAttemptCount >= 3) {
         updates.userlocked = "Y";
         updates.lockeddate = new Date().toISOString();
-
-        // Send alert email
-        const { sendMail } = require("../utils/mailer");
-        await sendMail(
-          user.email,
-          "Account Locked Due to Multiple Failed Logins",
-          `<p>Dear ${user.full_name},</p>
-     <p>Your account has been locked after multiple failed login attempts.</p>
-     <p>And it will be locked out after 5 min.</p>`
-        );
       }
 
       const { error: updateError } = await supabase
@@ -165,7 +160,7 @@ exports.login = async (req, res) => {
         .update(updates)
         .eq("id", user.id);
 
-         if (updateError) {
+      if (updateError) {
         console.error("Failed to update invalid attempts:", updateError.message);
       }
 
@@ -177,14 +172,17 @@ exports.login = async (req, res) => {
       });
     }
 
-    // Step 4: Reset InvalidAttempt count on successful login
-     const { error: resetError } = await supabase
+    // Step 4: Reset invalid attempts and update last_login
+    const { error: updateError } = await supabase
       .from("users")
-      .update({ invalidattempt: 0 })
+      .update({
+        invalidattempt: 0,
+        last_login: new Date().toISOString(), // Update last_login
+      })
       .eq("id", user.id);
 
-      if (resetError) {
-      console.error("Failed to reset invalid attempts:", resetError.message);
+    if (updateError) {
+      console.error("Failed to update user data:", updateError.message);
     }
 
     // Step 5: Generate JWT
@@ -233,34 +231,50 @@ exports.ssoLogin = async (req, res) => {
       return res.status(500).json({ error: userFetchError.message });
     }
 
-    let userRole = 'user'; 
+    let userId;
+    let userRole = "user";
 
     if (!existingUser) {
-      // New User -> Create with ssologin = Y
-      const { error: insertError } = await supabase.from("users").insert([{
-        full_name: user.user_metadata.full_name || user.email,
-        email: user.email,
-        password: "",
-        role: "user",
-        ssologin: "Y",
-      }]);
+      // New User -> Create with ssologin = Y and joined timestamp
+      const { data: newUser, error: insertError } = await supabase
+        .from("users")
+        .insert([
+          {
+            full_name: user.user_metadata.full_name || user.email,
+            email: user.email,
+            password: "",
+            role: "user",
+            ssologin: "Y",
+            joined: new Date().toISOString(), // Set joined for new user
+          },
+        ])
+        .select()
+        .single();
 
       if (insertError) {
         return res.status(500).json({ error: insertError.message });
       }
-
-      userRole = 'user';
-
+      userId = newUser.id;
     } else {
-      if (existingUser.ssologin !== 'Y') {
+      if (existingUser.ssologin !== "Y") {
         return res.status(403).json({ error: "SSO login is not allowed for this user." });
       }
+      userId = existingUser.id;
+      userRole = existingUser.role;
 
-       userRole = existingUser.role; 
+      // Update last_login for existing user
+      const { error: updateError } = await supabase
+        .from("users")
+        .update({ last_login: new Date().toISOString() })
+        .eq("id", userId);
+
+      if (updateError) {
+        console.error("Failed to update last_login:", updateError.message);
+      }
     }
 
     const appToken = jwt.sign(
-      { id: user.id,fullname:existingUser.full_name, email: user.email, role: userRole  },
+      { id: userId, fullname: user.user_metadata.full_name || user.email, email: user.email, role: userRole },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );

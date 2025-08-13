@@ -55,8 +55,10 @@ function EmployeeManagement() {
     const transformedUsers = response.data.users.map(user => ({
       ...user,
       active: user.active,
+      joined: user.joined || "N/A",
+      last_login: user.last_login || "Never",
     }));
-    console.log("Fetched Users:", transformedUsers);
+
     setUsers(transformedUsers);
     } catch (error) {
       toast.dismiss();
