@@ -5,102 +5,106 @@ import CustomerServicePopup from "../CustomerService";
 import PrivacyPopup from "../Privacy";
 import TermsPopup from "../Terms";
 import ReturnsPopup from "../../pages/Returns";
-import MyOrders from "../../pages/MyOrder";
 import { Link } from "react-router-dom";
 
 const Footer = () => {
-  const [showFAQ, setShowFAQ] = useState(false);
-  const [showCustomerService, setShowCustomerService] = useState(false);
-  const [showPrivacy, setShowPrivacy] = useState(false);
-  const [showTerms, setShowTerms] = useState(false);
-  const [showReturns, setShowReturns] = useState(false);
+  const [activePopup, setActivePopup] = useState(null);
+
+  const openPopup = (popupName) => setActivePopup(popupName);
+  const closePopup = () => setActivePopup(null);
 
   return (
     <>
       <footer className="bg-[#EDE1DF] text-black border-t-2 border-black py-12 font-serif">
-        <div className="max-full mx-auto px-6 flex flex-col items-center">
-          <div className="w-full flex flex-wrap justify-between gap-8 mb-8">
+        <div className="max-w-full mx-auto px-6 flex flex-col items-center">
+          {/* Main Footer Content */}
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-8 mb-8 text-center sm:text-left">
             {/* Services */}
-            <div className="flex-1 min-w-[160px]">
+            <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
                 Services
               </h4>
               <button
-                onClick={() => setShowCustomerService(true)}
-                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
+                onClick={() => openPopup("customerService")}
+                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 Customer Service
               </button>
               <button
-                onClick={() => setShowFAQ(true)}
-                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
+                onClick={() => openPopup("faq")}
+                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 FAQs
               </button>
             </div>
 
             {/* Orders */}
-            <div className="flex-1 min-w-[160px]">
+            <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
                 Orders
               </h4>
-              <Link to={'/myorder'}
+              <Link
+                to="/myorder"
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 Track Order
               </Link>
               <button
-                onClick={() => setShowReturns(true)}
-                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
+                onClick={() => openPopup("returns")}
+                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 Returns
               </button>
             </div>
 
             {/* Legal */}
-            <div className="flex-1 min-w-[160px]">
+            <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
                 Legal
               </h4>
               <button
-                onClick={() => setShowPrivacy(true)}
-                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
+                onClick={() => openPopup("privacy")}
+                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 Privacy
               </button>
-
-              {showPrivacy && <PrivacyPopup onClose={() => setShowPrivacy(false)} />}
               <button
-                onClick={() => setShowTerms(true)}
-                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors text-left"
+                onClick={() => openPopup("terms")}
+                className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 Terms
               </button>
             </div>
 
             {/* Follow Us */}
-            <div className="flex-1 min-w-[160px]">
+            <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
                 Follow Us
               </h4>
-              <div className="flex gap-4 mt-2 justify-start">
+              <div className="flex gap-4 mt-2 justify-center sm:justify-start">
                 <a
-                  href="/"
+                  href="https://www.facebook.com/yourpage"
                   aria-label="Facebook"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-xl text-[#000] hover:text-[#1877F2] transition-colors"
                 >
                   <FaFacebookF />
                 </a>
                 <a
-                  href="/"
+                  href="https://www.instagram.com/shahumumbai?igsh=ZDl1YnN6cTFybmtx"
                   aria-label="Instagram"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-xl text-[#000] hover:text-[#E1306C] transition-colors"
                 >
                   <FaInstagram />
                 </a>
                 <a
-                  href="/"
+                  href="https://youtube.com/@bhumishahu?si=DiWMIpcvxRkBy8kb"
                   aria-label="YouTube"
+                  target="_blank"
+                  rel="noopener noreferrer"
                   className="text-xl text-[#000] hover:text-[#FF0000] transition-colors"
                 >
                   <FaYoutube />
@@ -109,19 +113,27 @@ const Footer = () => {
             </div>
 
             {/* Newsletter */}
-            <div className="flex-1 min-w-[160px]">
+            <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
                 Newsletter
               </h4>
-              <form className="flex flex-col gap-2 mt-2 items-start">
+              <form
+                className="flex flex-col gap-2 mt-2 items-center sm:items-start"
+                onSubmit={(e) => e.preventDefault()}
+              >
+                <label htmlFor="newsletter-email" className="sr-only">
+                  Email address
+                </label>
                 <input
+                  id="newsletter-email"
                   type="email"
                   placeholder="Enter your email"
                   className="w-full px-3 py-2 border border-black rounded text-sm"
+                  required
                 />
                 <button
                   type="submit"
-                  className="bg-black text-white px-4 py-2 rounded font-bold hover:bg-gray-800 transition-colors"
+                  className="bg-black text-white px-4 py-2 rounded font-bold hover:bg-gray-800 transition-colors w-full sm:w-auto"
                 >
                   Subscribe
                 </button>
@@ -129,6 +141,7 @@ const Footer = () => {
             </div>
           </div>
 
+          {/* Copyright */}
           <div className="w-full text-center text-sm border-t border-dashed border-black pt-4 mt-8">
             <p>&copy; Shahu Mumbai 2025. All rights reserved.</p>
           </div>
@@ -136,13 +149,13 @@ const Footer = () => {
       </footer>
 
       {/* Popups */}
-      {showFAQ && <FAQPopup onClose={() => setShowFAQ(false)} />}
-      {showCustomerService && (
-        <CustomerServicePopup onClose={() => setShowCustomerService(false)} />
+      {activePopup === "faq" && <FAQPopup onClose={closePopup} />}
+      {activePopup === "customerService" && (
+        <CustomerServicePopup onClose={closePopup} />
       )}
-      {showPrivacy && <PrivacyPopup onClose={() => setShowPrivacy(false)} />}
-      {showTerms && <TermsPopup onClose={() => setShowTerms(false)} />}
-      {showReturns && <ReturnsPopup onClose={() => setShowReturns(false)} />}
+      {activePopup === "privacy" && <PrivacyPopup onClose={closePopup} />}
+      {activePopup === "terms" && <TermsPopup onClose={closePopup} />}
+      {activePopup === "returns" && <ReturnsPopup onClose={closePopup} />}
     </>
   );
 };

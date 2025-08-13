@@ -22,7 +22,7 @@ function Hero() {
   }, []);
 
   return (
-    <section className="relative min-h-screen w-full overflow-hidden bg-[#EDE1DF]">
+    <section className="relative min-h-screen w-full overflow-hidden bg-[#F1E7E5]">
       {/* Parallax Video Background */}
       <motion.div
         style={{ y }}

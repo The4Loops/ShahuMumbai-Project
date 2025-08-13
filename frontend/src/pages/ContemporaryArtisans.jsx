@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, memo } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
 
+// --- Data ---
 const artisans = [
   {
     name: "Anaya Kapoor",
@@ -44,41 +46,89 @@ const technicalTeam = [
   },
 ];
 
+// --- Components ---
+const TeamToggle = ({ view, setView }) => (
+  <nav aria-label="Team categories" className="flex justify-center mb-12 relative">
+    <div className="flex gap-8 relative">
+      {["artisans", "technical"].map((type) => (
+        <button
+          key={type}
+          onClick={() => setView(type)}
+          aria-pressed={view === type}
+          className="relative px-3 py-2 font-medium text-lg"
+        >
+          {type === "artisans" ? "Contemporary Artisans" : "Technical Team"}
+          {view === type && (
+            <motion.div
+              layoutId={`underline-${type}`}
+              className="absolute left-0 right-0 h-[3px] bg-pink-800 bottom-0 rounded-full"
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            />
+          )}
+        </button>
+      ))}
+    </div>
+  </nav>
+);
+
+const TeamMemberCard = memo(({ member, view, delay }) => (
+  <motion.div
+    className="bg-white rounded-xl shadow hover:shadow-lg transition duration-300 overflow-hidden cursor-pointer"
+    initial={{ opacity: 0, y: 30 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.5, delay }}
+  >
+    <div className="w-full h-60" style={{ backgroundColor: member.color }} />
+    <div className="p-6">
+      <h3 className="text-xl font-semibold font-serif">{member.name}</h3>
+      <p
+        className={`text-sm italic mb-2 ${
+          view === "artisans" ? "text-pink-800" : "text-blue-800"
+        }`}
+      >
+        {member.specialty}
+      </p>
+      <p className="text-[#555] text-sm">{member.bio}</p>
+    </div>
+  </motion.div>
+));
+
 export default function TeamPage() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [view, setView] = useState("artisans");
+
+  // Load from query string or localStorage
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const savedView = params.get("view") || localStorage.getItem("teamView");
+    if (savedView === "technical" || savedView === "artisans") {
+      setView(savedView);
+    }
+  }, [location.search]);
+
+  // Save state to both query string and localStorage
+  const handleViewChange = (type) => {
+    setView(type);
+    localStorage.setItem("teamView", type);
+    const params = new URLSearchParams(location.search);
+    params.set("view", type);
+    navigate({ search: params.toString() }, { replace: true });
+  };
+
   const teamData = view === "artisans" ? artisans : technicalTeam;
 
   return (
     <Layout>
       <div className="bg-[#F1E7E5] px-4 sm:px-10 py-16 min-h-screen text-[#2e2e2e]">
-        {/* Toggle Buttons with Animated Underline */}
-        <div className="flex justify-center mb-12 relative">
-          <div className="flex gap-8 relative">
-            {["artisans", "technical"].map((type) => (
-              <button
-                key={type}
-                onClick={() => setView(type)}
-                className="relative px-3 py-2 font-medium text-lg"
-              >
-                {type === "artisans"
-                  ? "Contemporary Artisans"
-                  : "Technical Team"}
-                {view === type && (
-                  <motion.div
-                    layoutId="underline"
-                    className="absolute left-0 right-0 h-[3px] bg-pink-800 bottom-0 rounded-full"
-                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
-                  />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
+        
+        {/* Toggle */}
+        <TeamToggle view={view} setView={handleViewChange} />
 
         {/* Title & Description */}
         <motion.div
           className="text-center mb-16"
-          key={view}
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
@@ -93,35 +143,15 @@ export default function TeamPage() {
           </p>
         </motion.div>
 
-        {/* Team Cards */}
+        {/* Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
           {teamData.map((member, idx) => (
-            <motion.div
-              key={idx}
-              className="bg-white rounded-xl shadow hover:shadow-md transition duration-300 overflow-hidden"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: idx * 0.15 }}
-              viewport={{ once: true }}
-            >
-              <div
-                className="w-full h-60"
-                style={{ backgroundColor: member.color }}
-              />
-              <div className="p-6">
-                <h3 className="text-xl font-semibold font-serif">
-                  {member.name}
-                </h3>
-                <p
-                  className={`text-sm italic mb-2 ${
-                    view === "artisans" ? "text-pink-800" : "text-blue-800"
-                  }`}
-                >
-                  {member.specialty}
-                </p>
-                <p className="text-[#555] text-sm">{member.bio}</p>
-              </div>
-            </motion.div>
+            <TeamMemberCard
+              key={member.name}
+              member={member}
+              view={view}
+              delay={idx * 0.15}
+            />
           ))}
         </div>
       </div>
