@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { FiGrid, FiList, FiX } from "react-icons/fi";
 
 export default function UserManagement() {
@@ -22,9 +22,12 @@ export default function UserManagement() {
   const [newUser, setNewUser] = useState({
     name: "",
     email: "",
+    password: "",
     role: "user",
     status: "active",
   });
+
+  const menuRef = useRef(null);
 
   const badgeColors = {
     admin: "bg-red-100 text-red-600",
@@ -71,13 +74,11 @@ export default function UserManagement() {
       setUsers([addedUser, ...users]);
     }
 
-    setNewUser({ name: "", email: "", role: "user", status: "active" });
-    setEditingIndex(null);
-    setShowModal(false);
+    resetForm();
   };
 
   const handleEdit = (index) => {
-    setNewUser({ ...users[index] });
+    setNewUser({ ...users[index], password: "" });
     setEditingIndex(index);
     setShowModal(true);
     setActionMenuIndex(null);
@@ -90,6 +91,12 @@ export default function UserManagement() {
     setActionMenuIndex(null);
   };
 
+  const resetForm = () => {
+    setNewUser({ name: "", email: "", password: "", role: "user", status: "active" });
+    setEditingIndex(null);
+    setShowModal(false);
+  };
+
   const renderAvatar = (user) => {
     return (
       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${avatarColors[user.role]}`}>
@@ -98,14 +105,25 @@ export default function UserManagement() {
     );
   };
 
+  // Close action menu on outside click
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setActionMenuIndex(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   return (
     <div>
       {/* Header */}
-      <h1 className="text-2xl font-semibold">User Management</h1>
+      <h1 className="text-2xl font-semibold">Employee Management</h1>
       <p className="text-gray-500 text-sm mt-1">Manage users, roles, and permissions across your organization</p>
 
       {/* Filter Section */}
-      <div className="mt-6 p-2 border rounded-lg bg-[#EDE1DF] shadow-sm">
+      <div className="mt-6 p-2 border rounded-lg bg-white shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <span className="text-gray-500">🔍 Filter & Search Users</span>
           <div className="flex flex-col sm:flex-row flex-wrap gap-3">
@@ -192,7 +210,7 @@ export default function UserManagement() {
                     {user.joined}
                     <div className="text-xs text-gray-400">Last: {user.lastLogin}</div>
                   </td>
-                  <td className="py-3 px-4 text-right relative">
+                  <td className="py-3 px-4 text-right relative" ref={menuRef}>
                     <button onClick={() => setActionMenuIndex(actionMenuIndex === idx ? null : idx)} className="px-2 py-1 rounded hover:bg-gray-100">⋮</button>
                     {actionMenuIndex === idx && (
                       <div className="absolute right-4 mt-1 bg-white border rounded shadow-lg text-sm z-10">
@@ -214,7 +232,7 @@ export default function UserManagement() {
           {filteredUsers.map((user, idx) => (
             <div key={idx} className="border rounded-lg p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition relative">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium text-white" style={{ backgroundColor: avatarColors[user.role]?.split(" ")[0] }}>
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${avatarColors[user.role]}`}>
                   {user.name.charAt(0)}
                 </div>
                 <div>
@@ -223,7 +241,7 @@ export default function UserManagement() {
                 </div>
                 <button onClick={() => setActionMenuIndex(actionMenuIndex === idx ? null : idx)} className="ml-auto px-2 py-1 rounded hover:bg-gray-100">⋮</button>
                 {actionMenuIndex === idx && (
-                  <div className="absolute right-4 top-10 bg-white border rounded shadow-lg text-sm z-10">
+                  <div className="absolute right-4 top-10 bg-white border rounded shadow-lg text-sm z-10" ref={menuRef}>
                     <button onClick={() => handleEdit(idx)} className="block px-4 py-2 hover:bg-gray-100 w-full text-left">Edit</button>
                     <button onClick={() => handleDelete(idx)} className="block px-4 py-2 hover:bg-gray-100 w-full text-left text-red-600">Delete</button>
                   </div>
@@ -244,13 +262,14 @@ export default function UserManagement() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
-            <button onClick={() => setShowModal(false)} className="absolute top-3 right-3 text-gray-500 hover:text-black">
+            <button onClick={resetForm} className="absolute top-3 right-3 text-gray-500 hover:text-black">
               <FiX size={20} />
             </button>
             <h2 className="text-xl font-semibold mb-4">{editingIndex !== null ? "Edit User" : "Add New User"}</h2>
 
             <input type="text" placeholder="Full Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="border rounded-lg px-3 py-2 w-full mb-3" />
             <input type="email" placeholder="Email Address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="border rounded-lg px-3 py-2 w-full mb-3" />
+            <input type="password" placeholder="Password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="border rounded-lg px-3 py-2 w-full mb-3" />
 
             <div className="flex gap-3 mb-3">
               <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} className="border rounded-lg px-3 py-2 w-1/2">

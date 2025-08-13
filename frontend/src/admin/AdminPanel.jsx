@@ -8,7 +8,7 @@ import OrderDashboard from './OrderDashboard';
 import Analytics from './Analytics';
 import AddCategory from './AddCategory';
 import AddBlogPost from './AddBlogPost';
-import UserManagement from './UsreManagement';
+import EmployeeManagement from './EmployeeManagement';
 import TeamManagement from './TeamManagement'; // ✅ New import
 import { FaBars, FaTimes } from 'react-icons/fa';
 
@@ -21,7 +21,7 @@ const TABS = [
   'Analytics',
   'Add Category',
   'Add Blog Post',
-  'User Management',
+  'Employee Management',
   'Team Management', // ✅ New tab
 ];
 
@@ -140,7 +140,7 @@ const AdminPanel = () => {
               {activeTab === 'Analytics' && <Analytics />}
               {activeTab === 'Add Category' && <AddCategory />}
               {activeTab === 'Add Blog Post' && <AddBlogPost />}
-              {activeTab === 'User Management' && <UserManagement />}
+              {activeTab === 'Employee Management' && <EmployeeManagement />}
               {activeTab === 'Team Management' && <TeamManagement />} {/* ✅ New content */}
             </div>
           </div>

@@ -6,116 +6,100 @@ const artistTeam = [
     initials: "IC",
     name: "Isabella Chen",
     role: "Lead Designer",
-    desc: "Creative visionary with 8+ years in vintage-inspired design. Specializes in authentic period aesthetics and modern functionality.",
+    desc: "Creative visionary with 8+ years in vintage-inspired design.",
     color: "bg-pink-500",
   },
-  {
-    initials: "MR",
-    name: "Marcus Rivera",
-    role: "Art Director",
-    desc: "Award-winning art director passionate about storytelling through visual design. Expert in branding and creative campaigns.",
-    color: "bg-orange-400",
-  },
-  {
-    initials: "SA",
-    name: "Sofia Andersson",
-    role: "Illustrator",
-    desc: "Hand-drawn illustrations and digital art specialist. Creates unique vintage-style artwork and custom designs.",
-    color: "bg-green-500",
-  },
-  {
-    initials: "ER",
-    name: "Elena Rodriguez",
-    role: "Color Specialist",
-    desc: "Expert in vintage color palettes and authentic period-appropriate design choices. 10+ years in restoration.",
-    color: "bg-purple-500",
-  },
-  {
-    initials: "JL",
-    name: "James Liu",
-    role: "Typography Designer",
-    desc: "Specialist in vintage typography and hand-lettering. Creates custom fonts and period-accurate text designs.",
-    color: "bg-blue-500",
-  },
-  {
-    initials: "AN",
-    name: "Aria Nakamura",
-    role: "UI/UX Designer",
-    desc: "Bridges vintage aesthetics with modern usability. Expert in creating intuitive interfaces with classic appeal.",
-    color: "bg-teal-500",
-  },
+  // ... your other artist members
 ];
 
 const technicalTeam = [
   {
-    initials: "DK",
-    name: "David Kim",
-    role: "Frontend Developer",
-    desc: "Specializes in modern React.js and Tailwind CSS development. Passionate about clean, responsive design.",
-    color: "bg-indigo-500",
-  },
-  {
-    initials: "SJ",
-    name: "Sarah Johnson",
-    role: "Backend Developer",
-    desc: "Expert in Node.js, Express, and API development. Builds secure, scalable backend solutions.",
-    color: "bg-pink-500",
-  },
-  {
-    initials: "MP",
-    name: "Michael Patel",
-    role: "Full Stack Engineer",
-    desc: "Brings concepts to life from UI to database with a focus on performance and security.",
-    color: "bg-orange-400",
-  },
-  {
-    initials: "RS",
-    name: "Rachel Singh",
-    role: "DevOps Engineer",
-    desc: "Automates workflows and manages CI/CD pipelines for smooth product delivery.",
-    color: "bg-green-500",
-  },
-  {
-    initials: "TH",
-    name: "Tom Harris",
-    role: "QA Engineer",
-    desc: "Ensures bug-free releases through rigorous testing and automation.",
-    color: "bg-purple-500",
-  },
-  {
-    initials: "LW",
-    name: "Linda Wong",
-    role: "Security Specialist",
-    desc: "Protects applications and data through penetration testing and security audits.",
+    initials: "JD",
+    name: "John Doe",
+    role: "Frontend Engineer",
+    desc: "Expert in React and modern frontend tech.",
     color: "bg-blue-500",
   },
+  // ... your other technical members
 ];
 
 export default function TeamManagement() {
   const [teamType, setTeamType] = useState("artist");
   const [search, setSearch] = useState("");
+  const [showModal, setShowModal] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingIndex, setEditingIndex] = useState(null);
 
-  const teamData = teamType === "artist" ? artistTeam : technicalTeam;
+  const [artistTeamState, setArtistTeamState] = useState(artistTeam);
+  const [technicalTeamState, setTechnicalTeamState] = useState(technicalTeam);
+
+  const [newMember, setNewMember] = useState({
+    name: "",
+    role: "",
+    color: "bg-pink-500",
+    team: teamType,
+    desc: "",
+  });
+
+  const teamData = teamType === "artist" ? artistTeamState : technicalTeamState;
   const filteredTeam = teamData.filter((member) =>
     member.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const cardVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 },
-    exit: { opacity: 0, y: -20 },
+  const handleAddOrUpdateMember = () => {
+    if (!newMember.name || !newMember.role) {
+      return alert("Please fill all required fields");
+    }
+
+    const memberToSave = {
+      ...newMember,
+      initials: newMember.name
+        .split(" ")
+        .map((n) => n[0])
+        .join("")
+        .toUpperCase(),
+    };
+
+    if (isEditing && editingIndex !== null) {
+      // Remove from original team
+      if (teamType === "artist") {
+        setArtistTeamState((prev) =>
+          prev.filter((_, i) => i !== editingIndex)
+        );
+      } else {
+        setTechnicalTeamState((prev) =>
+          prev.filter((_, i) => i !== editingIndex)
+        );
+      }
+
+      // Add to new/selected team
+      if (newMember.team === "artist") {
+        setArtistTeamState((prev) => [...prev, memberToSave]);
+      } else {
+        setTechnicalTeamState((prev) => [...prev, memberToSave]);
+      }
+    } else {
+      // Add new member
+      if (newMember.team === "artist") {
+        setArtistTeamState((prev) => [...prev, memberToSave]);
+      } else {
+        setTechnicalTeamState((prev) => [...prev, memberToSave]);
+      }
+    }
+
+    // Reset modal
+    setNewMember({ name: "", role: "", color: "bg-pink-500", team: teamType, desc: "" });
+    setShowModal(false);
+    setIsEditing(false);
+    setEditingIndex(null);
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <h1 className="text-3xl font-bold text-center">Team Management</h1>
-      <p className="text-center text-gray-600 mt-2">
-        Manage your creative and technical teams. Add new members, update roles,
-        and organize your workforce.
-      </p>
 
-      {/* Toggle with Animated Indicator */}
+      {/* Team Toggle */}
       <div className="relative flex w-fit mx-auto mt-6 bg-gray-100 rounded-full p-1">
         <button
           onClick={() => setTeamType("artist")}
@@ -133,7 +117,6 @@ export default function TeamManagement() {
         >
           🛠 Technical Team
         </button>
-
         <motion.div
           layout
           transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -143,7 +126,7 @@ export default function TeamManagement() {
         />
       </div>
 
-      {/* Search + Stats */}
+      {/* Search + Add */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between mt-6 gap-4">
         <input
           type="text"
@@ -155,60 +138,191 @@ export default function TeamManagement() {
         <div className="flex items-center gap-4">
           <span className="text-gray-600">{teamData.length} members</span>
           <span className="text-gray-600">
-            Total: {artistTeam.length + technicalTeam.length}
+            Total: {artistTeamState.length + technicalTeamState.length}
           </span>
-          <button className="bg-black text-white px-4 py-2 rounded-lg">
+          <button
+            className="bg-black text-white px-4 py-2 rounded-lg"
+            onClick={() => {
+              setNewMember({ name: "", role: "", color: "bg-pink-500", team: teamType, desc: "" });
+              setIsEditing(false);
+              setShowModal(true);
+            }}
+          >
             + Add {teamType === "artist" ? "Artist" : "Tech"}
           </button>
         </div>
       </div>
 
-      {/* Team Cards */}
+     {/* Team Cards */}
+<motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+  <AnimatePresence mode="popLayout">
+    {filteredTeam.map((member, idx) => (
       <motion.div
-        layout
-        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8"
+        key={member.name + idx}
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -20 }}
+        transition={{ duration: 0.3, delay: idx * 0.05 }}
+        whileHover={{
+          scale: 1.03,
+          boxShadow: "0px 10px 25px rgba(0,0,0,0.15)",
+          borderColor: "#000000",
+        }}
+        className="relative border border-gray-200 rounded-lg p-5 transition-all duration-300 group"
       >
-        <AnimatePresence mode="popLayout">
-          {filteredTeam.map((member, idx) => (
-            <motion.div
-              key={member.name}
-              variants={cardVariants}
-              initial="hidden"
-              animate="visible"
-              exit="exit"
-              transition={{ duration: 0.3, delay: idx * 0.05 }}
-              whileHover={{ scale: 1.03 }}
-              className="border border-gray-200 rounded-lg p-5 shadow-sm hover:shadow-md transition"
-            >
-              <div
-                className={`w-12 h-12 flex items-center justify-center text-white rounded-full ${member.color} text-lg font-semibold`}
-              >
-                {member.initials}
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">{member.name}</h3>
-              <p className="text-sm text-gray-500">{member.role}</p>
-              <p className="text-gray-600 mt-3 text-sm">{member.desc}</p>
-              <span className="inline-block mt-4 px-3 py-1 text-xs bg-pink-100 text-pink-600 rounded-full">
-                {teamType === "artist" ? "artist" : "tech"}
-              </span>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </motion.div>
+        <div
+          className={`w-12 h-12 flex items-center justify-center text-white rounded-full ${member.color} text-lg font-semibold`}
+        >
+          {member.initials}
+        </div>
+        <h3 className="mt-4 text-lg font-semibold">{member.name}</h3>
+        <p className="text-sm text-gray-500">{member.role}</p>
+        <p className="text-gray-600 mt-3 text-sm">{member.desc}</p>
+        <span className="inline-block mt-4 px-3 py-1 text-xs bg-pink-100 text-pink-600 rounded-full">
+          {teamType === "artist" ? "artist" : "tech"}
+        </span>
 
-      {/* Footer Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-8">
-        <div className="border rounded-lg p-4 border-pink-300">
-          <h4 className="font-semibold">🎨 Artist Team</h4>
-          <p className="text-2xl">{artistTeam.length}</p>
-          <p className="text-gray-500">Creative professionals</p>
+        {/* Edit/Delete Icons */}
+        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+          <button
+            onClick={() => {
+              setNewMember({ ...member, team: teamType });
+              setIsEditing(true);
+              setEditingIndex(idx);
+              setShowModal(true);
+            }}
+            className="bg-gray-100 p-1 rounded hover:bg-gray-200"
+          >
+            ✏️
+          </button>
+          <button
+            onClick={() => {
+              if (teamType === "artist") {
+                setArtistTeamState((prev) => prev.filter((_, i) => i !== idx));
+              } else {
+                setTechnicalTeamState((prev) => prev.filter((_, i) => i !== idx));
+              }
+            }}
+            className="bg-gray-100 p-1 rounded hover:bg-gray-200"
+          >
+            🗑
+          </button>
         </div>
-        <div className="border rounded-lg p-4 border-blue-300">
-          <h4 className="font-semibold">🛠 Technical Team</h4>
-          <p className="text-2xl">{technicalTeam.length}</p>
-          <p className="text-gray-500">Technical specialists</p>
-        </div>
-      </div>
+      </motion.div>
+    ))}
+  </AnimatePresence>
+</motion.div>
+
+      {/* Modal */}
+      <AnimatePresence>
+        {showModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.8 }}
+              layout
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              className="bg-white rounded-lg w-full max-w-md p-6 overflow-y-auto max-h-[90vh]"
+            >
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-semibold">
+                  {isEditing ? "Edit Team Member" : "Add New Team Member"}
+                </h2>
+                <button onClick={() => setShowModal(false)}>✕</button>
+              </div>
+
+              {/* Avatar */}
+              <div className="flex flex-col items-center mb-4">
+                <div
+                  className={`w-16 h-16 flex items-center justify-center text-white rounded-full ${newMember.color} text-lg font-semibold mb-2`}
+                >
+                  {newMember.name
+                    ? newMember.name
+                        .split(" ")
+                        .map((n) => n[0])
+                        .join("")
+                        .toUpperCase()
+                    : "XX"}
+                </div>
+                <div className="text-center">
+                  <p className="font-semibold">{newMember.name || "Team Member Name"}</p>
+                  <p className="text-gray-500">{newMember.role || "Role/Specialty"}</p>
+                </div>
+              </div>
+
+              {/* Form */}
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Full Name *"
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                  value={newMember.name}
+                  onChange={(e) => setNewMember({ ...newMember, name: e.target.value })}
+                />
+                <input
+                  type="text"
+                  placeholder="Role/Specialty *"
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                  value={newMember.role}
+                  onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
+                />
+                <select
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                  value={newMember.team}
+                  onChange={(e) => setNewMember({ ...newMember, team: e.target.value })}
+                >
+                  <option value="artist">Artist Team</option>
+                  <option value="technical">Technical Team</option>
+                </select>
+
+                {/* Color picker */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    "bg-pink-500",
+                    "bg-purple-500",
+                    "bg-blue-500",
+                    "bg-green-500",
+                    "bg-orange-400",
+                    "bg-red-500",
+                    "bg-teal-500",
+                    "bg-gray-600",
+                  ].map((color) => (
+                    <div
+                      key={color}
+                      className={`${color} w-8 h-8 rounded-lg cursor-pointer border ${
+                        newMember.color === color ? "border-black" : "border-transparent"
+                      }`}
+                      onClick={() => setNewMember({ ...newMember, color })}
+                    />
+                  ))}
+                </div>
+
+                <textarea
+                  placeholder="Short Bio *"
+                  className="border border-gray-300 rounded-lg px-4 py-2 w-full"
+                  value={newMember.desc}
+                  maxLength={300}
+                  onChange={(e) => setNewMember({ ...newMember, desc: e.target.value })}
+                />
+                <p className="text-gray-400 text-sm text-right">{newMember.desc.length}/300 characters</p>
+
+                <button
+                  className="bg-black text-white px-4 py-2 rounded-lg w-full"
+                  onClick={handleAddOrUpdateMember}
+                >
+                  {isEditing ? "Update Member" : "Add Member"}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
