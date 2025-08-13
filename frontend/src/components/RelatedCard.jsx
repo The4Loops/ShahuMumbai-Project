@@ -6,7 +6,7 @@ const RelatedCard = ({ product }) => {
 
   return (
     <Link
-      to={`/product/${id}`}
+      to={`/products/${id}`}
       className="bg-white border border-[#D4A5A5] rounded-lg overflow-hidden shadow-md hover:shadow-lg transition duration-300 flex flex-col"
     >
       <img

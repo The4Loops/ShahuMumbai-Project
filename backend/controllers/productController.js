@@ -130,7 +130,19 @@ exports.getAllProducts = async (req, res) => {
       `
       )
       .eq("isactive", true);
-    
+
+    const { category, limit } = req.query;
+
+    // Filter by category if provided
+    if (category) {
+      query = query.ilike("categories.name", category);
+    }
+
+    // Apply limit if provided
+    if (limit) {
+      query = query.limit(parseInt(limit));
+    }
+
     const { data, error } = await query;
 
     if (error) {

@@ -46,7 +46,7 @@ const ProductDetails = () => {
 
         // Fetch related products (assuming API supports category-based filtering)
         const relatedResponse = await api.get(
-          `/api/products?category=${productResponse.data.category}&limit=4`
+          `/api/products?category=${productResponse.data.categories?.name}&limit=4`
         );
         setRelatedProducts(relatedResponse.data.filter((p) => p.id !== id));
 
