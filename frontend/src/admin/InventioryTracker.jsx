@@ -1,14 +1,39 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect, useCallback } from "react";
+import { toast } from "react-toastify";
+import api from "../supabase/axios";
 
 const InventoryTracker = () => {
   const [query, setQuery] = useState("");
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const products = [
-    { name: "Vintage Bag", quantity: 5 },
-    { name: "Tote Bag", quantity: 0 },
-    { name: "Pouch", quantity: 12 },
-  ];
+  // Fetch products from API
+  const fetchProducts = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const response = await api.get("/api/products");
+      const fetchedProducts = response.data.map(product => ({
+        id: product.id,
+        name: product.name,
+        quantity: product.stock || 0, // Ensure quantity is defined
+        category: product.categories?.name || "N/A",
+        image: product.product_images?.find(img => img.is_hero)?.image_url || "",
+      }));
+      setProducts(fetchedProducts);
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.message || "Failed to fetch products");
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
+  // Fetch products on component mount
+  useEffect(() => {
+    fetchProducts();
+  }, [fetchProducts]);
+
+  // Debounced search
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return products;
@@ -45,84 +70,87 @@ const InventoryTracker = () => {
         />
       </div>
 
-      {/* Mobile cards */}
-      <div className="grid grid-cols-1 gap-3 md:hidden">
-        {filtered.map((p, idx) => {
-          const { label, tone } = getStatus(p.quantity);
-          return (
-            <div
-              key={idx}
-              className={`rounded-lg border p-4 bg-white ${
-                tone === "out"
-                  ? "border-rose-200"
-                  : tone === "low"
-                  ? "border-[#E6DCD2]"
-                  : "border-[#E6DCD2]"
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[#6B4226] font-semibold">{p.name}</p>
-                  <p className="text-sm text-[#6B4226]/70 mt-0.5">
-                    Qty: <span className="font-medium text-[#6B4226]">{p.quantity}</span>
-                  </p>
-                </div>
-                <span className={`px-2 py-1 text-xs rounded-full ${badgeClass(tone)}`}>
-                  {label}
-                </span>
-              </div>
-            </div>
-          );
-        })}
-        {filtered.length === 0 && (
-          <p className="text-sm text-[#6B4226]/70">No products match your search.</p>
-        )}
-      </div>
-
-      {/* Desktop table */}
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
-        <table className="w-full table-auto border-collapse">
-          <thead>
-            <tr className="bg-[#F1E7E5] text-[#6B4226]">
-              <th className="p-3 text-left">Product</th>
-              <th className="p-3 text-right">Quantity</th>
-              <th className="p-3 text-center">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map((p, idx) => {
+      {isLoading ? (
+        <div className="text-center py-4 text-[#6B4226]">Loading...</div>
+      ) : filtered.length === 0 ? (
+        <p className="text-sm text-[#6B4226]/70">No products match your search.</p>
+      ) : (
+        <>
+          {/* Mobile cards */}
+          <div className="grid grid-cols-1 gap-3 md:hidden">
+            {filtered.map((p) => {
               const { label, tone } = getStatus(p.quantity);
               return (
-                <tr
-                  key={idx}
-                  className={`border-t border-[#E6DCD2] ${
+                <div
+                  key={p.id}
+                  className={`rounded-lg border p-4 bg-white ${
                     tone === "out"
-                      ? "bg-rose-50"
+                      ? "border-rose-200"
                       : tone === "low"
-                      ? "bg-[#FFF7F6]"
-                      : "bg-white"
+                      ? "border-[#E6DCD2]"
+                      : "border-[#E6DCD2]"
                   }`}
                 >
-                  <td className="p-3 text-[#6B4226]">{p.name}</td>
-                  <td className="p-3 text-right text-[#6B4226]">{p.quantity}</td>
-                  <td className="p-3 text-center">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[#6B4226] font-semibold">{p.name}</p>
+                      <p className="text-sm text-[#6B4226]/70 mt-0.5">
+                        Qty: <span className="font-medium text-[#6B4226]">{p.quantity}</span>
+                      </p>
+                      <p className="text-sm text-[#6B4226]/70 mt-0.5">
+                        Category: <span className="font-medium text-[#6B4226]">{p.category}</span>
+                      </p>
+                    </div>
                     <span className={`px-2 py-1 text-xs rounded-full ${badgeClass(tone)}`}>
                       {label}
                     </span>
-                  </td>
-                </tr>
+                  </div>
+                </div>
               );
             })}
-            {filtered.length === 0 && (
-              <tr>
-                <td className="p-3 text-sm text-[#6B4226]/70" colSpan={3}>
-                  No products match your search.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden md:block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
+            <table className="w-full table-auto border-collapse">
+              <thead>
+                <tr className="bg-[#F1E7E5] text-[#6B4226]">
+                  <th className="p-3 text-left">Product</th>
+                  <th className="p-3 text-right">Quantity</th>
+                  <th className="p-3 text-left">Category</th>
+                  <th className="p-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((p) => {
+                  const { label, tone } = getStatus(p.quantity);
+                  return (
+                    <tr
+                      key={p.id}
+                      className={`border-t border-[#E6DCD2] ${
+                        tone === "out"
+                          ? "bg-rose-50"
+                          : tone === "low"
+                          ? "bg-[#FFF7F6]"
+                          : "bg-white"
+                      }`}
+                    >
+                      <td className="p-3 text-[#6B4226]">{p.name}</td>
+                      <td className="p-3 text-right text-[#6B4226]">{p.quantity}</td>
+                      <td className="p-3 text-[#6B4226]">{p.category}</td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2 py-1 text-xs rounded-full ${badgeClass(tone)}`}>
+                          {label}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
   );
 };
