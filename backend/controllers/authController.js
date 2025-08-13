@@ -4,7 +4,7 @@ const nodemailer = require("nodemailer");
 const supabase = require("../config/supabaseClient");
 const { encryptData } = require("../utils/crypto");
 
-
+// VERIFY ADMIN
 const verifyAdmin = (req) => {
   const token = req.headers.authorization?.split(" ")[1];
   if (!token) return { error: "Unauthorized: Token missing" };
@@ -271,53 +271,3 @@ exports.ssoLogin = async (req, res) => {
   }
 };
 
-// create user by admin
-exports.adminCreateUser = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ message: authError });
-
-  try {
-    const { full_name, email, password, role, active , ssologin = "N" } = req.body;
-
-    // Step 1: Check if email already exists
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("id")
-      .eq("email", email)
-      .maybeSingle();
-
-    if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
-    }
-    // Step 2: Hash password if provided
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
-
-    // Step 3: Insert into "users" table
-    const { data, error } = await supabase
-      .from("users")
-      .insert([
-        { full_name, email, password: hashedPassword, role,active, ssologin },
-      ])
-      .select();
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(201).json({ message: "User created successfully", user: data[0] });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
- //  4️⃣ ADMIN API: Get All Users
-exports.getAllUsers = async (req, res) => {
-  try {
-    // Fetch all users from "users" table
-    const { data, error } = await supabase.from("users").select("*");
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(200).json(data);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};

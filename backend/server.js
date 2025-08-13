@@ -10,6 +10,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
 const designerRoutes = require('./routes/designerRoutes');
 const productDesignerRoutes = require('./routes/productDesignerController');
+const userRoutes=require('./routes/userRoutes');
 
 const app = express();
 
@@ -41,6 +42,7 @@ app.use('/api',categoryRoutes);
 app.use('/api', uploadRoutes);
 app.use('/api', designerRoutes);
 app.use('/api',productDesignerRoutes);
+app.use('/api',userRoutes);
 
 // Rate Limiting
 const limiter = rateLimit({

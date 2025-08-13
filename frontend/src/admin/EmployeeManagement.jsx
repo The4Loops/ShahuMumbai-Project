@@ -1,16 +1,10 @@
 import React, { useState, useEffect, useRef } from "react";
 import { FiGrid, FiList, FiX } from "react-icons/fi";
+import api from "../supabase/axios";
+import { toast } from "react-toastify";
 
-export default function UserManagement() {
-  const [users, setUsers] = useState([
-    { name: "John Doe", email: "john.doe@example.com", role: "admin", status: "active", joined: "Jan 15, 2024", lastLogin: "Jan 20, 2024" },
-    { name: "Sarah Mitchell", email: "sarah.mitchell@example.com", role: "manager", status: "active", joined: "Jan 12, 2024", lastLogin: "Jan 19, 2024" },
-    { name: "Michael Chen", email: "michael.chen@example.com", role: "editor", status: "active", joined: "Jan 10, 2024", lastLogin: "Jan 18, 2024" },
-    { name: "Emily Rodriguez", email: "emily.rodriguez@example.com", role: "user", status: "inactive", joined: "Jan 8, 2024", lastLogin: "Jan 15, 2024" },
-    { name: "David Wilson", email: "david.wilson@example.com", role: "user", status: "active", joined: "Jan 5, 2024", lastLogin: "Jan 17, 2024" },
-    { name: "Lisa Thompson", email: "lisa.thompson@example.com", role: "editor", status: "active", joined: "Jan 3, 2024", lastLogin: "Jan 16, 2024" },
-  ]);
-
+function EmployeeManagement() {
+  const [users, setUsers] = useState([]);
   const [view, setView] = useState("table");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
@@ -44,63 +38,123 @@ export default function UserManagement() {
     editor: "bg-green-500 text-white",
     user: "bg-gray-500 text-white",
   };
+  
 
-  const filteredUsers = users.filter((u) => {
-    return (
-      (u.name.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase())) &&
-      (roleFilter === "All" || u.role === roleFilter.toLowerCase()) &&
-      (statusFilter === "All" || u.status === statusFilter.toLowerCase())
-    );
-  });
+  // Fetch users from API
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/api/users", {
+        params: {
+          search: search || undefined,
+          role: roleFilter !== "All" ? roleFilter.toLowerCase() : undefined,
+          status:
+            statusFilter !== "All" ? statusFilter.toLowerCase() : undefined,
+        },
+      });
+      // Transform the data to match frontend expectations
+    const transformedUsers = response.data.users.map(user => ({
+      ...user,
+      active: user.active,
+    }));
+    console.log("Fetched Users:", transformedUsers);
+    setUsers(transformedUsers);
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "Failed to fetch users");
+    }
+  };
+  useEffect(() => {
+    fetchUsers();
+  }, [search, roleFilter, statusFilter]);
 
-  const handleAddOrEditUser = () => {
-    if (!newUser.name || !newUser.email) return alert("Name and Email are required!");
-
-    if (editingIndex !== null) {
-      const updated = [...users];
-      updated[editingIndex] = { ...users[editingIndex], ...newUser };
-      setUsers(updated);
-    } else {
-      const now = new Date();
-      const joinedDate = now.toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric" });
-
-      const addedUser = {
-        ...newUser,
-        joined: joinedDate,
-        lastLogin: "Never",
-      };
-
-      setUsers([addedUser, ...users]);
+  const handleAddOrEditUser = async () => {
+    if (!newUser.name || !newUser.email) {
+      toast.dismiss();
+      toast.error("Name and Email are required!");
+      return;
     }
 
-    resetForm();
+    try {
+      if (editingIndex !== null) {
+        const user = users[editingIndex];
+        await api.put(`/api/users/${user.id}`, {
+          full_name: newUser.name,
+          email: newUser.email,
+          password: newUser.password || undefined,
+          role: newUser.role,
+          active: newUser.status === "active",
+        });
+        toast.dismiss();
+        toast.success("User updated successfully");
+      } else {
+        await api.post("/api/create-users", {
+          full_name: newUser.name,
+          email: newUser.email,
+          password: newUser.password,
+          role: newUser.role,
+          active: newUser.status === "active",
+        });
+        toast.dismiss();
+        toast.success("User created successfully");
+      }
+      fetchUsers();
+      resetForm();
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "Operation failed");
+    }
   };
 
   const handleEdit = (index) => {
-    setNewUser({ ...users[index], password: "" });
+    const user = users[index];
+    setNewUser({
+      name: user.full_name,
+      email: user.email,
+      password: "",
+      role: user.role,
+      status: user.active ? "active" : "inactive",
+    });
     setEditingIndex(index);
     setShowModal(true);
     setActionMenuIndex(null);
   };
 
-  const handleDelete = (index) => {
-    if (window.confirm(`Are you sure you want to delete ${users[index].name}?`)) {
-      setUsers(users.filter((_, i) => i !== index));
+  const handleDelete = async (index) => {
+    const user = users[index];
+    if (window.confirm(`Are you sure you want to delete ${user.full_name}?`)) {
+      try {
+        await api.delete(`/api/users/${user.id}`);
+        toast.dismiss();
+        toast.success("User deleted successfully");
+        fetchUsers();
+      } catch (error) {
+        toast.dismiss();
+        toast.error(error.response?.data?.error || "Failed to delete user");
+      }
     }
     setActionMenuIndex(null);
   };
 
   const resetForm = () => {
-    setNewUser({ name: "", email: "", password: "", role: "user", status: "active" });
+    setNewUser({
+      name: "",
+      email: "",
+      password: "",
+      role: "user",
+      status: "active",
+    });
     setEditingIndex(null);
     setShowModal(false);
   };
 
   const renderAvatar = (user) => {
     return (
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${avatarColors[user.role]}`}>
-        {user.name.charAt(0)}
+      <div
+        className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
+          avatarColors[user.role]
+        }`}
+      >
+        {user.full_name.charAt(0)}
       </div>
     );
   };
@@ -116,13 +170,11 @@ export default function UserManagement() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  return (
+  return(
     <div>
-      {/* Header */}
       <h1 className="text-2xl font-semibold">Employee Management</h1>
       <p className="text-gray-500 text-sm mt-1">Manage users, roles, and permissions across your organization</p>
 
-      {/* Filter Section */}
       <div className="mt-6 p-2 border rounded-lg bg-white shadow-sm">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <span className="text-gray-500">🔍 Filter & Search Users</span>
@@ -156,10 +208,9 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* Table/Cards Toggle */}
       <div className="flex justify-between items-center mt-4">
         <p className="text-sm text-gray-500">
-          Showing {filteredUsers.length} of {users.length} users
+          Showing {users?.length} of {users?.length} users
         </p>
         <div className="flex gap-2">
           <button
@@ -177,7 +228,6 @@ export default function UserManagement() {
         </div>
       </div>
 
-      {/* Table View */}
       {view === "table" && (
         <div className="mt-6 border rounded-lg overflow-x-auto shadow-sm relative">
           <table className="min-w-full bg-white">
@@ -191,12 +241,12 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody>
-              {filteredUsers.map((user, idx) => (
-                <tr key={idx} className="border-b hover:bg-gray-50 relative">
+              {users.map((user, idx) => (
+                <tr key={user.id} className="border-b hover:bg-gray-50 relative">
                   <td className="py-3 px-4 flex items-center gap-3">
                     {renderAvatar(user)}
                     <div>
-                      <div className="font-medium">{user.name}</div>
+                      <div className="font-medium">{user.full_name}</div>
                       <div className="text-sm text-gray-500">{user.email}</div>
                     </div>
                   </td>
@@ -204,11 +254,13 @@ export default function UserManagement() {
                     <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.role]}`}>{user.role}</span>
                   </td>
                   <td className="py-3 px-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.status]}`}>{user.status}</span>
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.active ? "active" : "inactive"]}`}>
+                      {user.active ? "active" : "inactive"}
+                    </span>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-600">
                     {user.joined}
-                    <div className="text-xs text-gray-400">Last: {user.lastLogin}</div>
+                    <div className="text-xs text-gray-400">Last: {user.last_login || "Never"}</div>
                   </td>
                   <td className="py-3 px-4 text-right relative" ref={menuRef}>
                     <button onClick={() => setActionMenuIndex(actionMenuIndex === idx ? null : idx)} className="px-2 py-1 rounded hover:bg-gray-100">⋮</button>
@@ -226,17 +278,14 @@ export default function UserManagement() {
         </div>
       )}
 
-      {/* Cards View */}
       {view === "cards" && (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {filteredUsers.map((user, idx) => (
-            <div key={idx} className="border rounded-lg p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition relative">
+          {users.map((user, idx) => (
+            <div key={user.id} className="border rounded-lg p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition relative">
               <div className="flex items-center gap-3">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium ${avatarColors[user.role]}`}>
-                  {user.name.charAt(0)}
-                </div>
+                {renderAvatar(user)}
                 <div>
-                  <div className="font-medium">{user.name}</div>
+                  <div className="font-medium">{user.full_name}</div>
                   <div className="text-sm text-gray-500">{user.email}</div>
                 </div>
                 <button onClick={() => setActionMenuIndex(actionMenuIndex === idx ? null : idx)} className="ml-auto px-2 py-1 rounded hover:bg-gray-100">⋮</button>
@@ -249,16 +298,17 @@ export default function UserManagement() {
               </div>
               <div className="flex gap-2">
                 <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.role]}`}>{user.role}</span>
-                <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.status]}`}>{user.status}</span>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.active ? "active" : "inactive"]}`}>
+                  {user.active ? "active" : "inactive"}
+                </span>
               </div>
               <div className="text-sm text-gray-600">Joined: {user.joined}</div>
-              <div className="text-xs text-gray-400">Last Login: {user.lastLogin}</div>
+              <div className="text-xs text-gray-400">Last Login: {user.last_login || "Never"}</div>
             </div>
           ))}
         </div>
       )}
 
-      {/* Add/Edit User Modal */}
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
@@ -267,24 +317,53 @@ export default function UserManagement() {
             </button>
             <h2 className="text-xl font-semibold mb-4">{editingIndex !== null ? "Edit User" : "Add New User"}</h2>
 
-            <input type="text" placeholder="Full Name" value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} className="border rounded-lg px-3 py-2 w-full mb-3" />
-            <input type="email" placeholder="Email Address" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} className="border rounded-lg px-3 py-2 w-full mb-3" />
-            <input type="password" placeholder="Password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} className="border rounded-lg px-3 py-2 w-full mb-3" />
+            <input
+              type="text"
+              placeholder="Full Name"
+              value={newUser.name}
+              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+              className="border rounded-lg px-3 py-2 w-full mb-3"
+            />
+            <input
+              type="email"
+              placeholder="Email Address"
+              value={newUser.email}
+              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              className="border rounded-lg px-3 py-2 w-full mb-3"
+            />
+            <input
+              type="password"
+              placeholder="Password"
+              value={newUser.password}
+              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              className="border rounded-lg px-3 py-2 w-full mb-3"
+            />
 
             <div className="flex gap-3 mb-3">
-              <select value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })} className="border rounded-lg px-3 py-2 w-1/2">
+              <select
+                value={newUser.role}
+                onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
+                className="border rounded-lg px-3 py-2 w-1/2"
+              >
                 <option value="user">User</option>
                 <option value="editor">Editor</option>
                 <option value="manager">Manager</option>
                 <option value="admin">Admin</option>
               </select>
-              <select value={newUser.status} onChange={(e) => setNewUser({ ...newUser, status: e.target.value })} className="border rounded-lg px-3 py-2 w-1/2">
+              <select
+                value={newUser.status}
+                onChange={(e) => setNewUser({ ...newUser, status: e.target.value })}
+                className="border rounded-lg px-3 py-2 w-1/2"
+              >
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
               </select>
             </div>
 
-            <button onClick={handleAddOrEditUser} className="bg-black text-white px-4 py-2 rounded-lg w-full hover:bg-gray-800">
+            <button
+              onClick={handleAddOrEditUser}
+              className="bg-black text-white px-4 py-2 rounded-lg w-full hover:bg-gray-800"
+            >
               {editingIndex !== null ? "Update User" : "Add User"}
             </button>
           </div>
@@ -293,3 +372,5 @@ export default function UserManagement() {
     </div>
   );
 }
+
+export default EmployeeManagement;

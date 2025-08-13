@@ -5,4 +5,15 @@ const instance = axios.create({
   withCredentials: true // If you need cookies/JWT via HttpOnly
 });
 
+// Add JWT token to every request
+instance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token"); // Retrieve token from localStorage
+    if (token) {
+      config.headers["Authorization"] = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 export default instance;
