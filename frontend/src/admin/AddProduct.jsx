@@ -81,7 +81,7 @@ const AddProduct = () => {
       const formData = new FormData();
       selectedImages.forEach((file) => formData.append('files', file));
 
-      const uploadResponse = await api.post('/api/upload', formData, {
+      const uploadResponse = await api.post('/api/upload/multiple', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
 

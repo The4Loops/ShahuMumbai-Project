@@ -1,8 +1,11 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { upload, uploadFile } = require('../controllers/uploadController');
+const { uploadSingle, uploadMultiple, uploadFile } = require("../controllers/uploadController");
 
-// Route: POST /api/upload
-router.post('/upload', upload.array('files', 10), uploadFile);
+// Route: POST /api/upload/single - For single file upload
+router.post("/upload/single", uploadSingle, uploadFile);
+
+// Route: POST /api/upload/multiple - For multiple file uploads (up to 10 files)
+router.post("/upload/multiple", uploadMultiple, uploadFile);
 
 module.exports = router;
