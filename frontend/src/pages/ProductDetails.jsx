@@ -1,4 +1,3 @@
-// pages/ProductDetails.jsx (Amazon-style layout, themed colors preserved)
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -10,6 +9,8 @@ import { IoMdShareAlt } from "react-icons/io";
 import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import RelatedCard from "../components/RelatedCard";
 import api from "../supabase/axios";
+import { jwtDecode } from "jwt-decode";
+import { toast } from "react-toastify";
 
 // Carousel Arrows
 const NextArrow = ({ onClick }) => (
@@ -51,9 +52,14 @@ const QuantitySelect = ({ max = 10, value, onChange }) => (
 
 const StarRating = ({ value = 0, size = 18 }) => {
   const full = Math.floor(value);
-  const stars = Array.from({ length: 5 }, (_, i) => (i < full ? "full" : "empty"));
+  const stars = Array.from({ length: 5 }, (_, i) =>
+    i < full ? "full" : "empty"
+  );
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`Rating: ${value} out of 5`}>
+    <span
+      className="inline-flex items-center gap-0.5"
+      aria-label={`Rating: ${value} out of 5`}
+    >
       {stars.map((t, i) =>
         t === "full" ? (
           <AiFillStar key={i} size={size} className="text-[#D4A5A5]" />
@@ -73,6 +79,7 @@ const ProductDetails = () => {
   const [error, setError] = useState(null);
   const [qty, setQty] = useState(1);
   const sliderRef = useRef();
+  const token = localStorage.getItem("token");
 
   // Reviews state
   const [reviews, setReviews] = useState([]);
@@ -80,9 +87,11 @@ const ProductDetails = () => {
   const [reviewCount, setReviewCount] = useState(0);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState(null);
-
+  const decoded = jwtDecode(token);
+  const userid = decoded?.id;
+  const fullName = decoded?.fullname || "Anonymous";
   // New review form
-  const [reviewName, setReviewName] = useState("");
+  const [reviewName, setReviewName] = useState(fullName);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -114,11 +123,13 @@ const ProductDetails = () => {
         setReviewLoading(true);
         setReviewError(null);
         // Adjust to your API shape; expecting an array of {id, name, rating, comment, created_at}
-        const res = await api.get(`/api/products/${id}/reviews`);
-        const list = Array.isArray(res.data) ? res.data : (res.data?.data || []);
+        const res = await api.get(`/api/reviews/${id}`);
+        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
         setReviews(list);
         const count = list.length;
-        const avg = count ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count : 0;
+        const avg = count
+          ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count
+          : 0;
         setReviewCount(count);
         setAvgRating(Number(avg.toFixed(1)));
       } catch (e) {
@@ -134,33 +145,26 @@ const ProductDetails = () => {
 
   const submitReview = async (e) => {
     e.preventDefault();
+    var response="";
     if (!reviewText.trim()) return;
     try {
       setSubmitting(true);
-      await api.post(`/api/products/${id}/reviews`, {
-        name: reviewName || "Anonymous",
+      response = await api.post(`/api/reviews`, {
         rating: Number(reviewRating),
+        productid: id,
+        userid: parseInt(userid),
         comment: reviewText.trim(),
       });
-      // Optimistically add to list
-      const newItem = {
-        id: `temp-${Date.now()}`,
-        name: reviewName || "Anonymous",
-        rating: Number(reviewRating),
-        comment: reviewText.trim(),
-        created_at: new Date().toISOString(),
-      };
-      const next = [newItem, ...reviews];
-      setReviews(next);
-      setReviewCount(next.length);
-      const avg = next.reduce((s, r) => s + Number(r.rating || 0), 0) / next.length;
-      setAvgRating(Number(avg.toFixed(1)));
-      // Reset form
-      setReviewName("");
-      setReviewRating(5);
-      setReviewText("");
+      toast.dismiss();
+      toast.success("Review submitted successfully!");
     } catch (e) {
-      alert("Could not submit review. Please try again.");
+      if(e.response?.status === 400) {
+        toast.dismiss();
+        toast.error(e.response?.data?.message || "Failed to submit review.");
+      }else{
+        toast.dismiss();
+      toast.error("Failed to submit review."+e);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -172,7 +176,9 @@ const ProductDetails = () => {
 
   if (error || !product) {
     return (
-      <p className="p-6 text-center text-red-500">{error || "Product not found"}</p>
+      <p className="p-6 text-center text-red-500">
+        {error || "Product not found"}
+      </p>
     );
   }
 
@@ -201,8 +207,11 @@ const ProductDetails = () => {
 
   // Pricing & discount: sale price is discountprice when present
   const hasDiscount =
-    product.discountprice && Number(product.discountprice) < Number(product.price);
-  const salePrice = hasDiscount ? Number(product.discountprice) : Number(product.price);
+    product.discountprice &&
+    Number(product.discountprice) < Number(product.price);
+  const salePrice = hasDiscount
+    ? Number(product.discountprice)
+    : Number(product.price);
   const mrp = Number(product.price);
   const discountPercentage = hasDiscount
     ? Math.round(((mrp - salePrice) / mrp) * 100)
@@ -210,7 +219,8 @@ const ProductDetails = () => {
 
   const handleThumbClick = (idx) => sliderRef.current?.slickGoTo(idx);
 
-  const hero = images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+  const hero =
+    images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
 
   return (
     <Layout>
@@ -219,7 +229,9 @@ const ProductDetails = () => {
         <nav className="max-w-6xl mx-auto text-sm mb-4 text-[#6B4226]">
           <ol className="flex flex-wrap gap-1">
             <li>
-              <Link to="/" className="hover:underline">Home</Link>
+              <Link to="/" className="hover:underline">
+                Home
+              </Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
             <li>
@@ -228,7 +240,10 @@ const ProductDetails = () => {
               </Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
-            <li className="text-[#3E2C23] truncate max-w-[60%]" title={product.name}>
+            <li
+              className="text-[#3E2C23] truncate max-w-[60%]"
+              title={product.name}
+            >
               {product.name}
             </li>
           </ol>
@@ -289,7 +304,10 @@ const ProductDetails = () => {
                 type="button"
                 onClick={() => {
                   if (navigator.share) {
-                    navigator.share({ title: product.name, url: window.location.href });
+                    navigator.share({
+                      title: product.name,
+                      url: window.location.href,
+                    });
                   } else {
                     navigator.clipboard.writeText(window.location.href);
                     alert("Link copied to clipboard");
@@ -308,32 +326,53 @@ const ProductDetails = () => {
           <aside className="lg:col-span-4 order-3">
             <div className="lg:sticky lg:top-24 flex flex-col gap-4">
               <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-5">
-                <h1 className="text-2xl font-bold text-[#6B4226] mb-1">{product.name}</h1>
+                <h1 className="text-2xl font-bold text-[#6B4226] mb-1">
+                  {product.name}
+                </h1>
                 <div className="flex items-center gap-2 mt-1">
                   <StarRating value={avgRating} />
                   <span className="text-xs text-[#3E2C23]">
-                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                    {avgRating}/5 • {reviewCount} review
+                    {reviewCount === 1 ? "" : "s"}
                   </span>
                 </div>
-                <p className="text-sm italic text-[#A3B18A] mt-1">Color: {product.color}</p>
-                <p className="text-sm italic text-[#A3B18A]">Category: {product.categories?.name || "N/A"}</p>
+                <p className="text-sm italic text-[#A3B18A] mt-1">
+                  Color: {product.color}
+                </p>
+                <p className="text-sm italic text-[#A3B18A]">
+                  Category: {product.categories?.name || "N/A"}
+                </p>
 
                 <div className="mt-4">
                   {hasDiscount ? (
                     <div className="flex items-baseline gap-3">
-                      <p className="text-3xl font-extrabold text-[#6B4226]">₹{salePrice.toFixed(2)}</p>
-                      <p className="text-base text-gray-500 line-through">₹{mrp.toFixed(2)}</p>
-                      <p className="text-base text-[#A3B18A] font-semibold">{discountPercentage}% OFF</p>
+                      <p className="text-3xl font-extrabold text-[#6B4226]">
+                        ₹{salePrice.toFixed(2)}
+                      </p>
+                      <p className="text-base text-gray-500 line-through">
+                        ₹{mrp.toFixed(2)}
+                      </p>
+                      <p className="text-base text-[#A3B18A] font-semibold">
+                        {discountPercentage}% OFF
+                      </p>
                     </div>
                   ) : (
-                    <p className="text-3xl font-extrabold text-[#6B4226]">₹{mrp.toFixed(2)}</p>
+                    <p className="text-3xl font-extrabold text-[#6B4226]">
+                      ₹{mrp.toFixed(2)}
+                    </p>
                   )}
                 </div>
 
                 <div className="mt-5 flex items-center gap-3">
-                  <QuantitySelect max={Math.min(10, Number(product.stock) || 10)} value={qty} onChange={setQty} />
+                  <QuantitySelect
+                    max={Math.min(10, Number(product.stock) || 10)}
+                    value={qty}
+                    onChange={setQty}
+                  />
                   {Number(product.stock) > 0 ? (
-                    <p className="text-sm text-[#A3B18A]">In Stock: {product.stock}</p>
+                    <p className="text-sm text-[#A3B18A]">
+                      In Stock: {product.stock}
+                    </p>
                   ) : (
                     <p className="text-sm text-red-500">Out of Stock</p>
                   )}
@@ -342,7 +381,9 @@ const ProductDetails = () => {
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
                     className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0 ? "opacity-50 cursor-not-allowed" : ""
+                      Number(product.stock) === 0
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
                     }`}
                     aria-label="Add this product to your shopping cart"
                     disabled={Number(product.stock) === 0}
@@ -352,7 +393,9 @@ const ProductDetails = () => {
                   </button>
                   <button
                     className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0 ? "opacity-50 cursor-not-allowed" : ""
+                      Number(product.stock) === 0
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
                     }`}
                     aria-label="Buy now"
                     disabled={Number(product.stock) === 0}
@@ -365,7 +408,9 @@ const ProductDetails = () => {
 
               {/* About this item */}
               <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-4">
-                <h3 className="text-[#6B4226] font-semibold mb-2">About this item</h3>
+                <h3 className="text-[#6B4226] font-semibold mb-2">
+                  About this item
+                </h3>
                 <ul className="list-disc list-inside text-sm text-[#3E2C23] space-y-1">
                   {product.shortdescription ? (
                     product.shortdescription
@@ -387,27 +432,39 @@ const ProductDetails = () => {
         <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h2 className="text-xl font-bold text-[#6B4226] mb-3">Product Description</h2>
+              <h2 className="text-xl font-bold text-[#6B4226] mb-3">
+                Product Description
+              </h2>
               <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
                 {product.description || "No additional description provided."}
               </p>
               <div className="mt-4 text-md text-[#6B4226]">
-                Designer: <span className="font-semibold">{product.branddesigner}</span>
+                Designer:{" "}
+                <span className="font-semibold">{product.branddesigner}</span>
               </div>
             </div>
           </div>
           <div className="lg:col-span-4">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h3 className="text-lg font-bold text-[#6B4226] mb-2">Specifications</h3>
+              <h3 className="text-lg font-bold text-[#6B4226] mb-2">
+                Specifications
+              </h3>
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
-                  <dt>Color</dt><dd className="font-medium">{product.color || "—"}</dd>
+                  <dt>Color</dt>
+                  <dd className="font-medium">{product.color || "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
-                  <dt>Category</dt><dd className="font-medium">{product.categories?.name || "—"}</dd>
+                  <dt>Category</dt>
+                  <dd className="font-medium">
+                    {product.categories?.name || "—"}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
-                  <dt>Stock</dt><dd className="font-medium">{Number(product.stock) > 0 ? product.stock : "Out of stock"}</dd>
+                  <dt>Stock</dt>
+                  <dd className="font-medium">
+                    {Number(product.stock) > 0 ? product.stock : "Out of stock"}
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -419,11 +476,14 @@ const ProductDetails = () => {
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-[#6B4226]">Customer Reviews</h2>
+                <h2 className="text-xl font-bold text-[#6B4226]">
+                  Customer Reviews
+                </h2>
                 <div className="flex items-center gap-2">
                   <StarRating value={avgRating} />
                   <span className="text-sm text-[#3E2C23]">
-                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                    {avgRating}/5 • {reviewCount} review
+                    {reviewCount === 1 ? "" : "s"}
                   </span>
                 </div>
               </div>
@@ -433,20 +493,27 @@ const ProductDetails = () => {
               ) : reviewError ? (
                 <p className="text-red-500">{reviewError}</p>
               ) : reviews.length === 0 ? (
-                <p className="text-[#3E2C23]">No reviews yet. Be the first to review!</p>
+                <p className="text-[#3E2C23]">
+                  No reviews yet. Be the first to review!
+                </p>
               ) : (
                 <ul className="space-y-4">
                   {reviews.map((r) => (
-                    <li key={r.id} className="border border-[#F1E7E5] rounded-lg p-4">
+                    <li
+                      key={r.id}
+                      className="border border-[#F1E7E5] rounded-lg p-4"
+                    >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <StarRating value={Number(r.rating) || 0} />
                           <span className="text-sm text-[#6B4226] font-semibold">
-                            {r.name || "Anonymous"}
+                            {r.users.full_name || "Anonymous"}
                           </span>
                         </div>
                         <time className="text-xs text-[#3E2C23] opacity-70">
-                          {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}
+                          {r.created_at
+                            ? new Date(r.created_at).toLocaleDateString("en-IN")
+                            : ""}
                         </time>
                       </div>
                       <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
@@ -460,19 +527,29 @@ const ProductDetails = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <form onSubmit={submitReview} className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h3 className="text-lg font-bold text-[#6B4226] mb-3">Write a review</h3>
+            <form
+              onSubmit={submitReview}
+              className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6"
+            >
+              <h3 className="text-lg font-bold text-[#6B4226] mb-3">
+                Write a review
+              </h3>
 
-              <label className="block text-sm text-[#3E2C23] mb-1">Your name (optional)</label>
+              <label className="block text-sm text-[#3E2C23] mb-1">
+                Your name (optional)
+              </label>
               <input
                 type="text"
                 value={reviewName}
                 onChange={(e) => setReviewName(e.target.value)}
                 className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
                 placeholder="e.g., Arjun"
+                readOnly
               />
 
-              <label className="block text-sm text-[#3E2C23] mb-1">Rating</label>
+              <label className="block text-sm text-[#3E2C23] mb-1">
+                Rating
+              </label>
               <select
                 value={reviewRating}
                 onChange={(e) => setReviewRating(Number(e.target.value))}
@@ -480,12 +557,23 @@ const ProductDetails = () => {
               >
                 {[5, 4, 3, 2, 1].map((n) => (
                   <option key={n} value={n}>
-                    {n} - {n === 5 ? "Excellent" : n === 4 ? "Good" : n === 3 ? "Average" : n === 2 ? "Poor" : "Terrible"}
+                    {n} -{" "}
+                    {n === 5
+                      ? "Excellent"
+                      : n === 4
+                      ? "Good"
+                      : n === 3
+                      ? "Average"
+                      : n === 2
+                      ? "Poor"
+                      : "Terrible"}
                   </option>
                 ))}
               </select>
 
-              <label className="block text-sm text-[#3E2C23] mb-1">Review</label>
+              <label className="block text-sm text-[#3E2C23] mb-1">
+                Review
+              </label>
               <textarea
                 value={reviewText}
                 onChange={(e) => setReviewText(e.target.value)}
@@ -509,11 +597,14 @@ const ProductDetails = () => {
 
         {/* Related Products */}
         <div className="mt-16 px-2 max-w-[1440px] mx-auto font-serif">
-          <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">You May Also Like</h2>
+          <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">
+            You May Also Like
+          </h2>
           <div className="flex flex-wrap justify-center gap-8">
             {relatedProducts.map((related) => {
               const relatedHasDiscount =
-                related.discountprice && Number(related.discountprice) < Number(related.price);
+                related.discountprice &&
+                Number(related.discountprice) < Number(related.price);
               const relatedSalePrice = relatedHasDiscount
                 ? Number(related.discountprice)
                 : Number(related.price);
