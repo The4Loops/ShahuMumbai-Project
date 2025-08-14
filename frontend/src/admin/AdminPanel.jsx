@@ -9,7 +9,9 @@ import Analytics from './Analytics';
 import AddCategory from './AddCategory';
 import AddBlogPost from './AddBlogPost';
 import EmployeeManagement from './EmployeeManagement';
-import TeamManagement from './TeamManagement'; // ✅ New import
+import TeamManagement from './TeamManagement';
+import Tables from './Tables'; // ✅ Updated import
+
 import { FaBars, FaTimes } from 'react-icons/fa';
 
 const TABS = [
@@ -22,7 +24,8 @@ const TABS = [
   'Add Category',
   'Add Blog Post',
   'Employee Management',
-  'Team Management', // ✅ New tab
+  'Team Management',
+  'Table',
 ];
 
 const AdminPanel = () => {
@@ -70,7 +73,9 @@ const AdminPanel = () => {
       <div className="min-h-screen bg-[#f9f5f0] px-4 sm:px-6 lg:px-8 py-6 lg:py-12 font-serif">
         <div className="max-w-6xl mx-auto">
           <div className="flex items-center justify-between mb-6 lg:mb-10">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#6B4226]">Admin Panel</h1>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-[#6B4226]">
+              Admin Panel
+            </h1>
 
             {isMobile && (
               <button
@@ -83,19 +88,29 @@ const AdminPanel = () => {
             )}
           </div>
 
+          {/* Mobile Toggle / Pills */}
           {isMobile && (
-            <div className="mb-4">
-              <label className="sr-only" htmlFor="tabPicker">Select admin section</label>
-              <select
-                id="tabPicker"
-                value={activeTab}
-                onChange={(e) => setActiveTab(e.target.value)}
-                className="w-full border border-[#D4A5A5] bg-white rounded-md px-3 py-2 text-[#6B4226] focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
-              >
-                {TABS.map((t) => (
-                  <option key={t} value={t}>{t}</option>
-                ))}
-              </select>
+            <div className="mb-4 relative flex overflow-x-auto rounded-full border border-gray-300">
+              <div
+                className="absolute top-0 left-0 h-full bg-blue-600 rounded-full transition-all duration-300"
+                style={{
+                  width: `${100 / TABS.length}%`,
+                  transform: `translateX(${TABS.indexOf(activeTab) * 100}%)`,
+                }}
+              ></div>
+              {TABS.map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setActiveTab(tab)}
+                  className={`relative flex-shrink-0 py-2 px-4 whitespace-nowrap rounded-full z-10 transition-colors duration-300 ${
+                    activeTab === tab
+                      ? 'text-white font-semibold'
+                      : 'text-gray-700 hover:text-gray-900'
+                  }`}
+                >
+                  {tab}
+                </button>
+              ))}
             </div>
           )}
 
@@ -111,8 +126,7 @@ const AdminPanel = () => {
                   onClick={() => setIsSidebarOpen(false)}
                 />
                 <aside
-                  className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#D4A5A5]
-                             rounded-r-xl"
+                  className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#D4A5A5] rounded-r-xl"
                   role="dialog"
                   aria-modal="true"
                 >
@@ -141,7 +155,8 @@ const AdminPanel = () => {
               {activeTab === 'Add Category' && <AddCategory />}
               {activeTab === 'Add Blog Post' && <AddBlogPost />}
               {activeTab === 'Employee Management' && <EmployeeManagement />}
-              {activeTab === 'Team Management' && <TeamManagement />} {/* ✅ New content */}
+              {activeTab === 'Team Management' && <TeamManagement />}
+              {activeTab === 'Table' && <Tables />} {/* ✅ Updated Table */}
             </div>
           </div>
         </div>

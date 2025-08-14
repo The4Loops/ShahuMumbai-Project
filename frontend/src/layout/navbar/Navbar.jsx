@@ -43,7 +43,7 @@ const ABOUT = [
   {
     section: "Craft",
     items: [
-      { label: "Contemporary artisans", href: "/contemporaryartisans" },
+      { label: "Our Team", href: "/contemporaryartisans" },
       { label: "Services", href: "/service" },
       { label: "Contact us", href: "/contactus" },
     ],

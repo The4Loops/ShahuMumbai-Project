@@ -50,23 +50,32 @@ const technicalTeam = [
 const TeamToggle = ({ view, setView }) => (
   <nav aria-label="Team categories" className="flex justify-center mb-12 relative">
     <div className="flex gap-8 relative">
-      {["artisans", "technical"].map((type) => (
-        <button
-          key={type}
-          onClick={() => setView(type)}
-          aria-pressed={view === type}
-          className="relative px-3 py-2 font-medium text-lg"
-        >
-          {type === "artisans" ? "Contemporary Artisans" : "Technical Team"}
-          {view === type && (
-            <motion.div
-              layoutId={`underline-${type}`}
-              className="absolute left-0 right-0 h-[3px] bg-pink-800 bottom-0 rounded-full"
-              transition={{ type: "spring", stiffness: 500, damping: 30 }}
-            />
-          )}
-        </button>
-      ))}
+      {["artisans", "technical"].map((type) => {
+        const isActive = view === type;
+        return (
+          <motion.button
+            key={type}
+            onClick={() => setView(type)}
+            aria-pressed={isActive}
+            className="relative px-4 py-2 font-medium text-lg rounded-md"
+            initial={false}
+            animate={{
+              scale: isActive ? 1.1 : 1,
+              color: isActive ? (type === "artisans" ? "#e91e63" : "#1e88e5") : "#333",
+            }}
+            transition={{ type: "spring", stiffness: 400, damping: 25 }}
+          >
+            {type === "artisans" ? "Contemporary Artisans" : "Technical Team"}
+            {isActive && (
+              <motion.div
+                layoutId="underline"
+                className="absolute left-0 right-0 h-[3px] bg-pink-800 bottom-0 rounded-full"
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              />
+            )}
+          </motion.button>
+        );
+      })}
     </div>
   </nav>
 );
@@ -93,7 +102,7 @@ const TeamMemberCard = memo(({ member, view, delay }) => (
   </motion.div>
 ));
 
-export default function TeamPage() {
+function TeamPage() {
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -158,3 +167,4 @@ export default function TeamPage() {
     </Layout>
   );
 }
+export default memo(TeamPage);
