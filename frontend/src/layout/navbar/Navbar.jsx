@@ -149,7 +149,11 @@ export default function Navbar() {
           to="/"
           className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none"
         >
-          <img src={Logo} alt="Shahu Mumbai Logo" className="h-16 object-contain" />
+          <img
+            src={Logo}
+            alt="Shahu Mumbai Logo"
+            className="h-16 object-contain"
+          />
         </Link>
         <button
           className="lg:hidden text-[#6B4226] p-2 ml-auto"
@@ -163,7 +167,8 @@ export default function Navbar() {
       <div className="hidden lg:flex items-center py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1]">
         <ul className="flex items-center gap-8 flex-[1]">
           {menus.map((menu) => {
-            const hasDropdown = menu.dropdown_items && menu.dropdown_items.length > 0;
+            const hasDropdown =
+              menu.dropdown_items && menu.dropdown_items.length > 0;
             if (hasDropdown) {
               const sortedItems = [...menu.dropdown_items].sort(
                 (a, b) => a.order_index - b.order_index
@@ -200,7 +205,10 @@ export default function Navbar() {
                           title={section.title}
                           links={section.links}
                           onLinkClick={() =>
-                            setDropdown((prev) => ({ ...prev, [menu.id]: false }))
+                            setDropdown((prev) => ({
+                              ...prev,
+                              [menu.id]: false,
+                            }))
                           }
                         />
                       ))
@@ -257,7 +265,10 @@ export default function Navbar() {
                     </button>
                   </li>
                   <li>
-                    <Link to="/wishlist" onClick={() => setMobileMenuOpen(false)}>
+                    <Link
+                      to="/wishlist"
+                      onClick={() => setMobileMenuOpen(false)}
+                    >
                       Wishlist
                     </Link>
                   </li>
@@ -281,9 +292,11 @@ export default function Navbar() {
 
       {/* Mobile Navigation (Restored Original Design) */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4">
+        <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]">
+          {/* Mobile Menus */}
           {menus.map((menu) => {
-            const hasDropdown = menu.dropdown_items && menu.dropdown_items.length > 0;
+            const hasDropdown =
+              menu.dropdown_items && menu.dropdown_items.length > 0;
             if (hasDropdown) {
               const sortedItems = [...menu.dropdown_items].sort(
                 (a, b) => a.order_index - b.order_index
@@ -303,38 +316,36 @@ export default function Navbar() {
                   </button>
                   {mobileDropdownOpen === menu.id && (
                     <div className="pl-4 pt-1 space-y-2">
-                      {!sortedItems[0].links ? (
-                        sortedItems.map(({ label, href }) => (
-                          <Link
-                            key={label}
-                            to={href}
-                            onClick={() => setMobileMenuOpen(false)}
-                            className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                          >
-                            {label}
-                          </Link>
-                        ))
-                      ) : (
-                        sortedItems.map((section) => (
-                          <div key={section.title}>
-                            {section.title && (
-                              <p className="text-sm font-semibold text-[#6B4226] mt-2">
-                                {section.title}
-                              </p>
-                            )}
-                            {section.links.map(({ label, href }) => (
-                              <Link
-                                key={label}
-                                to={href}
-                                onClick={() => setMobileMenuOpen(false)}
-                                className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                              >
-                                {label}
-                              </Link>
-                            ))}
-                          </div>
-                        ))
-                      )}
+                      {!sortedItems[0].links
+                        ? sortedItems.map(({ label, href }) => (
+                            <Link
+                              key={label}
+                              to={href}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                            >
+                              {label}
+                            </Link>
+                          ))
+                        : sortedItems.map((section) => (
+                            <div key={section.title}>
+                              {section.title && (
+                                <p className="text-sm font-semibold text-[#6B4226] mt-2">
+                                  {section.title}
+                                </p>
+                              )}
+                              {section.links.map(({ label, href }) => (
+                                <Link
+                                  key={label}
+                                  to={href}
+                                  onClick={() => setMobileMenuOpen(false)}
+                                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                                >
+                                  {label}
+                                </Link>
+                              ))}
+                            </div>
+                          ))}
                     </div>
                   )}
                 </div>
@@ -351,6 +362,70 @@ export default function Navbar() {
               </Link>
             );
           })}
+
+          {/* Account Menu Item */}
+          <div className="border-b border-[#d4c4b6] pb-2">
+            <button
+              className="w-full flex justify-between items-center py-2"
+              onClick={() =>
+                !token
+                  ? (navigate("/account"), setMobileMenuOpen(false))
+                  : setMobileDropdownOpen((prev) =>
+                      prev === "account" ? null : "account"
+                    )
+              }
+            >
+              <span>Account</span>
+              <span>{mobileDropdownOpen === "account" ? "−" : "+"}</span>
+            </button>
+
+            {/* Account dropdown in mobile */}
+            {mobileDropdownOpen === "account" && token && (
+              <div className="pl-4 pt-1 space-y-2">
+                <Link
+                  to="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                >
+                  My Profile
+                </Link>
+                <Link
+                  to="/myorder"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                >
+                  Track Order
+                </Link>
+                <Link
+                  to="/wishlist"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                >
+                  Wishlist
+                </Link>
+                <button
+                  onClick={handleLogout}
+                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Cart Menu Item */}
+          <Link
+            to="/cart"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block py-2 border-b border-[#d4c4b6] relative"
+          >
+            Cart
+            {cartItemCount > 0 && (
+              <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
+                {cartItemCount}
+              </span>
+            )}
+          </Link>
         </div>
       )}
     </nav>
