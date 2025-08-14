@@ -12,7 +12,7 @@ const sampleDataInit = {
   Products: [
     {
       id: 1,
-      image: "https://via.placeholder.com/64",
+      image: null,
       name: "Laptop",
       sku: "LP-13-256",
       category: "Electronics",
@@ -23,7 +23,7 @@ const sampleDataInit = {
     },
     {
       id: 2,
-      image: "https://via.placeholder.com/64",
+      image: null,
       name: "Headphones",
       sku: "HP-ANC-BLK",
       category: "Audio",
@@ -38,7 +38,7 @@ const sampleDataInit = {
       id: 1,
       name: "John Doe",
       email: "johnathan-maximilian-doe.super.long.email@example-very-very-long-domain.com",
-      avatar: "https://i.pravatar.cc/80?img=1",
+      avatar: null,
       role: "admin",
       status: "active",
       joined: "2024-11-15",
@@ -48,7 +48,7 @@ const sampleDataInit = {
       id: 2,
       name: "Jane Smith",
       email: "jane.smith@subdomain.reallylongcompanyname.co.in",
-      avatar: "https://i.pravatar.cc/80?img=2",
+      avatar: null,
       role: "manager",
       status: "suspended",
       joined: "2025-02-01",
@@ -63,7 +63,7 @@ const sampleDataInit = {
     {
       id: 1,
       title: "Summer Sale",
-      image: "https://via.placeholder.com/300x120",
+      image: null,
       position: "Homepage Hero",
       startDate: "2025-04-01",
       endDate: "2025-09-01",
@@ -72,7 +72,7 @@ const sampleDataInit = {
     {
       id: 2,
       title: "New Arrivals",
-      image: "https://via.placeholder.com/300x120",
+      image: null,
       position: "Category Top",
       startDate: "2025-07-01",
       endDate: "2025-08-31",
