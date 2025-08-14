@@ -19,7 +19,6 @@ const VintageArticlePage = () => {
   const [replyName, setReplyName] = useState("");
   const [replyText, setReplyText] = useState("");
   const [replyToReviewIndex, setReplyToReviewIndex] = useState(null);
-
   const [showReviewsSection, setShowReviewsSection] = useState(true);
 
   const [reviews, setReviews] = useState([
@@ -45,12 +44,11 @@ const VintageArticlePage = () => {
     },
   ]);
 
+  const totalReviews = reviews.length;
   const ratingsData = [5, 4, 3, 2, 1].map((stars) => ({
     stars,
     count: reviews.filter((r) => r.stars === stars).length,
   }));
-
-  const totalReviews = reviews.length;
 
   const handleReviewSubmit = () => {
     if (!reviewName.trim() || !reviewText.trim() || rating === 0) return;
@@ -203,12 +201,12 @@ const VintageArticlePage = () => {
               exit={{ opacity: 0, height: 0 }}
               transition={{ duration: 0.4 }}
             >
-              {/* Ratings */}
+              {/* Ratings Summary */}
               <div className="mt-8 bg-white p-6 rounded-lg shadow">
                 <h3 className="text-xl font-semibold mb-4 text-[#5d4037]">
                   Reviews & Ratings
                 </h3>
-                <div className="flex flex-wrap items-center gap-4 mb-6">
+                <div className="flex items-center gap-4 mb-4">
                   <span className="text-3xl font-bold">
                     {totalReviews > 0
                       ? (
@@ -234,139 +232,132 @@ const VintageArticlePage = () => {
                     Based on {totalReviews} reviews
                   </span>
                 </div>
-                <div className="space-y-2">
-                  {ratingsData.map((r, i) => (
-                    <div key={i} className="flex items-center gap-2">
-                      <span className="w-10">{r.stars}★</span>
-                      <div className="flex-1 h-2 bg-gray-200 rounded">
-                        <div
-                          className="h-2 bg-yellow-500 rounded"
-                          style={{
-                            width: `${
-                              totalReviews ? (r.count / totalReviews) * 100 : 0
-                            }%`,
-                          }}
-                        ></div>
-                      </div>
-                      <span className="w-6 text-right">{r.count}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
 
-              {/* Write Review */}
-              <div className="mt-6 bg-white p-6 rounded-lg shadow">
-                <h4 className="font-semibold mb-3 text-[#5d4037]">Write a Review</h4>
-                <input
-                  type="text"
-                  placeholder="Your Name"
-                  value={reviewName}
-                  onChange={(e) => setReviewName(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 mb-3"
-                />
-                <div className="flex text-yellow-500 mb-3">
-                  {[...Array(5)].map((_, i) => (
-                    <button
-                      key={i}
-                      onClick={() => setRating(i + 1)}
-                      className="hover:scale-110 transition-transform"
-                    >
-                      {i < rating ? <FaStar /> : <FaRegStar />}
-                    </button>
-                  ))}
-                </div>
-                <textarea
-                  placeholder="Your Review"
-                  value={reviewText}
-                  onChange={(e) => setReviewText(e.target.value)}
-                  className="w-full border border-gray-300 rounded px-3 py-2 mb-3"
-                  rows="4"
-                ></textarea>
-                <button
-                  onClick={handleReviewSubmit}
-                  className="bg-[#6d4c41] text-white px-4 py-2 rounded hover:bg-[#5d4037] transition"
-                >
-                  Submit Review
-                </button>
-              </div>
-
-              {/* Reviews List */}
-              <div className="mt-6 space-y-4">
-                <AnimatePresence>
-                  {reviews.map((rev, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, y: 15 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="bg-white p-4 rounded shadow"
-                    >
-                      <h5 className="font-semibold">{rev.name}</h5>
-                      <p className="text-gray-500 text-sm">{rev.date}</p>
-                      <div className="flex text-yellow-500 mt-1">
-                        {[...Array(rev.stars)].map((_, i) => (
-                          <FaStar key={i} />
-                        ))}
+                {/* Star Breakdown */}
+                <div className="space-y-1">
+                  {ratingsData.map(({ stars, count }) => {
+                    const percentage = totalReviews
+                      ? Math.round((count / totalReviews) * 100)
+                      : 0;
+                    return (
+                      <div key={stars} className="flex items-center gap-2 text-sm">
+                        <span className="w-12">{stars} star</span>
+                        <div className="flex-1 bg-gray-200 rounded h-3 overflow-hidden">
+                          <div
+                            className="bg-yellow-500 h-3"
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                        <span className="w-6 text-right text-gray-500">{count}</span>
                       </div>
-                      <p className="mt-2">{rev.text}</p>
+                    );
+                  })}
+                </div>
+
+                {/* Review Form */}
+                <div className="mt-6">
+                  <h4 className="font-medium text-[#5d4037] mb-2">Add Your Review</h4>
+                  <input
+                    type="text"
+                    placeholder="Your Name"
+                    value={reviewName}
+                    onChange={(e) => setReviewName(e.target.value)}
+                    className="w-full mb-2 p-2 border rounded"
+                  />
+                  <textarea
+                    placeholder="Your Review"
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    className="w-full mb-2 p-2 border rounded"
+                  />
+                  <div className="flex items-center mb-2">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <span
+                        key={star}
+                        onClick={() => setRating(star)}
+                        className={`cursor-pointer text-xl ${
+                          rating >= star ? "text-yellow-500" : "text-gray-300"
+                        }`}
+                      >
+                        <FaStar />
+                      </span>
+                    ))}
+                  </div>
+                  <button
+                    onClick={handleReviewSubmit}
+                    className="bg-[#8d6e63] text-white px-4 py-2 rounded hover:bg-[#6d4c41] transition"
+                  >
+                    Submit Review
+                  </button>
+                </div>
+
+                {/* Display Reviews */}
+                <div className="mt-6 space-y-4">
+                  {reviews.map((review, index) => (
+                    <div key={index} className="border-t pt-4">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-semibold">{review.name}</span>
+                        <span className="text-gray-400 text-sm">{review.date}</span>
+                      </div>
+                      <div className="flex items-center gap-1 text-yellow-500 mb-1">
+                        {[...Array(5)].map((_, i) =>
+                          i < review.stars ? <FaStar key={i} /> : <FaRegStar key={i} />
+                        )}
+                      </div>
+                      <p className="text-gray-700 mb-2">{review.text}</p>
                       <button
-                        className="text-sm text-[#6d4c41] hover:underline mt-2"
                         onClick={() =>
                           setReplyToReviewIndex(
                             replyToReviewIndex === index ? null : index
                           )
                         }
+                        className="text-sm text-[#8d6e63] hover:underline"
                       >
-                        {replyToReviewIndex === index
-                          ? "Cancel Reply"
-                          : "Reply"}
+                        {replyToReviewIndex === index ? "Cancel Reply" : "Reply"}
                       </button>
-                      {rev.replies?.length > 0 && (
-                        <div className="pl-4 mt-3 border-l-2 border-gray-200 space-y-2">
-                          {rev.replies.map((rep, i) => (
-                            <div key={i}>
-                              <h5 className="font-semibold">{rep.name}</h5>
-                              <p className="text-gray-500 text-sm">{rep.date}</p>
-                              <p className="mt-1">{rep.text}</p>
+
+                      {/* Reply Form */}
+                      {replyToReviewIndex === index && (
+                        <div className="mt-2 ml-4 space-y-2">
+                          <input
+                            type="text"
+                            placeholder="Your Name"
+                            value={replyName}
+                            onChange={(e) => setReplyName(e.target.value)}
+                            className="w-full mb-1 p-2 border rounded"
+                          />
+                          <textarea
+                            placeholder="Your Reply"
+                            value={replyText}
+                            onChange={(e) => setReplyText(e.target.value)}
+                            className="w-full mb-1 p-2 border rounded"
+                          />
+                          <button
+                            onClick={() => handleReplySubmit(index)}
+                            className="bg-[#8d6e63] text-white px-3 py-1 rounded hover:bg-[#6d4c41] transition text-sm"
+                          >
+                            Submit Reply
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Display Replies */}
+                      {review.replies.length > 0 && (
+                        <div className="mt-2 ml-4 space-y-2 border-l-2 border-gray-200 pl-2">
+                          {review.replies.map((reply, rIndex) => (
+                            <div key={rIndex}>
+                              <div className="flex items-center gap-2 text-sm">
+                                <span className="font-medium">{reply.name}</span>
+                                <span className="text-gray-400">{reply.date}</span>
+                              </div>
+                              <p className="text-gray-600 text-sm">{reply.text}</p>
                             </div>
                           ))}
                         </div>
                       )}
-                      <AnimatePresence>
-                        {replyToReviewIndex === index && (
-                          <motion.div
-                            initial={{ opacity: 0, height: 0 }}
-                            animate={{ opacity: 1, height: "auto" }}
-                            exit={{ opacity: 0, height: 0 }}
-                            transition={{ duration: 0.3 }}
-                            className="mt-3 bg-gray-50 p-3 rounded overflow-hidden"
-                          >
-                            <input
-                              type="text"
-                              placeholder="Your Name"
-                              value={replyName}
-                              onChange={(e) => setReplyName(e.target.value)}
-                              className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
-                            />
-                            <textarea
-                              placeholder="Your Reply"
-                              value={replyText}
-                              onChange={(e) => setReplyText(e.target.value)}
-                              className="w-full border border-gray-300 rounded px-3 py-2 mb-2"
-                              rows="3"
-                            ></textarea>
-                            <button
-                              onClick={() => handleReplySubmit(index)}
-                              className="bg-[#6d4c41] text-white px-4 py-2 rounded hover:bg-[#5d4037] transition"
-                            >
-                              Submit Reply
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                    </div>
                   ))}
-                </AnimatePresence>
+                </div>
               </div>
             </motion.div>
           )}

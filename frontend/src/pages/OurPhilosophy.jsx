@@ -1,55 +1,71 @@
+import React from "react";
 import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
-
-const philosophy = [
-  {
-    title: "Timeless Design",
-    text: "We believe in designs that transcend trends — embracing pieces that last generations.",
-  },
-  {
-    title: "Authenticity First",
-    text: "Every item tells a story. We celebrate the imperfections that add soul and character.",
-  },
-  {
-    title: "Sustainable Choices",
-    text: "Vintage fashion is a step toward conscious, sustainable living — and we're proud to be part of that journey.",
-  },
-];
 
 function OurPhilosophy() {
   return (
     <Layout>
-      <div className="bg-[#F1E7E5] px-4 sm:px-10 py-16 text-[#2e2e2e] min-h-screen">
-        <motion.div
-          className="text-center mb-16"
+    <section className="bg-[#F1E7E5] py-16 px-6 md:px-20 lg:px-32">
+      <div className="max-w-5xl mx-auto text-center">
+        <motion.h1
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }} // Faster animation here
+          transition={{ duration: 0.6 }}
+          className="text-4xl md:text-5xl font-bold text-gray-800 mb-6"
         >
-          <h1 className="text-4xl font-serif mb-4">Our Philosophy</h1>
-          <p className="max-w-2xl mx-auto text-[#555]">
-            Guided by heritage, craftsmanship, and meaning, we curate with heart and purpose.
-          </p>
-        </motion.div>
+          Our Philosophy
+        </motion.h1>
 
-        <div className="space-y-12 max-w-4xl mx-auto">
-          {philosophy.map((item, idx) => (
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2, duration: 0.6 }}
+          className="text-lg text-gray-600 leading-relaxed mb-12"
+        >
+          At <span className="font-semibold text-gray-800">[Your Brand]</span>,
+          we believe shopping should be more than just a transaction. It’s about
+          connection, trust, and bringing quality into your life. We are
+          committed to sourcing ethically, reducing waste, and creating
+          products that last — because great style should also be kind to the
+          planet.
+        </motion.p>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-10">
+          {[
+            {
+              title: "Quality First",
+              desc: "Every product we offer is crafted with care and built to last, so you can buy with confidence.",
+              icon: "💎",
+            },
+            {
+              title: "Sustainability",
+              desc: "We prioritize eco-friendly materials and responsible production methods to protect our planet.",
+              icon: "🌱",
+            },
+            {
+              title: "Customer Connection",
+              desc: "Your happiness matters. We strive to create a shopping experience that feels personal and trustworthy.",
+              icon: "🤝",
+            },
+          ].map((item, idx) => (
             <motion.div
               key={idx}
-              className="bg-white p-6 rounded-xl shadow"
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: idx * 0.1 }} // Faster & less delay here
-              viewport={{ once: true }}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + idx * 0.1, duration: 0.6 }}
+              className="bg-gray-50 p-6 rounded-2xl shadow hover:shadow-lg transition"
             >
-              <h2 className="text-2xl font-serif mb-2">{item.title}</h2>
-              <p className="text-[#555]">{item.text}</p>
+              <div className="text-4xl mb-4">{item.icon}</div>
+              <h3 className="text-xl font-semibold text-gray-800 mb-2">
+                {item.title}
+              </h3>
+              <p className="text-gray-600 text-base">{item.desc}</p>
             </motion.div>
           ))}
         </div>
       </div>
+    </section>
     </Layout>
   );
 }
-
 export default OurPhilosophy;
