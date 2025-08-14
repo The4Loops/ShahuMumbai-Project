@@ -1,5 +1,21 @@
 import React from "react";
-import { EllipsisVerticalIcon } from "@heroicons/react/24/solid"; // For the 3-dot action menu
+import { EllipsisVerticalIcon } from "@heroicons/react/24/solid";
+
+const chip = (text, color) => (
+  <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${color}`}>{text}</span>
+);
+
+const roleChip = (role) =>
+  role === "admin"
+    ? chip("admin", "bg-red-100 text-red-600")
+    : role === "manager"
+    ? chip("manager", "bg-blue-100 text-blue-600")
+    : chip(role || "user", "bg-gray-100 text-gray-600");
+
+const statusChip = (status) =>
+  status === "active"
+    ? chip("active", "bg-green-100 text-green-600")
+    : chip(status || "—", "bg-gray-100 text-gray-600");
 
 const Table = ({ data }) => {
   if (!data || data.length === 0) {
@@ -7,68 +23,53 @@ const Table = ({ data }) => {
   }
 
   return (
-    <div className="overflow-x-auto bg-white shadow-lg rounded-lg border border-gray-200">
+    <div className="overflow-x-auto bg-white shadow rounded-xl border border-gray-200">
       <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
+        <thead className="bg-gray-50 sticky top-0 z-10">
           <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              User
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Role
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Status
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Joined
-            </th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-              Actions
-            </th>
+            {["User", "Role", "Status", "Joined", "Actions"].map((h) => (
+              <th key={h} className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
+                {h}
+              </th>
+            ))}
           </tr>
         </thead>
 
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-gray-100">
           {data.map((row) => (
             <tr key={row.id} className="hover:bg-gray-50 transition-colors">
-              {/* User column with avatar */}
-              <td className="px-6 py-4 whitespace-nowrap flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-gray-400 text-white flex items-center justify-center font-medium">
-                  {row.name.charAt(0)}
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-900">{row.name}</div>
-                  <div className="text-xs text-gray-500">{row.email}</div>
+              {/* User column with avatar + truncating email */}
+              <td className="px-6 py-4">
+                <div className="flex items-center gap-3 min-w-0">
+                  {row.avatar ? (
+                    <img className="w-10 h-10 rounded-full object-cover border" src={row.avatar} alt={row.name} />
+                  ) : (
+                    <div className="w-10 h-10 rounded-full bg-gray-400 text-white flex items-center justify-center font-medium">
+                      {row.name?.charAt(0)}
+                    </div>
+                  )}
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-gray-900">{row.name}</div>
+                    <div
+                      className="text-xs text-gray-500 max-w-[200px] truncate"
+                      title={row.email}
+                    >
+                      {row.email}
+                    </div>
+                  </div>
                 </div>
               </td>
 
               {/* Role badge */}
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span
-                  className={`px-2 py-1 text-xs rounded-full font-medium ${
-                    row.role === "admin"
-                      ? "bg-red-100 text-red-600"
-                      : row.role === "manager"
-                      ? "bg-blue-100 text-blue-600"
-                      : "bg-gray-100 text-gray-600"
-                  }`}
-                >
-                  {row.role}
-                </span>
-              </td>
+              <td className="px-6 py-4 whitespace-nowrap">{roleChip(row.role)}</td>
 
               {/* Status badge */}
-              <td className="px-6 py-4 whitespace-nowrap">
-                <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-600">
-                  {row.status}
-                </span>
-              </td>
+              <td className="px-6 py-4 whitespace-nowrap">{statusChip(row.status)}</td>
 
               {/* Joined column */}
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                 <div>{row.joined}</div>
-                <div className="text-xs text-gray-400">Last: {row.last || "Invalid Date"}</div>
+                <div className="text-xs text-gray-400">Last: {row.last || "—"}</div>
               </td>
 
               {/* Actions */}
