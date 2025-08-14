@@ -121,7 +121,7 @@ function EmployeeManagement() {
         toast.dismiss();
         toast.success("User updated successfully");
       } else {
-        await api.post("/api/create-users", {
+        await api.post("/api/users", {
           full_name: newUser.name,
           email: newUser.email,
           password: newUser.password,
