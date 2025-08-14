@@ -40,7 +40,6 @@ const Callback = () => {
 
           const decoded = jwtDecode(res.data.token);
           const role = decoded.role;
-          console.log("Decoded JWT:", decoded);
 
           toast.dismiss();
           toast.success("Login Successful!");

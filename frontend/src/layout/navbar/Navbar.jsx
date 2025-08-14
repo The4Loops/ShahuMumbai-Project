@@ -1,63 +1,22 @@
-import React, {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-} from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
 import clsx from "clsx";
 import { jwtDecode } from "jwt-decode";
 import Logo from "../../assets/ShahuLogo.png";
+import api from "../../supabase/axios";
+import { toast } from "react-toastify";
 
-const PRODUCTS = [
-  { label: "Our Products", href: "/products" },
-  { label: "Blankets and Pillows", href: "/" },
-  { label: "Tableware", href: "/" },
-  { label: "Furniture and Lighting", href: "/" },
-];
-
-const MEN = [
-  { label: "Kurtas", href: "/men/kurtas" },
-  { label: "Shirts", href: "/men/shirts" },
-  { label: "Bottoms", href: "/men/bottoms" },
-];
-
-const WOMEN = [
-  { label: "Sarees", href: "/women/sarees" },
-  { label: "Dresses", href: "/women/dresses" },
-  { label: "Accessories", href: "/women/accessories" },
-];
-
-const ABOUT = [
-  { section: "About Us", items: [{ label: "Our Story", href: "/about" }] },
-  {
-    section: "Legacy",
-    items: [
-      { label: "Our Philosophy", href: "/ourphilosophy" },
-      { label: "Heritage Timeline", href: "/heritagetimeline" },
-      { label: "Our Studios", href: "/ourstudios" },
-    ],
-  },
-  {
-    section: "Craft",
-    items: [
-      { label: "Our Team", href: "/contemporaryartisans" },
-      { label: "Services", href: "/service" },
-      { label: "Contact us", href: "/contactus" },
-    ],
-  },
-    { section: "Blogs", items: [{ label: "Our Blog", href: "/blog" }] },
-];
-
+// Dropdown section reusable
 const DropdownSection = ({ title, links, onLinkClick }) => (
   <div className="min-w-[180px] mt-4 first:mt-0">
-    <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
-      {title.toUpperCase()}
-    </h3>
+    {title && (
+      <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
+        {title.toUpperCase()}
+      </h3>
+    )}
     <ul className="space-y-1">
-      {links.map(({ label, href }) => (
+      {links?.map(({ label, href }) => (
         <li key={label}>
           <Link
             to={href}
@@ -72,9 +31,9 @@ const DropdownSection = ({ title, links, onLinkClick }) => (
   </div>
 );
 
+// Desktop dropdown component
 const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
   const timerRef = useRef(null);
-
   const handleMouseEnter = () => {
     clearTimeout(timerRef.current);
     setOpen(true);
@@ -82,7 +41,6 @@ const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
   const handleMouseLeave = () => {
     timerRef.current = setTimeout(() => setOpen(false), 150);
   };
-
   return (
     <li
       ref={refEl}
@@ -95,7 +53,6 @@ const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
-        onKeyDown={(e) => e.key === "Enter" && setOpen(!isOpen)}
       >
         {label}
       </span>
@@ -113,21 +70,18 @@ const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
   );
 };
 
-const Navbar = () => {
-  const [dropdown, setDropdown] = useState({
-    products: false,
-    about: false,
-    men: false,
-    women: false,
-    account: false,
-  });
+export default function Navbar() {
+  const [menus, setMenus] = useState([]);
+  const [dropdown, setDropdown] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null); // only one open at a time
+  const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
+  const refs = useRef({});
   const navigate = useNavigate();
+
   const token = localStorage.getItem("token");
   let userRole = null;
-
   if (token) {
     try {
       const decoded = jwtDecode(token);
@@ -136,44 +90,47 @@ const Navbar = () => {
       localStorage.removeItem("token");
     }
   }
-
   const cartItemCount = 3;
 
-  const productsRef = useRef(null);
-  const aboutRef = useRef(null);
-  const menRef = useRef(null);
-  const womenRef = useRef(null);
-  const accountRef = useRef({ timer: null });
+  // Fetch menus
+  const fetchMenuData = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const res = await api.get("/api/navbar/menus");
+      let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
+      // Hide Admin if not an admin
+      if (userRole !== "admin") {
+        sorted = sorted.filter((m) => m.label.toLowerCase() !== "admin");
+      }
+      setMenus(sorted);
+      const initDrop = {};
+      sorted.forEach((m) => (initDrop[m.id] = false));
+      setDropdown(initDrop);
+    } catch (err) {
+      toast.error(err.response?.data?.message || "Failed to load menus");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userRole]);
 
-  const refs = useMemo(
-    () => ({
-      products: productsRef,
-      about: aboutRef,
-      men: menRef,
-      women: womenRef,
-      account: accountRef,
-    }),
-    []
-  );
+  useEffect(() => {
+    fetchMenuData();
+  }, [fetchMenuData]);
 
-  const handleClickOutside = useCallback(
-    (e) => {
-      Object.entries(refs).forEach(([key, ref]) => {
-        if (ref.current && !ref.current.contains(e.target)) {
-          setDropdown((prev) => ({ ...prev, [key]: false }));
-        }
-      });
-    },
-    [refs]
-  );
-
+  // Close dropdowns on outside click
+  const handleClickOutside = useCallback((e) => {
+    Object.keys(refs.current).forEach((key) => {
+      if (refs.current[key] && !refs.current[key].contains(e.target)) {
+        setDropdown((prev) => ({ ...prev, [key]: false }));
+      }
+    });
+  }, []);
   useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [handleClickOutside]);
 
   const handleProtectedClick = (path) => {
-    setDropdown((prev) => ({ ...prev, account: false }));
     navigate(path);
     setMobileMenuOpen(false);
   };
@@ -181,256 +138,140 @@ const Navbar = () => {
   const handleLogout = () => {
     localStorage.clear();
     navigate("/");
-    setDropdown({
-      products: false,
-      about: false,
-      men: false,
-      women: false,
-      account: false,
-    });
     setMobileMenuOpen(false);
   };
 
-  const renderProductsContent = useMemo(
-    () => (
-      <>
-        <DropdownSection
-          title="Our Store"
-          links={[PRODUCTS[0]]}
-          onLinkClick={() =>
-            setDropdown((prev) => ({ ...prev, products: false }))
-          }
-        />
-        <DropdownSection
-          title="Categories"
-          links={PRODUCTS.slice(1)}
-          onLinkClick={() =>
-            setDropdown((prev) => ({ ...prev, products: false }))
-          }
-        />
-      </>
-    ),
-    []
-  );
-
-  const renderAboutContent = useMemo(
-    () => (
-      <>
-        {ABOUT.map(({ section, items }) => (
-          <DropdownSection
-            key={section}
-            title={section}
-            links={items}
-            onLinkClick={() =>
-              setDropdown((prev) => ({ ...prev, about: false }))
-            }
-          />
-        ))}
-      </>
-    ),
-    []
-  );
-
-  const renderMenContent = useMemo(
-    () => (
-      <DropdownSection
-        title="Men's Collection"
-        links={MEN}
-        onLinkClick={() => setDropdown((prev) => ({ ...prev, men: false }))}
-      />
-    ),
-    []
-  );
-
-  const renderWomenContent = useMemo(
-    () => (
-      <DropdownSection
-        title="Women's Collection"
-        links={WOMEN}
-        onLinkClick={() => setDropdown((prev) => ({ ...prev, women: false }))}
-      />
-    ),
-    []
-  );
-
-  const dropdownConfigs = [
-    { key: "products", label: "Products", content: renderProductsContent },
-    { key: "men", label: "Men", content: renderMenContent },
-    { key: "women", label: "Women", content: renderWomenContent },
-    { key: "about", label: "About Us", content: renderAboutContent },
-  ];
-
   return (
-    <nav className="fixed top-0 w-full z-50 bg-[#EDE1DF] border-b border-[#EDE1DF] shadow-md font-serif">
+    <nav className="fixed top-0 w-full z-50 bg-[#EDE1DF] shadow-md font-serif">
       {/* Top Bar */}
-<div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
-  {/* Logo - Centered on mobile */}
-  <Link
-    to="/"
-    className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none flex items-center"
-  >
-    <img
-      src={Logo}
-      alt="Shahu Mumbai Logo"
-      className="h-16 object-contain"
-    />
-  </Link>
-
-  {/* Hamburger Menu - Only visible on mobile */}
-  <button
-    className="lg:hidden text-[#6B4226] p-2 ml-auto"
-    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-    aria-label="Toggle menu"
-  >
-    {mobileMenuOpen ? <FaTimes size={26} /> : <FaBars size={26} />}
-  </button>
-</div>
-
-      {/* Desktop Navigation */}
-      <div className="hidden lg:flex items-center py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1] w-full">
-      
-      {/* LEFT: Menu */}
-      <ul className="flex items-center gap-8 flex-[1]">
-        <li>
-          <Link
-            to="/"
-            className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
-          >
-            Home
-          </Link>
-        </li>
-        {dropdownConfigs.map(({ key, label, content }) => (
-          <DesktopDropdown
-            key={key}
-            label={label}
-            isOpen={dropdown[key]}
-            setOpen={(state) =>
-              setDropdown({
-                products: false,
-                about: false,
-                men: false,
-                women: false,
-                account: false,
-                [key]: state,
-              })
-            }
-            refEl={refs[key]}
-            content={content}
-          />
-        ))}
-        {userRole === "admin" && (
-          <li>
-            <Link
-              to="/admin"
-              className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
-            >
-              Admin
-            </Link>
-          </li>
-        )}
-      </ul>
-
-      {/* CENTER: Search */}
-      <div className="flex justify-center flex-[1]">
-        <input
-          type="text"
-          placeholder="Search"
-          aria-label="Search products"
-          className="w-[250px] px-3 py-1.5 rounded-full border border-gray-300 bg-white focus:outline-none focus:border-[#D4A5A5]"
-        />
+      <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
+        <Link
+          to="/"
+          className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none"
+        >
+          <img src={Logo} alt="Shahu Mumbai Logo" className="h-16 object-contain" />
+        </Link>
+        <button
+          className="lg:hidden text-[#6B4226] p-2 ml-auto"
+          onClick={() => setMobileMenuOpen((prev) => !prev)}
+        >
+          {mobileMenuOpen ? <FaTimes size={26} /> : <FaBars size={26} />}
+        </button>
       </div>
 
-      {/* RIGHT: Icons */}
-      <ul className="flex items-center gap-6 justify-end flex-[1]">
-        <li
-          ref={refs.account}
-          className="relative list-none"
-          onMouseEnter={() => {
-            clearTimeout(refs.account.current.timer);
-            setDropdown({
-              products: false,
-              about: false,
-              men: false,
-              women: false,
-              account: true,
-            });
-          }}
-          onMouseLeave={() => {
-            refs.account.current.timer = setTimeout(() => {
-              setDropdown((prev) => ({ ...prev, account: false }));
-            }, 150);
-          }}
-        >
-          <button
-            onClick={() => {
-              if (!token) {
-                navigate("/account");
-              } else {
-                setDropdown((prev) => ({ ...prev, account: !prev.account }));
+      {/* Desktop Navigation */}
+      <div className="hidden lg:flex items-center py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1]">
+        <ul className="flex items-center gap-8 flex-[1]">
+          {menus.map((menu) => {
+            const hasDropdown = menu.dropdown_items && menu.dropdown_items.length > 0;
+            if (hasDropdown) {
+              const sortedItems = [...menu.dropdown_items].sort(
+                (a, b) => a.order_index - b.order_index
+              );
+              return (
+                <DesktopDropdown
+                  key={menu.id}
+                  label={menu.label}
+                  isOpen={dropdown[menu.id]}
+                  setOpen={(state) => {
+                    const closedAll = Object.keys(dropdown).reduce(
+                      (acc, id) => ({ ...acc, [id]: false }),
+                      {}
+                    );
+                    setDropdown({ ...closedAll, [menu.id]: state });
+                  }}
+                  refEl={(el) => (refs.current[menu.id] = el)}
+                  content={
+                    !sortedItems[0].links ? (
+                      <DropdownSection
+                        title={menu.label}
+                        links={sortedItems.map((item) => ({
+                          label: item.label,
+                          href: item.href,
+                        }))}
+                        onLinkClick={() =>
+                          setDropdown((prev) => ({ ...prev, [menu.id]: false }))
+                        }
+                      />
+                    ) : (
+                      sortedItems.map((section) => (
+                        <DropdownSection
+                          key={section.title}
+                          title={section.title}
+                          links={section.links}
+                          onLinkClick={() =>
+                            setDropdown((prev) => ({ ...prev, [menu.id]: false }))
+                          }
+                        />
+                      ))
+                    )
+                  }
+                />
+              );
+            }
+            return (
+              <li key={menu.id}>
+                <Link
+                  to={menu.href || "#"}
+                  className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
+                >
+                  {menu.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+
+        {/* Search */}
+        <div className="flex justify-center flex-[1]">
+          <input
+            type="text"
+            placeholder="Search"
+            className="w-[250px] px-3 py-1.5 rounded-full border border-gray-300"
+          />
+        </div>
+
+        {/* Account & Cart */}
+        <ul className="flex items-center gap-6 justify-end flex-">
+          <li>
+            <button
+              onClick={() =>
+                !token
+                  ? navigate("/account")
+                  : setDropdown((prev) => ({ ...prev, account: !prev.account }))
               }
-            }}
-            className="hover:text-[#D4A5A5] flex items-center"
-            aria-haspopup="true"
-            aria-expanded={dropdown.account}
-          >
-
-              <FaUser size={20} title="Account" />
+            >
+              <FaUser size={20} />
             </button>
-
-            {token && (
-              <div
-                className={clsx(
-                  "absolute top-full right-0 mt-2 bg-white p-4 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[180px] transition-all duration-300 transform",
-                  dropdown.account
-                    ? "opacity-100 translate-y-2 pointer-events-auto"
-                    : "opacity-0 translate-y-1 pointer-events-none"
-                )}
-              >
+            {token && dropdown.account && (
+              <div className="absolute mt-2 bg-white border p-4 shadow">
                 <ul className="space-y-2">
                   <li>
-                    <button
-                      onClick={() => handleProtectedClick("/profile")}
-                      className="hover:text-[#D4A5A5] text-gray-700"
-                    >
+                    <button onClick={() => handleProtectedClick("/profile")}>
                       My Profile
                     </button>
                   </li>
                   <li>
-                    <button
-                      onClick={() => handleProtectedClick("/myorder")}
-                      className="hover:text-[#D4A5A5] text-gray-700"
-                    >
+                    <button onClick={() => handleProtectedClick("/myorder")}>
                       Track Order
                     </button>
                   </li>
                   <li>
-                    <Link
-                      to="/wishlist"
-                      onClick={() =>
-                        setDropdown((prev) => ({ ...prev, account: false }))
-                      }
-                      className="hover:text-[#D4A5A5] text-gray-700"
-                    >
+                    <Link to="/wishlist" onClick={() => setMobileMenuOpen(false)}>
                       Wishlist
                     </Link>
                   </li>
                   <li>
-                    <button
-                      onClick={handleLogout}
-                      className="hover:text-[#D4A5A5] text-gray-700"
-                    >
-                      Logout
-                    </button>
+                    <button onClick={handleLogout}>Logout</button>
                   </li>
                 </ul>
               </div>
             )}
           </li>
-
           <li className="relative">
-            <Link to="/cart" className="hover:text-[#D4A5A5] relative">
-              <FaShoppingCart size={20} title="Cart" />
-              <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs font-semibold px-1.5 py-0.5 rounded-full">
+            <Link to="/cart">
+              <FaShoppingCart size={20} />
+              <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs rounded-full px-1">
                 {cartItemCount}
               </span>
             </Link>
@@ -438,135 +279,80 @@ const Navbar = () => {
         </ul>
       </div>
 
-          {/* Mobile Navigation */}
+      {/* Mobile Navigation (Restored Original Design) */}
       {mobileMenuOpen && (
-        <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 text-[#6B4226] font-medium text-base overflow-y-auto max-h-[calc(100vh-96px)]">
-          {/* Home */}
-          <Link
-            to="/"
-            className="block py-2 border-b border-[#d4c4b6]"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            Home
-          </Link>
-
-          {/* Menu Sections */}
-          {dropdownConfigs.map(({ key, label, content }) => (
-            <div key={key} className="border-b border-[#d4c4b6] pb-2">
-              <button
-                onClick={() =>
-                  setMobileDropdownOpen((prev) => (prev === key ? null : key))
-                }
-                className="w-full flex justify-between items-center py-2"
-              >
-                <span>{label}</span>
-                <span>{mobileDropdownOpen === key ? "−" : "+"}</span>
-              </button>
-              {mobileDropdownOpen === key && (
-                <div className="pl-4 pt-1 space-y-2">
-                  {React.Children.map(content.props.children, (section) => (
-                    <div>
-                      {section.props.title && (
-                        <p className="text-sm font-semibold text-[#6B4226] mt-2">
-                          {section.props.title}
-                        </p>
-                      )}
-                      {section.props.links.map(({ label, href }) => (
-                        <Link
-                          key={label}
-                          to={href}
-                          onClick={() => setMobileMenuOpen(false)}
-                          className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                        >
-                          {label}
-                        </Link>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-
-          {/* Admin Link */}
-          {userRole === "admin" && (
-            <Link
-              to="/admin"
-              className="block py-2 border-b border-[#d4c4b6]"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Admin
-            </Link>
-          )}
-
-          {/* Account */}
-          <div className="border-b border-[#d4c4b6] pb-2">
-            <button
-              onClick={() =>
-                setMobileDropdownOpen((prev) =>
-                  prev === "account" ? null : "account"
-                )
-              }
-              className="w-full flex justify-between items-center py-2"
-            >
-              <span>Account</span>
-              <span>{mobileDropdownOpen === "account" ? "−" : "+"}</span>
-            </button>
-            {mobileDropdownOpen === "account" && (
-              <div className="pl-4 pt-1 space-y-2">
-                {token ? (
-                  <>
-                    <button
-                      onClick={() => handleProtectedClick("/profile")}
-                      className="block text-sm hover:text-[#D4A5A5]"
-                    >
-                      My Profile
-                    </button>
-                    <button
-                      onClick={() => handleProtectedClick("/myorder")}
-                      className="block text-sm hover:text-[#D4A5A5]"
-                    >
-                      Track Order
-                    </button>
-                    <Link
-                      to="/wishlist"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="block text-sm hover:text-[#D4A5A5]"
-                    >
-                      Wishlist
-                    </Link>
-                    <button
-                      onClick={handleLogout}
-                      className="block text-sm hover:text-[#D4A5A5]"
-                    >
-                      Logout
-                    </button>
-                  </>
-                ) : (
-                  <Link
-                    to="/account"
-                    onClick={() => setMobileMenuOpen(false)}
-                    className="block text-sm hover:text-[#D4A5A5]"
+        <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4">
+          {menus.map((menu) => {
+            const hasDropdown = menu.dropdown_items && menu.dropdown_items.length > 0;
+            if (hasDropdown) {
+              const sortedItems = [...menu.dropdown_items].sort(
+                (a, b) => a.order_index - b.order_index
+              );
+              return (
+                <div key={menu.id} className="border-b border-[#d4c4b6] pb-2">
+                  <button
+                    className="w-full flex justify-between items-center py-2"
+                    onClick={() =>
+                      setMobileDropdownOpen((prev) =>
+                        prev === menu.id ? null : menu.id
+                      )
+                    }
                   >
-                    Login / Register
-                  </Link>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Cart */}
-          <Link
-            to="/cart"
-            className="block flex items-center gap-2 py-2"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <FaShoppingCart /> Cart ({cartItemCount})
-          </Link>
+                    <span>{menu.label}</span>
+                    <span>{mobileDropdownOpen === menu.id ? "−" : "+"}</span>
+                  </button>
+                  {mobileDropdownOpen === menu.id && (
+                    <div className="pl-4 pt-1 space-y-2">
+                      {!sortedItems[0].links ? (
+                        sortedItems.map(({ label, href }) => (
+                          <Link
+                            key={label}
+                            to={href}
+                            onClick={() => setMobileMenuOpen(false)}
+                            className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                          >
+                            {label}
+                          </Link>
+                        ))
+                      ) : (
+                        sortedItems.map((section) => (
+                          <div key={section.title}>
+                            {section.title && (
+                              <p className="text-sm font-semibold text-[#6B4226] mt-2">
+                                {section.title}
+                              </p>
+                            )}
+                            {section.links.map(({ label, href }) => (
+                              <Link
+                                key={label}
+                                to={href}
+                                onClick={() => setMobileMenuOpen(false)}
+                                className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                              >
+                                {label}
+                              </Link>
+                            ))}
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            return (
+              <Link
+                key={menu.id}
+                to={menu.href || "#"}
+                onClick={() => setMobileMenuOpen(false)}
+                className="block py-2 border-b border-[#d4c4b6]"
+              >
+                {menu.label}
+              </Link>
+            );
+          })}
         </div>
       )}
     </nav>
   );
-};
-
-export default Navbar;
+}

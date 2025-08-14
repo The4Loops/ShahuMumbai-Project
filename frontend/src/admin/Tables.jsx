@@ -73,7 +73,7 @@ const Tables = () => {
         return acc;
       }, {});
       setFormData(initialData);
-    }, [row, activeTable, data]);
+    }, [activeTable]);
 
     if (!modal.type || modal.type === "delete") return null;
 

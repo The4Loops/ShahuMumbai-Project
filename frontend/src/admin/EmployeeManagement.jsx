@@ -55,8 +55,8 @@ function EmployeeManagement() {
       const transformedUsers = response.data.users.map(user => ({
         ...user,
         active: user.active === true || user.active === "Y", // Handle both boolean and "Y"/"N"
-        joined: user.joined ? new Date(user.joined).toLocaleDateString("en-US", { timeZone: "UTC" }) : "N/A",
-        last_login: user.last_login ? new Date(user.last_login).toLocaleDateString("en-US", { timeZone: "UTC" }) : "Never",
+        joined: user.joined || "N/A",
+        last_login: user.last_login || "Never",
       }));
       setUsers(transformedUsers);
     } catch (error) {
