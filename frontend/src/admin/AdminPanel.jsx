@@ -42,9 +42,7 @@ import {
   CartesianGrid,
 } from "recharts";
 
-/* ----------------------------
-   Registry: all admin tools
----------------------------- */
+
 const MENU_REGISTRY = [
   { id: "Order Dashboard", label: "Order Dashboard", icon: FiPackage, category: "Orders", component: OrderDashboard },
   { id: "Sales Report", label: "Sales Report", icon: TbReportAnalytics, category: "Reports", component: SalesReport },
@@ -81,9 +79,7 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-/* ----------------------------
-   Main
----------------------------- */
+
 const AdminPanel = () => {
   const isMobile = useIsMobile();
 
@@ -280,9 +276,7 @@ const AdminPanel = () => {
 
 export default AdminPanel;
 
-/* ----------------------------
-   Sidebar (collapsible)
----------------------------- */
+
 const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, asDrawer }) => {
   // Accordion open/close per category (keep short to reduce scroll)
   const defaultOpen = new Set(grouped.slice(0, 2).map(([k]) => k)); // first 2 categories open
@@ -394,9 +388,7 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
   );
 };
 
-/* ----------------------------
-   Dashboard (compact, low-scroll)
----------------------------- */
+
 const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
   // mock data (replace with real API later)
   const kpis = [
@@ -573,9 +565,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
   );
 };
 
-/* ----------------------------
-   Command Palette (minimal)
----------------------------- */
+
 const Palette = ({ items, onClose, onSelect }) => {
   const [q, setQ] = useState("");
   useEffect(() => {
