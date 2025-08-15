@@ -12,6 +12,8 @@ import EmployeeManagement from './EmployeeManagement';
 import TeamManagement from './TeamManagement';
 import Tables from './Tables'; // ✅ Updated import
 import Communications from './Communications';
+import MenuManagement from './MenuManagement';
+import RoleManagement from './RoleManagement';
 
 import { FaBars, FaTimes } from 'react-icons/fa';
 
@@ -27,6 +29,8 @@ const TABS = [
   'Add Blog Post',
   'Employee Management',
   'Team Management',
+  'Menu Management',
+  'Role Management',
   'Table',
 ];
 
@@ -159,6 +163,8 @@ const AdminPanel = () => {
               {activeTab === 'Add Blog Post' && <AddBlogPost />}
               {activeTab === 'Employee Management' && <EmployeeManagement />}
               {activeTab === 'Team Management' && <TeamManagement />}
+              {activeTab === 'Menu Management' && <MenuManagement />}
+              {activeTab === 'Role Management' && <RoleManagement />}
               {activeTab === 'Table' && <Tables />} {/* ✅ Updated Table */}
             </div>
           </div>

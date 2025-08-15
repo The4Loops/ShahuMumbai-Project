@@ -14,6 +14,7 @@ const userRoutes=require('./routes/userRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 const navbarRoutes = require('./routes/navbarRoutes');
+const roleRoutes = require('./routes/roleRoutes');
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use('/api',userRoutes);
 app.use('/api', bannerRoutes);
 app.use('/api', reviewRoutes);
 app.use('/api/navbar', navbarRoutes);
+app.use('/api', roleRoutes);
 
 // Rate Limiting
 const limiter = rateLimit({
