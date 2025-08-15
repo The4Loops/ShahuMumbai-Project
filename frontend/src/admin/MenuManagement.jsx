@@ -6,6 +6,8 @@ import debounce from "lodash/debounce";
 
 function MenuManagement() {
   const [menus, setMenus] = useState([]);
+  const [dropdownMenus, setDropdownMenus] = useState([]);
+  const [roles, setRoles] = useState([]);
   const [view, setView] = useState("table");
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
@@ -18,65 +20,60 @@ function MenuManagement() {
     label: "",
     href: "",
     order_index: 0,
-    role_labels: ["user"], // Default to 'user'
+    role_ids: [],
   });
   const [newMenuItem, setNewMenuItem] = useState({
     menu_id: "",
     label: "",
     href: "",
     order_index: 0,
+    role_ids: [], // Added for menu item roles
   });
 
-  // Store refs for each action menu
   const actionMenuRefs = useRef({});
 
   const badgeColors = {
-    admin: "bg-red-100 text-red-600",
-    user: "bg-gray-100 text-gray-600",
+    Admin: "bg-red-100 text-red-600",
+    Manager: "bg-blue-100 text-blue-600",
+    Users: "bg-gray-100 text-gray-600",
+    Editor: "bg-green-100 text-green-600",
   };
 
-  // Fetch menus from API
-  const fetchMenus = async () => {
+  const fetchData = async () => {
     setIsLoading(true);
     try {
-      const response = await api.get("/api/navbar/menus", {
+      const roleResponse = await api.get("/api/roles", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      setRoles(roleResponse.data.roles);
+
+      const menuResponse = await api.get("/api/menus", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         params: {
           search: search || undefined,
           role: roleFilter !== "All" ? roleFilter : undefined,
         },
       });
-      console.log("Fetched menus:", response.data);
-      // Fetch roletags for each menu to display assigned roles
-      const menuIds = response.data.menus.map(menu => menu.id);
-      const { data: roletags } = await api.get("/api/roletags", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        params: { menu_ids: menuIds.join(",") },
-      });
+      setMenus(menuResponse.data.menus);
 
-      const transformedMenus = response.data.menus.map(menu => ({
-        ...menu,
-        roles: roletags
-          ?.filter(rt => rt.menu_id === menu.id)
-          .map(rt => rt.role_label) || [],
-      }));
-      setMenus(transformedMenus);
+      const dropdownResponse = await api.get("/api/menus/dropdown", {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
+      setDropdownMenus(dropdownResponse.data.menus);
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.error || "Failed to fetch menus");
+      toast.error(error.response?.data?.error || "Failed to fetch data");
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Debounce fetchMenus to prevent excessive API calls
-  const debouncedFetchMenus = useCallback(debounce(fetchMenus, 300), [search, roleFilter]);
+  const debouncedFetchData = useCallback(debounce(fetchData, 300), [search, roleFilter]);
 
   useEffect(() => {
-    debouncedFetchMenus();
+    debouncedFetchData();
   }, [search, roleFilter]);
 
-  // Close action menu on outside click
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (actionMenuId !== null) {
@@ -90,7 +87,6 @@ function MenuManagement() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [actionMenuId]);
 
-  // Close modal on Escape key
   useEffect(() => {
     const handleEscape = (e) => {
       if (e.key === "Escape") resetForm();
@@ -115,7 +111,7 @@ function MenuManagement() {
         });
         await api.post("/api/roletags", {
           menu_id: editingMenuId,
-          role_labels: newMenu.role_labels,
+          role_ids: newMenu.role_ids,
           order_index: parseInt(newMenu.order_index) || 0,
         });
         toast.dismiss();
@@ -126,15 +122,17 @@ function MenuManagement() {
           href: newMenu.href || null,
           order_index: parseInt(newMenu.order_index) || 0,
         });
-        await api.post("/api/roletags", {
-          menu_id: menu.id,
-          role_labels: newMenu.role_labels,
-          order_index: parseInt(newMenu.order_index) || 0,
-        });
+        if (newMenu.role_ids.length > 0) {
+          await api.post("/api/roletags", {
+            menu_id: menu.id,
+            role_ids: newMenu.role_ids,
+            order_index: parseInt(newMenu.order_index) || 0,
+          });
+        }
         toast.dismiss();
         toast.success("Menu created successfully");
       }
-      fetchMenus();
+      fetchData();
       resetForm();
     } catch (error) {
       toast.dismiss();
@@ -155,20 +153,34 @@ function MenuManagement() {
           label: newMenuItem.label,
           href: newMenuItem.href,
           order_index: parseInt(newMenuItem.order_index) || 0,
+          role_ids: newMenuItem.role_ids,
+        });
+        await api.post("/api/menu-items/roles", {
+          menu_item_id: editingMenuItemId,
+          role_ids: newMenuItem.role_ids,
+          order_index: parseInt(newMenuItem.order_index) || 0,
         });
         toast.dismiss();
         toast.success("Menu item updated successfully");
       } else {
-        await api.post("/api/navbar/menu-items", {
+        const { data: menuItem } = await api.post("/api/navbar/menu-items", {
           menu_id: newMenuItem.menu_id,
           label: newMenuItem.label,
           href: newMenuItem.href,
           order_index: parseInt(newMenuItem.order_index) || 0,
+          role_ids: newMenuItem.role_ids,
         });
+        if (newMenuItem.role_ids.length > 0) {
+          await api.post("/api/menu-items/roles", {
+            menu_item_id: menuItem.id,
+            role_ids: newMenuItem.role_ids,
+            order_index: parseInt(newMenuItem.order_index) || 0,
+          });
+        }
         toast.dismiss();
         toast.success("Menu item created successfully");
       }
-      fetchMenus();
+      fetchData();
       resetMenuItemForm();
     } catch (error) {
       toast.dismiss();
@@ -184,7 +196,7 @@ function MenuManagement() {
         });
         toast.dismiss();
         toast.success("Menu deleted successfully");
-        fetchMenus();
+        fetchData();
       } catch (error) {
         toast.dismiss();
         toast.error(error.response?.data?.error || "Failed to delete menu");
@@ -201,7 +213,7 @@ function MenuManagement() {
         });
         toast.dismiss();
         toast.success("Menu item deleted successfully");
-        fetchMenus();
+        fetchData();
       } catch (error) {
         toast.dismiss();
         toast.error(error.response?.data?.error || "Failed to delete menu item");
@@ -215,9 +227,17 @@ function MenuManagement() {
       label: "",
       href: "",
       order_index: 0,
-      role_labels: ["user"],
+      role_ids: [],
+    });
+    setNewMenuItem({
+      menu_id: "",
+      label: "",
+      href: "",
+      order_index: 0,
+      role_ids: [],
     });
     setEditingMenuId(null);
+    setEditingMenuItemId(null);
     setShowModal(false);
   };
 
@@ -227,6 +247,7 @@ function MenuManagement() {
       label: "",
       href: "",
       order_index: 0,
+      role_ids: [],
     });
     setEditingMenuItemId(null);
     setShowModal(false);
@@ -253,9 +274,12 @@ function MenuManagement() {
               value={roleFilter}
               onChange={(e) => setRoleFilter(e.target.value)}
             >
-              <option>All</option>
-              <option>admin</option>
-              <option>user</option>
+              <option value="All">All Roles</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.label}
+                </option>
+              ))}
             </select>
             <button
               onClick={() => {
@@ -319,7 +343,7 @@ function MenuManagement() {
                         {menu.roles.map((role) => (
                           <span
                             key={role}
-                            className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[role] || badgeColors.user}`}
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[role] || badgeColors.Users}`}
                           >
                             {role}
                           </span>
@@ -331,7 +355,19 @@ function MenuManagement() {
                         <ul className="text-sm text-gray-600">
                           {menu.dropdown_items.map((item) => (
                             <li key={item.id} className="flex justify-between items-center">
-                              <span>{item.label} ({item.href})</span>
+                              <span>
+                                {item.label} ({item.href})
+                                <div className="flex gap-2 mt-1">
+                                  {item.roles.map((role) => (
+                                    <span
+                                      key={role}
+                                      className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[role] || badgeColors.Users}`}
+                                    >
+                                      {role}
+                                    </span>
+                                  ))}
+                                </div>
+                              </span>
                               <button
                                 onClick={() => {
                                   setNewMenuItem({
@@ -339,6 +375,9 @@ function MenuManagement() {
                                     label: item.label,
                                     href: item.href,
                                     order_index: item.order_index,
+                                    role_ids: roles
+                                      .filter((role) => item.roles.includes(role.label))
+                                      .map((role) => role.id),
                                   });
                                   setEditingMenuItemId(item.id);
                                   setShowModal(true);
@@ -371,7 +410,9 @@ function MenuManagement() {
                                   label: menu.label,
                                   href: menu.href,
                                   order_index: menu.order_index,
-                                  role_labels: menu.roles,
+                                  role_ids: roles
+                                    .filter((role) => menu.roles.includes(role.label))
+                                    .map((role) => role.id),
                                 });
                                 setEditingMenuId(menu.id);
                                 setShowModal(true);
@@ -389,7 +430,7 @@ function MenuManagement() {
                             </button>
                             <button
                               onClick={() => {
-                                setNewMenuItem({ menu_id: menu.id, label: "", href: "", order_index: 0 });
+                                setNewMenuItem({ menu_id: menu.id, label: "", href: "", order_index: 0, role_ids: [] });
                                 setEditingMenuItemId(null);
                                 setShowModal(true);
                                 setActionMenuId(null);
@@ -435,7 +476,9 @@ function MenuManagement() {
                             label: menu.label,
                             href: menu.href,
                             order_index: menu.order_index,
-                            role_labels: menu.roles,
+                            role_ids: roles
+                              .filter((role) => menu.roles.includes(role.label))
+                              .map((role) => role.id),
                           });
                           setEditingMenuId(menu.id);
                           setShowModal(true);
@@ -453,7 +496,7 @@ function MenuManagement() {
                       </button>
                       <button
                         onClick={() => {
-                          setNewMenuItem({ menu_id: menu.id, label: "", href: "", order_index: 0 });
+                          setNewMenuItem({ menu_id: menu.id, label: "", href: "", order_index: 0, role_ids: [] });
                           setEditingMenuItemId(null);
                           setShowModal(true);
                           setActionMenuId(null);
@@ -470,7 +513,7 @@ function MenuManagement() {
                 {menu.roles.map((role) => (
                   <span
                     key={role}
-                    className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[role] || badgeColors.user}`}
+                    className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[role] || badgeColors.Users}`}
                   >
                     {role}
                   </span>
@@ -481,7 +524,19 @@ function MenuManagement() {
                   <ul>
                     {menu.dropdown_items.map((item) => (
                       <li key={item.id} className="flex justify-between items-center">
-                        <span>{item.label} ({item.href})</span>
+                        <span>
+                          {item.label} ({item.href})
+                          <div className="flex gap-2 mt-1">
+                            {item.roles.map((role) => (
+                              <span
+                                key={role}
+                                className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[role] || badgeColors.Users}`}
+                              >
+                                {role}
+                              </span>
+                            ))}
+                          </div>
+                        </span>
                         <button
                           onClick={() => {
                             setNewMenuItem({
@@ -489,6 +544,9 @@ function MenuManagement() {
                               label: item.label,
                               href: item.href,
                               order_index: item.order_index,
+                              role_ids: roles
+                                .filter((role) => item.roles.includes(role.label))
+                                .map((role) => role.id),
                             });
                             setEditingMenuItemId(item.id);
                             setShowModal(true);
@@ -517,7 +575,11 @@ function MenuManagement() {
               <FiX size={20} />
             </button>
             <h2 className="text-xl font-semibold mb-4">
-              {editingMenuId !== null ? "Edit Menu" : editingMenuItemId !== null ? "Edit Dropdown Item" : "Add New Menu"}
+              {editingMenuId !== null
+                ? "Edit Menu"
+                : editingMenuItemId !== null
+                ? "Edit Dropdown Item"
+                : "Add New Menu"}
             </h2>
 
             {editingMenuItemId !== null || (showModal && !editingMenuId) ? (
@@ -529,11 +591,17 @@ function MenuManagement() {
                   disabled={editingMenuItemId !== null}
                 >
                   <option value="">Select Parent Menu</option>
-                  {menus.map((menu) => (
-                    <option key={menu.id} value={menu.id}>
-                      {menu.label}
+                  {dropdownMenus.length === 0 ? (
+                    <option value="" disabled>
+                      No menus available
                     </option>
-                  ))}
+                  ) : (
+                    dropdownMenus.map((menu) => (
+                      <option key={menu.id} value={menu.id}>
+                        {menu.label}
+                      </option>
+                    ))
+                  )}
                 </select>
                 <input
                   type="text"
@@ -556,6 +624,23 @@ function MenuManagement() {
                   onChange={(e) => setNewMenuItem({ ...newMenuItem, order_index: e.target.value })}
                   className="border rounded-lg px-3 py-2 w-full mb-3"
                 />
+                <select
+                  multiple
+                  value={newMenuItem.role_ids}
+                  onChange={(e) =>
+                    setNewMenuItem({
+                      ...newMenuItem,
+                      role_ids: Array.from(e.target.selectedOptions, (option) => option.value),
+                    })
+                  }
+                  className="border rounded-lg px-3 py-2 w-full mb-3"
+                >
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.label}
+                    </option>
+                  ))}
+                </select>
                 <button
                   onClick={handleAddOrEditMenuItem}
                   className="bg-black text-white px-4 py-2 rounded-lg w-full hover:bg-gray-800"
@@ -588,17 +673,20 @@ function MenuManagement() {
                 />
                 <select
                   multiple
-                  value={newMenu.role_labels}
+                  value={newMenu.role_ids}
                   onChange={(e) =>
                     setNewMenu({
                       ...newMenu,
-                      role_labels: Array.from(e.target.selectedOptions, (option) => option.value),
+                      role_ids: Array.from(e.target.selectedOptions, (option) => option.value),
                     })
                   }
                   className="border rounded-lg px-3 py-2 w-full mb-3"
                 >
-                  <option value="admin">Admin</option>
-                  <option value="user">User</option>
+                  {roles.map((role) => (
+                    <option key={role.id} value={role.id}>
+                      {role.label}
+                    </option>
+                  ))}
                 </select>
                 <button
                   onClick={handleAddOrEditMenu}

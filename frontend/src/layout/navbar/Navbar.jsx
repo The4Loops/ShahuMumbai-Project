@@ -98,14 +98,23 @@ export default function Navbar() {
     try {
       const res = await api.get("/api/navbar/menus");
       let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
-      // Hide Admin if not an admin
+      // Filter menus and dropdown items based on user role
+      sorted = sorted.map(menu => ({
+        ...menu,
+        dropdown_items: userRole
+          ? menu.dropdown_items.filter(
+              item => item.roles.length === 0 || item.roles.includes(userRole)
+            )
+          : menu.dropdown_items,
+      }));
+      // Hide Admin menu if not an admin
       if (userRole !== "Admin") {
-        sorted = sorted.filter((m) => m.label.toLowerCase() !== "Admin");
+        sorted = sorted.filter(m => m.label.toLowerCase() !== "admin");
       }
       setMenus(sorted);
       const initDrop = {};
-      sorted.forEach((m) => (initDrop[m.id] = false));
-      setDropdown(initDrop);
+      sorted.forEach(m => (initDrop[m.id] = false));
+      setDropdown({ ...initDrop, account: false });
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load menus");
     } finally {
@@ -240,7 +249,7 @@ export default function Navbar() {
         </div>
 
         {/* Account & Cart */}
-        <ul className="flex items-center gap-6 justify-end flex-">
+        <ul className="flex items-center gap-6 justify-end flex-[1]">
           <li>
             <button
               onClick={() =>
@@ -290,7 +299,7 @@ export default function Navbar() {
         </ul>
       </div>
 
-      {/* Mobile Navigation (Restored Original Design) */}
+      {/* Mobile Navigation */}
       {mobileMenuOpen && (
         <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]">
           {/* Mobile Menus */}

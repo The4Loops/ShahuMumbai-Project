@@ -28,176 +28,31 @@ const verifyUser = (req) => {
   }
 };
 
-// Create Menu
-exports.createMenu = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
-
-  try {
-    const { label, href, order_index } = req.body;
-    if (!label) {
-      return res.status(400).json({ error: "Menu label is required" });
-    }
-
-    const { data, error } = await supabase
-      .from("menus")
-      .insert([{ label, href: href || null, order_index: order_index || 0 }])
-      .select()
-      .single();
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(201).json({ message: "Menu created successfully", menu: data });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Get All Menus with Dropdowns
+// Get All Menus
 exports.getMenusWithItems = async (req, res) => {
   try {
     const { error: authError, decoded } = verifyUser(req);
-    if (!authError) {
-      // Authenticated user: fetch menus based on role
-      const { data: user, error: userError } = await supabase
-        .from("users")
-        .select("role_id")
-        .eq("id", decoded.id)
-        .single();
+    let data, error;
 
-      if (userError || !user) {
-        return res.status(404).json({ error: "User not found" });
+    if (authError) {
+      ({ data, error } = await supabase.rpc("get_menus_unauthenticated"));
+    } else {
+      // Authenticated: call get_menus_authenticated with user_id (int)
+      if (!decoded.id) {
+        return res.status(400).json({ error: "Invalid JWT: Missing user ID" });
       }
 
-      const { data, error } = await supabase.rpc("get_navbar_data", { user_role_id: user.role_id });
-
-      if (error) return res.status(400).json({ error: error.message });
-
-      return res.status(200).json({ menus: data || [] });
-    } else {
-      // Unauthenticated user: fetch public menus
-      const { data, error } = await supabase.rpc("get_public_navbar_data");
-
-      if (error) return res.status(400).json({ error: error.message });
-
-      return res.status(200).json({ menus: data || [] });
-    }
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Update Menu
-exports.updateMenu = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
-
-  try {
-    const { id } = req.params;
-    const { label, href, order_index } = req.body;
-
-    if (!label) {
-      return res.status(400).json({ error: "Menu label is required" });
+      ({ data, error } = await supabase.rpc("get_menus_authenticated", { user_id: parseInt(decoded.id) }));
     }
 
-    const { data, error } = await supabase
-      .from("menus")
-      .update({ label, href: href || null, order_index: order_index || 0 })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(200).json({ message: "Menu updated successfully", menu: data });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Delete Menu (and its dropdowns automatically via cascade)
-exports.deleteMenu = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
-
-  try {
-    const { id } = req.params;
-
-    const { error } = await supabase.from("menus").delete().eq("id", id);
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(200).json({ message: "Menu deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Create Dropdown Item
-exports.createMenuItem = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
-
-  try {
-    const { menu_id, label, href, order_index } = req.body;
-    if (!menu_id || !label || !href) {
-      return res.status(400).json({ error: "Menu ID, label, and href are required" });
+    if (error) {
+      console.error("RPC error:", error);
+      return res.status(400).json({ error: error.message });
     }
 
-    const { data, error } = await supabase
-      .from("menu_items")
-      .insert([{ menu_id, label, href, order_index: order_index || 0 }])
-      .select()
-      .single();
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(201).json({ message: "Menu item created successfully", menu_item: data });
+    res.status(200).json(data || { menus: [] });
   } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Update Dropdown Item
-exports.updateMenuItem = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
-
-  try {
-    const { id } = req.params;
-    const { label, href, order_index } = req.body;
-
-    if (!label || !href) {
-      return res.status(400).json({ error: "Label and href are required" });
-    }
-
-    const { data, error } = await supabase
-      .from("menu_items")
-      .update({ label, href, order_index: order_index || 0 })
-      .eq("id", id)
-      .select()
-      .single();
-
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(200).json({ message: "Menu item updated successfully", menu_item: data });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-};
-
-// Delete Dropdown Item
-exports.deleteMenuItem = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
-
-  try {
-    const { id } = req.params;
-
-    const { error } = await supabase.from("menu_items").delete().eq("id", id);
-    if (error) return res.status(400).json({ error: error.message });
-
-    res.status(200).json({ message: "Menu item deleted successfully" });
-  } catch (err) {
+    console.error("Error in getMenusWithItems:", err);
     res.status(500).json({ error: err.message });
   }
 };

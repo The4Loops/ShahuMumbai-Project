@@ -11,12 +11,11 @@ function RoleManagement() {
   const [search, setSearch] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
-  const [editingRoleId, setEditingRoleId] = useState(null);
   const [assignRoleModal, setAssignRoleModal] = useState(false);
+  const [editingRoleId, setEditingRoleId] = useState(null);
   const [actionMenuId, setActionMenuId] = useState(null);
   const [newRole, setNewRole] = useState({
     label: "",
-    description: "",
     is_active: true,
   });
   const [assignRoleData, setAssignRoleData] = useState({
@@ -28,8 +27,12 @@ function RoleManagement() {
   const actionMenuRefs = useRef({});
 
   const badgeColors = {
-    admin: "bg-red-100 text-red-600",
-    user: "bg-gray-100 text-gray-600",
+    Admin: "bg-red-100 text-red-600",
+    Manager: "bg-blue-100 text-blue-600",
+    Editor: "bg-green-100 text-green-600",
+    Users: "bg-gray-100 text-gray-600",
+    active: "bg-green-100 text-green-600",
+    inactive: "bg-red-100 text-red-600",
   };
 
   // Fetch roles and users
@@ -41,14 +44,17 @@ function RoleManagement() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         params: { search: search || undefined },
       });
+      console.log("Frontend roles response:", roleResponse.data); // Debug log
       setRoles(roleResponse.data.roles);
 
       // Fetch users for assignment dropdown
       const userResponse = await api.get("/api/users", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
+      console.log("Frontend users response:", userResponse.data); // Debug log
       setUsers(userResponse.data.users);
     } catch (error) {
+      console.error("Fetch error:", error.response?.data); // Debug log
       toast.dismiss();
       toast.error(error.response?.data?.error || "Failed to fetch data");
     } finally {
@@ -100,7 +106,6 @@ function RoleManagement() {
       if (editingRoleId !== null) {
         await api.put(`/api/roles/${editingRoleId}`, {
           label: newRole.label,
-          description: newRole.description || null,
           is_active: newRole.is_active,
         });
         toast.dismiss();
@@ -108,7 +113,6 @@ function RoleManagement() {
       } else {
         await api.post("/api/roles", {
           label: newRole.label,
-          description: newRole.description || null,
         });
         toast.dismiss();
         toast.success("Role created successfully");
@@ -161,7 +165,7 @@ function RoleManagement() {
   };
 
   const resetForm = () => {
-    setNewRole({ label: "", description: "", is_active: true });
+    setNewRole({ label: "", is_active: true });
     setEditingRoleId(null);
     setShowModal(false);
   };
@@ -231,7 +235,7 @@ function RoleManagement() {
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Role</th>
-                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Description</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Status</th>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Assigned Users</th>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Menus</th>
                 <th className="py-3 px-4 text-right text-sm font-medium text-gray-500">Actions</th>
@@ -242,18 +246,20 @@ function RoleManagement() {
                 <tr key={role.id} className="border-b hover:bg-gray-50 relative">
                   <td className="py-3 px-4">
                     <div className="font-medium">{role.label}</div>
-                    <div className="text-sm text-gray-500">{role.is_active ? "Active" : "Inactive"}</div>
                   </td>
                   <td className="py-3 px-4">
-                    <div className="text-sm text-gray-600">{role.description || "No description"}</div>
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        role.is_active ? badgeColors.active : badgeColors.inactive
+                      }`}
+                    >
+                      {role.is_active ? "Active" : "Inactive"}
+                    </span>
                   </td>
                   <td className="py-3 px-4">
                     <div className="text-sm text-gray-600">
-                      {users.filter(user => user.role_id === role.id).length > 0
-                        ? users
-                            .filter(user => user.role_id === role.id)
-                            .map(user => user.email)
-                            .join(", ")
+                      {role.users?.length > 0
+                        ? role.users.map(user => user.email).join(", ")
                         : "No users assigned"}
                     </div>
                   </td>
@@ -278,7 +284,6 @@ function RoleManagement() {
                             onClick={() => {
                               setNewRole({
                                 label: role.label,
-                                description: role.description,
                                 is_active: role.is_active,
                               });
                               setEditingRoleId(role.id);
@@ -314,7 +319,15 @@ function RoleManagement() {
               <div className="flex items-center justify-between">
                 <div>
                   <div className="font-medium">{role.label}</div>
-                  <div className="text-sm text-gray-500">{role.is_active ? "Active" : "Inactive"}</div>
+                  <div className="text-sm text-gray-500">
+                    <span
+                      className={`px-2 py-1 rounded-full text-xs font-medium ${
+                        role.is_active ? badgeColors.active : badgeColors.inactive
+                      }`}
+                    >
+                      {role.is_active ? "Active" : "Inactive"}
+                    </span>
+                  </div>
                 </div>
                 <div ref={(el) => (actionMenuRefs.current[role.id] = el)}>
                   <button
@@ -329,7 +342,6 @@ function RoleManagement() {
                         onClick={() => {
                           setNewRole({
                             label: role.label,
-                            description: role.description,
                             is_active: role.is_active,
                           });
                           setEditingRoleId(role.id);
@@ -343,7 +355,7 @@ function RoleManagement() {
                       <button
                         onClick={() => handleDeleteRole(role.id)}
                         className="block px-4 py-2 hover:bg-gray-100 w-full text-left text-red-600"
-                        >
+                      >
                         Delete
                       </button>
                     </div>
@@ -351,15 +363,9 @@ function RoleManagement() {
                 </div>
               </div>
               <div className="text-sm text-gray-600">
-                <strong>Description:</strong> {role.description || "No description"}
-              </div>
-              <div className="text-sm text-gray-600">
                 <strong>Assigned Users:</strong>{" "}
-                {users.filter(user => user.role_id === role.id).length > 0
-                  ? users
-                      .filter(user => user.role_id === role.id)
-                      .map(user => user.email)
-                      .join(", ")
+                {role.users?.length > 0
+                  ? role.users.map(user => user.email).join(", ")
                   : "No users assigned"}
               </div>
               <div className="text-sm text-gray-600">
@@ -383,12 +389,6 @@ function RoleManagement() {
               placeholder="Role Label"
               value={newRole.label}
               onChange={(e) => setNewRole({ ...newRole, label: e.target.value })}
-              className="border rounded-lg px-3 py-2 w-full mb-3"
-            />
-            <textarea
-              placeholder="Description (optional)"
-              value={newRole.description}
-              onChange={(e) => setNewRole({ ...newRole, description: e.target.value })}
               className="border rounded-lg px-3 py-2 w-full mb-3"
             />
             <label className="flex items-center gap-2 mb-3">
@@ -428,7 +428,7 @@ function RoleManagement() {
               <option value="">Select User</option>
               {users.map((user) => (
                 <option key={user.id} value={user.id}>
-                  {user.email}
+                  {user.email} ({user.full_name || "No name"})
                 </option>
               ))}
             </select>
