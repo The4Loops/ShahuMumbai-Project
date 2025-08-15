@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
-import axios from "axios";
+import api from "../supabase/axios";
+import { toast } from 'react-toastify';
 
 const slugify = (text) =>
   text
@@ -25,16 +26,15 @@ const AddBlogPost = () => {
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState(null);
   const [isMobile, setIsMobile] = useState(false);
+  const [drafts, setDrafts] = useState([]);
+  const [selectedDraftId, setSelectedDraftId] = useState(null);
 
-  // (Optional) replace with real categories from API later
   const categories = useMemo(
     () => ["Announcements", "Guides", "Releases", "Behind the Scenes"],
     []
   );
 
-  // Detect mobile
   useEffect(() => {
     const update = () => setIsMobile(window.innerWidth < 1024);
     update();
@@ -42,10 +42,23 @@ const AddBlogPost = () => {
     return () => window.removeEventListener("resize", update);
   }, []);
 
-  // Auto-slug from title until user edits slug manually
   useEffect(() => {
     if (!slugTouched) setSlug(slugify(title));
   }, [title, slugTouched]);
+
+  useEffect(() => {
+    fetchDrafts();
+  }, []);
+
+  const fetchDrafts = async () => {
+    try {
+      const response = await api.get("/api/admin/blogs/drafts");
+      setDrafts(response.data);
+    } catch (err) {
+      console.error("Error fetching drafts:", err);
+      toast.error("Failed to fetch drafts.");
+    }
+  };
 
   const onPickCover = (e) => {
     const file = e.target.files?.[0];
@@ -55,6 +68,22 @@ const AddBlogPost = () => {
       setCoverPreview(url);
     } else {
       setCoverPreview(null);
+    }
+  };
+
+  const uploadCoverImage = async () => {
+    if (!cover) return null;
+    const formData = new FormData();
+    formData.append("image", cover);
+    try {
+      const response = await api.post("/api/upload/single", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      return response.data.url;
+    } catch (err) {
+      console.error("Error uploading cover image:", err);
+      toast.error("Failed to upload cover image.");
+      throw new Error("Failed to upload cover image");
     }
   };
 
@@ -70,41 +99,52 @@ const AddBlogPost = () => {
   const handleSubmit = async (publishNow = false) => {
     const err = validate();
     if (err) {
-      setMessage({ type: "error", text: err });
+      toast.error(err);
       return;
     }
     setSubmitting(true);
-    setMessage(null);
 
     try {
-      const form = new FormData();
-      form.append("title", title.trim());
-      form.append("slug", slug.trim());
-      form.append("excerpt", excerpt.trim());
-      form.append("content", content);
-      if (cover) form.append("cover", cover); // expects multipart on backend
-      form.append("category", category);
-      form.append(
-        "tags",
-        JSON.stringify(
+      let coverImageUrl = null;
+      if (cover) {
+        coverImageUrl = await uploadCoverImage();
+      } else if (selectedDraftId && coverPreview) {
+        coverImageUrl = coverPreview; // Use existing URL if editing without new upload
+      }
+
+      const payload = {
+        title: title.trim(),
+        slug: slug.trim(),
+        excerpt: excerpt.trim(),
+        content,
+        category,
+        tags: JSON.stringify(
           tags
             .split(",")
             .map((t) => t.trim())
             .filter(Boolean)
-        )
-      );
-      form.append("status", publishNow ? "PUBLISHED" : status);
-      if (publishAt) form.append("publishAt", publishAt);
-      form.append("metaTitle", metaTitle.trim());
-      form.append("metaDescription", metaDescription.trim());
+        ),
+        status: publishNow ? "PUBLISHED" : status,
+        publish_at: publishNow && publishAt ? publishAt : null,
+        meta_title: metaTitle.trim() || null,
+        meta_description: metaDescription.trim() || null,
+        cover_image: coverImageUrl,
+      };
 
-      // TODO: adjust base URL/path to match your API
-      await axios.post("/api/blogs", form, {
-        headers: { "Content-Type": "multipart/form-data" },
+      const url = selectedDraftId
+        ? `/api/admin/blogs/${selectedDraftId}`
+        : "/api/admin/blogs";
+      const method = selectedDraftId ? "put" : "post";
+
+      await api({
+        method,
+        url,
+        data: payload,
+        headers: { "Content-Type": "application/json" },
       });
 
-      setMessage({ type: "success", text: "Blog post saved successfully." });
-      // reset form
+      toast.success("Blog post saved successfully.");
+      setSelectedDraftId(null);
       setTitle("");
       setSlug("");
       setSlugTouched(false);
@@ -118,16 +158,70 @@ const AddBlogPost = () => {
       setPublishAt("");
       setMetaTitle("");
       setMetaDescription("");
+      fetchDrafts();
     } catch (e) {
-      setMessage({
-        type: "error",
-        text:
-          e?.response?.data?.detail ||
-          "Failed to save the blog post. Please try again.",
-      });
+      toast.error(
+        e?.response?.data?.detail || "Failed to save the blog post. Please try again."
+      );
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const handleReset = async () => {
+    if (selectedDraftId) {
+      try {
+        await api.delete(`/api/admin/blogs/${selectedDraftId}/reset`);
+        toast.success("Draft reset successfully.");
+        setSelectedDraftId(null);
+        setTitle("");
+        setSlug("");
+        setSlugTouched(false);
+        setExcerpt("");
+        setContent("");
+        setCover(null);
+        setCoverPreview(null);
+        setCategory("");
+        setTags("");
+        setStatus("DRAFT");
+        setPublishAt("");
+        setMetaTitle("");
+        setMetaDescription("");
+        fetchDrafts();
+      } catch (e) {
+        toast.error(e?.response?.data?.detail || "Failed to reset draft.");
+      }
+    } else {
+      setTitle("");
+      setSlug("");
+      setSlugTouched(false);
+      setExcerpt("");
+      setContent("");
+      setCover(null);
+      setCoverPreview(null);
+      setCategory("");
+      setTags("");
+      setStatus("DRAFT");
+      setPublishAt("");
+      setMetaTitle("");
+      setMetaDescription("");
+    }
+  };
+
+  const loadDraft = (draft) => {
+    setSelectedDraftId(draft.id);
+    setTitle(draft.title);
+    setSlug(draft.slug);
+    setSlugTouched(true);
+    setExcerpt(draft.excerpt);
+    setContent(draft.content);
+    setCoverPreview(draft.cover_image || null); // Use existing URL
+    setCategory(draft.category);
+    setTags(draft.tags ? draft.tags.join(", ") : "");
+    setStatus(draft.status);
+    setPublishAt(draft.publish_at || "");
+    setMetaTitle(draft.meta_title || "");
+    setMetaDescription(draft.meta_description || "");
   };
 
   const inputBase =
@@ -139,15 +233,23 @@ const AddBlogPost = () => {
         Add Blog Post
       </h2>
 
-      {message && (
-        <div
-          className={`mb-4 lg:mb-6 rounded-md px-4 py-3 text-sm ${
-            message.type === "success"
-              ? "bg-green-100 text-green-800 border border-green-300"
-              : "bg-red-100 text-red-800 border border-red-300"
-          }`}
-        >
-          {message.text}
+      {/* Drafts List */}
+      {drafts.length > 0 && (
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-[#6B4226] mb-2">
+            Saved Drafts
+          </h3>
+          <ul className="space-y-2">
+            {drafts.map((draft) => (
+              <li
+                key={draft.id}
+                className="p-2 border border-[#D4A5A5] rounded-md cursor-pointer hover:bg-[#f3dede]"
+                onClick={() => loadDraft(draft)}
+              >
+                {draft.title} (Last updated: {new Date(draft.updated_at).toLocaleString()})
+              </li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -232,6 +334,7 @@ const AddBlogPost = () => {
             </label>
             <input
               type="file"
+              name="image"
               accept="image/*"
               onChange={onPickCover}
               className="w-full text-sm"
@@ -366,22 +469,7 @@ const AddBlogPost = () => {
         <button
           type="button"
           disabled={submitting}
-          onClick={() => {
-            setTitle("");
-            setSlug("");
-            setSlugTouched(false);
-            setExcerpt("");
-            setContent("");
-            setCover(null);
-            setCoverPreview(null);
-            setCategory("");
-            setTags("");
-            setStatus("DRAFT");
-            setPublishAt("");
-            setMetaTitle("");
-            setMetaDescription("");
-            setMessage(null);
-          }}
+          onClick={handleReset}
           className="px-5 py-2.5 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
         >
           Reset
@@ -391,8 +479,10 @@ const AddBlogPost = () => {
       {/* Sticky action bar (mobile) */}
       <div className="sm:hidden">
         <div className="h-16" />
-        <div className="fixed left-0 right-0 bottom-0 z-20 bg-white/95 backdrop-blur border-t border-[#E6DCD2] px-4 py-[10px] flex items-center gap-2 justify-between"
-             style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}>
+        <div
+          className="fixed left-0 right-0 bottom-0 z-20 bg-white/95 backdrop-blur border-t border-[#E6DCD2] px-4 py-[10px] flex items-center gap-2 justify-between"
+          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
+        >
           <button
             disabled={submitting}
             onClick={() => handleSubmit(false)}
@@ -410,22 +500,7 @@ const AddBlogPost = () => {
           <button
             type="button"
             disabled={submitting}
-            onClick={() => {
-              setTitle("");
-              setSlug("");
-              setSlugTouched(false);
-              setExcerpt("");
-              setContent("");
-              setCover(null);
-              setCoverPreview(null);
-              setCategory("");
-              setTags("");
-              setStatus("DRAFT");
-              setPublishAt("");
-              setMetaTitle("");
-              setMetaDescription("");
-              setMessage(null);
-            }}
+            onClick={handleReset}
             className="px-3 py-2 rounded-md border border-[#E6DCD2] text-[#6B4226] disabled:opacity-60"
             title="Reset"
           >
