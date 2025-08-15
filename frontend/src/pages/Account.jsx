@@ -94,23 +94,23 @@ const AuthForm = () => {
     try {
       if (isRegistering) {
         if (!otpSent) {
-          await api.post(`/api/auth/register/send-otp`, {
+          const res = await api.post(`/api/auth/register/send-otp`, {
             email: formData.email,
             full_name: formData.fullName,
             password: formData.password,
           });
           setOtpSent(true);
           toast.dismiss();
-          toast.success("OTP sent to your email.");
+          toast.success(res.data.message || "OTP sent to your email.");
         } else {
-          await api.post(`/api/auth/register/verify`, {
+          const res = await api.post(`/api/auth/register/verify`, {
             email: formData.email,
             full_name: formData.fullName,
             password: formData.password,
             otp: otp,
           });
           toast.dismiss();
-          toast.success("Registration successful. You can now login.");
+          toast.success(res.data.message || "Registration successful. You can now login.");
           setIsRegistering(false);
           resetForm();
           setOtpSent(false);
@@ -120,42 +120,59 @@ const AuthForm = () => {
           email: formData.email,
           password: formData.password,
         });
-        const token = res.data.token;
-        localStorage.setItem("token", token);
 
-        const decoded = jwtDecode(token);
+        const { token } = res.data;
+
+        // Store token in localStorage
+        try {
+          localStorage.setItem("token", token);
+        } catch (storageError) {
+          toast.error("Failed to store authentication token. Please try again."+storageError);
+          return;
+        }
+
+        // Decode token to get user role
+        let decoded;
+        try {
+          decoded = jwtDecode(token);
+        } catch (decodeError) {
+          throw new Error("Invalid token format");
+        }
+
         const userRole = decoded.role;
-
         toast.dismiss();
-        toast.success("Login successful!");
+        toast.success(res.data.message || "Login successful!");
 
-        if (userRole === "admin") {
+        // Navigate based on role
+        if (userRole === "Admin") {
           navigate("/admin");
-        } else if (userRole === "user") {
-          navigate("/profile");
         } else {
-          toast.error("Invalid role, contact admin.");
+           navigate("/profile");
         }
       }
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.error || "An error occurred.");
+      toast.error(error.response?.data?.error || error.message || "An error occurred.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleGoogleSSO = async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${process.env.REACT_APP_API_BASE_URL}/auth/callback`,
-      },
-    });
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${process.env.REACT_APP_API_BASE_URL}/auth/callback`,
+        },
+      });
 
-    if (error) {
+      if (error) {
+        throw new Error("SSO login failed: " + error.message);
+      }
+    } catch (error) {
       toast.dismiss();
-      toast.error("SSO login failed: " + error.message);
+      toast.error(error.message || "An error occurred during SSO login.");
     }
   };
 

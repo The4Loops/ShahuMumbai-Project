@@ -15,6 +15,19 @@ const verifyAdmin = (req) => {
   }
 };
 
+// VERIFY AUTHENTICATED USER
+const verifyUser = (req) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return { error: "Unauthorized: Token missing" };
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { decoded };
+  } catch (err) {
+    return { error: "Invalid Token" };
+  }
+};
+
 // Create Menu
 exports.createMenu = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
@@ -43,11 +56,32 @@ exports.createMenu = async (req, res) => {
 // Get All Menus with Dropdowns
 exports.getMenusWithItems = async (req, res) => {
   try {
-    const { data, error } = await supabase.rpc("get_navbar_data"); // We'll create this function in SQL
+    const { error: authError, decoded } = verifyUser(req);
+    if (!authError) {
+      // Authenticated user: fetch menus based on role
+      const { data: user, error: userError } = await supabase
+        .from("users")
+        .select("role_id")
+        .eq("id", decoded.id)
+        .single();
 
-    if (error) return res.status(400).json({ error: error.message });
+      if (userError || !user) {
+        return res.status(404).json({ error: "User not found" });
+      }
 
-    res.status(200).json({ menus: data });
+      const { data, error } = await supabase.rpc("get_navbar_data", { user_role_id: user.role_id });
+
+      if (error) return res.status(400).json({ error: error.message });
+
+      return res.status(200).json({ menus: data || [] });
+    } else {
+      // Unauthenticated user: fetch public menus
+      const { data, error } = await supabase.rpc("get_public_navbar_data");
+
+      if (error) return res.status(400).json({ error: error.message });
+
+      return res.status(200).json({ menus: data || [] });
+    }
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

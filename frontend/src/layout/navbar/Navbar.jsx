@@ -99,8 +99,8 @@ export default function Navbar() {
       const res = await api.get("/api/navbar/menus");
       let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
       // Hide Admin if not an admin
-      if (userRole !== "admin") {
-        sorted = sorted.filter((m) => m.label.toLowerCase() !== "admin");
+      if (userRole !== "Admin") {
+        sorted = sorted.filter((m) => m.label.toLowerCase() !== "Admin");
       }
       setMenus(sorted);
       const initDrop = {};

@@ -10,7 +10,7 @@ const verifyAdmin = (req) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") return { error: "Forbidden: Admins only" };
+    if (decoded.role !== "Admin") return { error: "Forbidden: Admins only" };
     return { decoded };
   } catch (err) {
     return { error: "Invalid Token" };
@@ -29,6 +29,17 @@ exports.adminCreateUser = async (req, res) => {
       return res.status(400).json({ error: "Name and Email are required" });
     }
 
+    // Fetch the role ID from roles table
+    const { data: roleData } = await supabase
+      .from("roles")
+      .select("id")
+      .eq("label", role || "user")
+      .single();
+
+    if (!roleData) {
+      return res.status(400).json({ error: `Role '${role || "user"}' not found` });
+    }
+
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
     const { data, error } = await supabase
@@ -38,12 +49,12 @@ exports.adminCreateUser = async (req, res) => {
           full_name,
           email,
           password: hashedPassword,
-          role: role || "user",
+          role_id: roleData.id,
           active: active ? "Y" : "N",
-          joined: new Date().toISOString(), // Set joined timestamp
+          joined: new Date().toISOString(),
         },
       ])
-      .select()
+      .select("*, roles(label)")
       .single();
 
     if (error) {
@@ -65,13 +76,24 @@ exports.getAllUsers = async (req, res) => {
     const { search, role, status } = req.query;
     let query = supabase
       .from("users")
-      .select("id, full_name, email, role, active, joined, last_login");
+      .select("id, full_name, email, roles!role_id(label), active, joined, last_login");
 
     if (search) {
       query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
     }
+
     if (role) {
-      query = query.eq("role", role);
+      // Fetch role_id for the given role label
+      const { data: roleData, error: roleError } = await supabase
+        .from("roles")
+        .select("id")
+        .eq("label", role)
+        .single();
+
+      if (roleError || !roleData) {
+        return res.status(400).json({ error: `Role '${role}' not found` });
+      }
+      query = query.eq("role_id", roleData.id);
     }
     if (status) {
       query = query.eq("active", status === "active" ? "Y" : "N");
@@ -84,6 +106,7 @@ exports.getAllUsers = async (req, res) => {
 
     const transformedData = data.map(user => ({
       ...user,
+      role: user.roles.label, // Transform roles.label to role for response
       active: user.active === "Y",
       joined: user.joined ? new Date(user.joined).toLocaleDateString() : "N/A",
       last_login: user.last_login ? new Date(user.last_login).toLocaleDateString() : "Never",
@@ -108,10 +131,21 @@ exports.updateUser = async (req, res) => {
       return res.status(400).json({ error: "Name and Email are required" });
     }
 
+    // Fetch the role ID from roles table
+    const { data: roleData } = await supabase
+      .from("roles")
+      .select("id")
+      .eq("label", role || "user")
+      .single();
+
+    if (!roleData) {
+      return res.status(400).json({ error: `Role '${role || "user"}' not found` });
+    }
+
     const updates = {
       full_name,
       email,
-      role: role || "user",
+      role_id: roleData.id,
       active: active ? "Y" : "N",
       updated_at: new Date().toISOString(),
     };
@@ -124,7 +158,7 @@ exports.updateUser = async (req, res) => {
       .from("users")
       .update(updates)
       .eq("id", id)
-      .select()
+      .select("*, roles!role_id(label)")
       .single();
 
     if (error) {

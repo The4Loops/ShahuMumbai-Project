@@ -3,9 +3,25 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const supabase = require("../config/supabaseClient");
 
+// VERIFY AUTHENTICATED USER
+const verifyUser = (req) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return { error: "Unauthorized: Token missing" };
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { decoded };
+  } catch (err) {
+    return { error: "Invalid Token" };
+  }
+};
+
 // Create Review
 exports.createReview = async (req, res) => {
   try {
+    const { error: authError, decoded } = verifyUser(req);
+    if (authError) return res.status(401).json({ message: authError });
+
     const { userid, productid, rating, comment } = req.body;
 
     // Validate required fields
@@ -20,11 +36,18 @@ exports.createReview = async (req, res) => {
         .json({ message: "Rating must be between 1 and 5" });
     }
 
+    // Ensure the user is creating a review for themselves
+    if (userid !== decoded.id) {
+      return res
+        .status(403)
+        .json({ message: "Forbidden: You can only create reviews for yourself" });
+    }
+
     // Check if a review already exists for this user and product
     const { data: existingReview, error: fetchError } = await supabase
       .from("reviews")
       .select("id")
-      .eq("userid", parseInt(userid))
+      .eq("userid", userid)
       .eq("productid", productid)
       .eq("is_active", true)
       .single();
@@ -49,9 +72,9 @@ exports.createReview = async (req, res) => {
       .from("reviews")
       .insert([
         {
-          userid: parseInt(userid),
+          userid,
           productid,
-          rating: rating ? parseInt(rating) : null,
+          rating: parseInt(rating),
           comment,
           updated_at: new Date().toISOString(),
         },
@@ -86,7 +109,7 @@ exports.getReviewsByProductId = async (req, res) => {
       .select(
         `
         *,
-        users!userid (
+        users (
           id,
           full_name
         ),
@@ -125,6 +148,9 @@ exports.getReviewsByProductId = async (req, res) => {
 // Update Review
 exports.updateReview = async (req, res) => {
   try {
+    const { error: authError, decoded } = verifyUser(req);
+    if (authError) return res.status(401).json({ message: authError });
+
     const { id } = req.params;
     const { rating, comment } = req.body;
 
@@ -151,7 +177,7 @@ exports.updateReview = async (req, res) => {
 
     if (
       decoded.role !== "admin" &&
-      parseInt(existingReview.userid) !== parseInt(decoded.id)
+      existingReview.userid !== decoded.id
     ) {
       return res
         .status(403)
@@ -190,6 +216,9 @@ exports.updateReview = async (req, res) => {
 // Delete Review
 exports.deleteReview = async (req, res) => {
   try {
+    const { error: authError, decoded } = verifyUser(req);
+    if (authError) return res.status(401).json({ message: authError });
+
     const { id } = req.params;
 
     // Fetch the review to check ownership
@@ -208,7 +237,7 @@ exports.deleteReview = async (req, res) => {
 
     if (
       decoded.role !== "admin" &&
-      parseInt(existingReview.userid) !== parseInt(decoded.id)
+      existingReview.userid !== decoded.id
     ) {
       return res
         .status(403)

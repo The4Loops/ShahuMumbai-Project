@@ -9,7 +9,7 @@ const verifyAdmin = (req) => {
 
     try {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (decoded.role !== 'admin') return { error: 'Forbidden: Admins only' };
+        if (decoded.role !== 'Admin') return { error: 'Forbidden: Admins only' };
         return { decoded };
     } catch (err) {
         return { error: 'Invalid Token' };

@@ -18,7 +18,7 @@ function EmployeeManagement() {
     name: "",
     email: "",
     password: "",
-    role: "user",
+    role: "Users",
     status: "active",
   });
 
@@ -48,7 +48,7 @@ function EmployeeManagement() {
       const response = await api.get("/api/users", {
         params: {
           search: search || undefined,
-          role: roleFilter !== "All" ? roleFilter.toLowerCase() : undefined,
+          role: roleFilter !== "All" ? roleFilter : undefined,
           status: statusFilter !== "All" ? statusFilter.toLowerCase() : undefined,
         },
       });
@@ -220,7 +220,7 @@ function EmployeeManagement() {
               <option>Admin</option>
               <option>Manager</option>
               <option>Editor</option>
-              <option>User</option>
+              <option>Users</option>
             </select>
             <select
               className="border rounded-lg px-3 py-2"
@@ -274,7 +274,7 @@ function EmployeeManagement() {
           <table className="min-w-full bg-white">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">User</th>
+                <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Users</th>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Role</th>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Status</th>
                 <th className="py-3 px-4 text-left text-sm font-medium text-gray-500">Joined</th>
@@ -433,10 +433,10 @@ function EmployeeManagement() {
                 onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}
                 className="border rounded-lg px-3 py-2 w-1/2"
               >
-                <option value="user">User</option>
-                <option value="editor">Editor</option>
-                <option value="manager">Manager</option>
-                <option value="admin">Admin</option>
+                <option value="Users">Users</option>
+                <option value="Editor">Editor</option>
+                <option value="Manager">Manager</option>
+                <option value="Admin">Admin</option>
               </select>
               <select
                 value={newUser.status}

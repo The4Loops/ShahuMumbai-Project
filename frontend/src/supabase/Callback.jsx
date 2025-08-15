@@ -11,6 +11,7 @@ const Callback = () => {
   useEffect(() => {
     const fetchSession = async () => {
       try {
+        // Retrieve Supabase session
         const { data, error } = await supabase.auth.getSession();
 
         if (error || !data.session) {
@@ -20,49 +21,66 @@ const Callback = () => {
           return;
         }
 
-        const token = data.session.access_token;
+        const accessToken = data.session.access_token;
+        if (!accessToken) {
+          toast.dismiss();
+          toast.error("No access token found in session.");
+          navigate("/");
+          return;
+        }
 
-        // Axios POST Request to backend SSO login API
+        // Send SSO request to backend
         const res = await api.post(
           "/api/auth/ssoLogin",
           {},
           {
             headers: {
-              Authorization: `Bearer ${token}`,
+              Authorization: `Bearer ${accessToken}`,
             },
             withCredentials: true, // If needed for cookies
-            validateStatus: () => true, // <-- Allow all responses to handle manually
           }
         );
 
         if (res.status === 200 && res.data?.token) {
-          localStorage.setItem("token", res.data.token);
+          // Store token in localStorage
+          try {
+            localStorage.setItem("token", res.data.token);
+          } catch (storageError) {
+            toast.error("Failed to store authentication token. Please try again.", storageError);
+            navigate("/");
+            return;
+          }
 
-          const decoded = jwtDecode(res.data.token);
+          // Decode token
+          let decoded;
+          try {
+            decoded = jwtDecode(res.data.token);
+          } catch (decodeError) {
+            localStorage.removeItem("token"); // Clean up invalid token
+            toast.error("Invalid token format.", decodeError);
+            navigate("/");
+            return;
+          }
+
           const role = decoded.role;
-
           toast.dismiss();
-          toast.success("Login Successful!");
+          toast.success(res.data.message || "Login Successful!");
 
-          if (role === "admin") {
+          // Navigate based on role
+          if (role === "Admin") {
             navigate("/admin");
           } else {
-            navigate("/home");
+            navigate("/profile");
           }
-        } else if (res.status === 403) {
-          toast.dismiss();
-          toast.error("SSO Login is not allowed for this user.");
-          navigate("/home");
         } else {
           toast.dismiss();
           toast.error(res.data?.error || "SSO Login failed.");
-          navigate("/home");
+          navigate("/");
         }
       } catch (err) {
         toast.dismiss();
-        toast.error("Network error occurred. Please try again.");
-        console.error(err);
-        navigate("/home");
+        toast.error(err.response?.data?.error || err.message || "An error occurred during SSO login.");
+        navigate("/");
       }
     };
 

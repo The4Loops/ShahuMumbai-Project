@@ -4,20 +4,6 @@ const nodemailer = require("nodemailer");
 const supabase = require("../config/supabaseClient");
 const { encryptData } = require("../utils/crypto");
 
-// VERIFY ADMIN
-const verifyAdmin = (req) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return { error: "Unauthorized: Token missing" };
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") return { error: "Forbidden: Admins only" };
-    return { decoded };
-  } catch (err) {
-    return { error: "Invalid Token" };
-  }
-};
-
 // SEND OTP
 exports.sendOtp = async (req, res) => {
   try {
@@ -25,7 +11,7 @@ exports.sendOtp = async (req, res) => {
 
     // Check if already exists
     const { data: existingUser } = await supabase
-      .from("Users")
+      .from("users")
       .select("*")
       .eq("email", email)
       .single();
@@ -90,6 +76,17 @@ exports.verifyOtpAndRegister = async (req, res) => {
       return res.status(400).json({ error: "Invalid or expired OTP" });
     }
 
+    // Fetch the default 'user' role ID
+    const { data: userRole } = await supabase
+      .from("roles")
+      .select("id")
+      .eq("label", "Users")
+      .single();
+
+    if (!userRole) {
+      return res.status(500).json({ error: "Default user role not found" });
+    }
+
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
 
     const { error } = await supabase.from("users").insert([
@@ -97,9 +94,9 @@ exports.verifyOtpAndRegister = async (req, res) => {
         full_name,
         email,
         password: hashedPassword,
-        role: "user",
+        role_id: userRole.id, // Use role_id instead of role
         ssologin,
-        joined: new Date().toISOString(), // Set joined to current timestamp
+        joined: new Date().toISOString(),
       },
     ]);
 
@@ -119,10 +116,10 @@ exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Step 1: Fetch user by email
+    // Step 1: Fetch user by email with role information
     const { data: user, error } = await supabase
       .from("users")
-      .select("*")
+      .select("*, roles(label)")
       .eq("email", email)
       .maybeSingle();
 
@@ -177,7 +174,7 @@ exports.login = async (req, res) => {
       .from("users")
       .update({
         invalidattempt: 0,
-        last_login: new Date().toISOString(), // Update last_login
+        last_login: new Date().toISOString(),
       })
       .eq("id", user.id);
 
@@ -191,7 +188,7 @@ exports.login = async (req, res) => {
         id: user.id,
         fullname: user.full_name,
         email: user.email,
-        role: user.role,
+        role: user.roles.label, // Include role label from roles table
       },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
@@ -220,10 +217,21 @@ exports.ssoLogin = async (req, res) => {
     if (error || !user)
       return res.status(401).json({ error: "Invalid Supabase token" });
 
+    // Fetch the default 'user' role ID
+    const { data: userRole } = await supabase
+      .from("roles")
+      .select("id, label")
+      .eq("label", "Users")
+      .single();
+
+    if (!userRole) {
+      return res.status(500).json({ error: "Default user role not found" });
+    }
+
     // Check if user exists in your DB
     const { data: existingUser, error: userFetchError } = await supabase
       .from("users")
-      .select("*")
+      .select("*, roles(label)")
       .eq("email", user.email)
       .maybeSingle();
 
@@ -232,7 +240,7 @@ exports.ssoLogin = async (req, res) => {
     }
 
     let userId;
-    let userRole = "user";
+    let userRoleLabel = userRole.label;
 
     if (!existingUser) {
       // New User -> Create with ssologin = Y and joined timestamp
@@ -243,9 +251,9 @@ exports.ssoLogin = async (req, res) => {
             full_name: user.user_metadata.full_name || user.email,
             email: user.email,
             password: "",
-            role: "user",
+            role_id: userRole.id, // Use role_id instead of role
             ssologin: "Y",
-            joined: new Date().toISOString(), // Set joined for new user
+            joined: new Date().toISOString(),
           },
         ])
         .select()
@@ -260,7 +268,7 @@ exports.ssoLogin = async (req, res) => {
         return res.status(403).json({ error: "SSO login is not allowed for this user." });
       }
       userId = existingUser.id;
-      userRole = existingUser.role;
+      userRoleLabel = existingUser.roles.label;
 
       // Update last_login for existing user
       const { error: updateError } = await supabase
@@ -274,7 +282,7 @@ exports.ssoLogin = async (req, res) => {
     }
 
     const appToken = jwt.sign(
-      { id: userId, fullname: user.user_metadata.full_name || user.email, email: user.email, role: userRole },
+      { id: userId, fullname: user.user_metadata.full_name || user.email, email: user.email, role: userRoleLabel },
       process.env.JWT_SECRET,
       { expiresIn: "2h" }
     );
@@ -284,4 +292,3 @@ exports.ssoLogin = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
-
