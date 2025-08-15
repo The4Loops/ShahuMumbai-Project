@@ -27,17 +27,18 @@ function Cart() {
         const formattedItems = response.data.map((item) => ({
           id: item.id,
           title: item.product.name,
-          category: item.product.categories.name ||"Accessories", // You may want to add category to your API response
-          price: item.product.price - item.product.discountprice || item.product.price,
+          category: item.product.categories.name || "Accessories",
+          price: item.product.price - (item.product.discountprice || 0),
           oldPrice: item.product.discountprice ? item.product.price : null,
           quantity: item.quantity,
           inStock: item.product.stock > 0,
           discount: item.product.discountprice
             ? Math.round(
-                ((item.product.price - item.product.discountprice)/item.product.price) * 100
+                (item.product.discountprice / item.product.price) * 100
               )
             : null,
-          image: item.product.product_images.find((img) => img.is_hero)?.image_url,
+          image: item.product.product_images.find((img) => img.is_hero)
+            ?.image_url,
         }));
         setCartItems(formattedItems);
       } catch (error) {
@@ -56,10 +57,10 @@ function Cart() {
     try {
       const item = cartItems.find((item) => item.id === id);
       const newQuantity = Math.max(1, item.quantity + delta);
-      
+
       // Update quantity via API
       await api.put(`/api/cart/${id}`, { quantity: newQuantity });
-      
+
       setCartItems((items) =>
         items.map((item) =>
           item.id === id ? { ...item, quantity: newQuantity } : item
