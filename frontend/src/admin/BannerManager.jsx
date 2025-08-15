@@ -14,6 +14,7 @@ const BannerManager = () => {
   // Handle image upload to /api/upload/single
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
+    console.log("Selected file:", file);
     if (!file) return;
 
     const formDataToUpload = new FormData();
@@ -23,7 +24,10 @@ const BannerManager = () => {
       const response = await api.post("/api/upload/single", formDataToUpload, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setFormData(prev => ({ ...prev, imageUrl: response.data.imageUrls }));
+      setFormData(prev => ({
+      ...prev,
+      imageUrl: response.data.url || response.data.imageUrls?.[0] || ""
+    }));
     } catch (error) {
       toast.dismiss();
       toast.error("Image upload failed "+error);
@@ -99,7 +103,7 @@ const BannerManager = () => {
         <input
           type="file"
           name="image"
-          accept="image/*"
+          accept="image/*,video/*"
           onChange={handleImageUpload}
           className="w-full border border-gray-300 rounded-md px-4 py-2 text-sm text-gray-600 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-[#D4A5A5] file:text-white hover:file:bg-[#C39898]"
         />

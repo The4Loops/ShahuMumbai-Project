@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion';
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 
 const items = [
   { title: 'Vintage Silk Scarf', price: '$89', oldPrice: '$120', tag: 'New', img: '🧣' },
@@ -9,6 +10,7 @@ const items = [
 ];
 
 function Featured() {
+  const navigate = useNavigate();
   return (
     <section className="py-16 px-6 text-center bg-[#F1E7E5]">
       <h2 className="text-3xl font-semibold mb-2 text-[#6B4226]">Featured Treasures</h2>
@@ -40,7 +42,7 @@ function Featured() {
         ))}
       </div>
 
-      <button className="mt-8 bg-[#D4A5A5] text-white px-6 py-2 rounded-lg hover:opacity-90 transition">
+      <button onClick={()=>navigate("/products")} className="mt-12 bg-[#D4A5A5] text-white px-6 py-2 rounded-lg hover:opacity-90 transition">
         View All Products
       </button>
     </section>

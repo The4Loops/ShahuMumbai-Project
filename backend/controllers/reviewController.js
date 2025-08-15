@@ -109,7 +109,7 @@ exports.getReviewsByProductId = async (req, res) => {
       .select(
         `
         *,
-        users (
+        users!userid (
           id,
           full_name
         ),

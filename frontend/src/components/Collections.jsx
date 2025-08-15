@@ -8,7 +8,7 @@ function Collections() {
   ];
 
   return (
-    <section className="bg-[#F1E7E5] py-20 px-6 text-center">
+    <section className="bg-[#F1E7E5] py-11 px-6 text-center">
       <h2 className="text-3xl font-semibold mb-4 text-[#6B4226]">Our Collections</h2>
       <p className="text-[#6B4226]/70 mb-10">
         Explore our carefully curated collections, each telling a unique story of style and heritage.

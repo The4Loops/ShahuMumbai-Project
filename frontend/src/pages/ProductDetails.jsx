@@ -80,6 +80,9 @@ const ProductDetails = () => {
   const [qty, setQty] = useState(1);
   const sliderRef = useRef();
   const token = localStorage.getItem("token");
+  const decoded = jwtDecode(token);
+  const userid = decoded?.id;
+  const fullName = decoded?.fullname || "Anonymous";
 
   // Reviews state
   const [reviews, setReviews] = useState([]);
@@ -87,14 +90,14 @@ const ProductDetails = () => {
   const [reviewCount, setReviewCount] = useState(0);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState(null);
-  const decoded = jwtDecode(token);
-  const userid = decoded?.id;
-  const fullName = decoded?.fullname || "Anonymous";
+  
+
   // New review form
   const [reviewName, setReviewName] = useState(fullName);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [cartSubmitting, setCartSubmitting] = useState(false); 
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -145,11 +148,10 @@ const ProductDetails = () => {
 
   const submitReview = async (e) => {
     e.preventDefault();
-    var response="";
     if (!reviewText.trim()) return;
     try {
       setSubmitting(true);
-      response = await api.post(`/api/reviews`, {
+      const response = await api.post(`/api/reviews`, {
         rating: Number(reviewRating),
         productid: id,
         userid: parseInt(userid),
@@ -157,6 +159,11 @@ const ProductDetails = () => {
       });
       toast.dismiss();
       toast.success("Review submitted successfully!");
+      setReviews([...reviews, response.data]);
+      const newAvg = ((avgRating * reviewCount) + Number(reviewRating)) / (reviewCount + 1);
+      setAvgRating(Number(newAvg.toFixed(1)));
+      setReviewText("");
+      setReviewRating(5);
     } catch (e) {
       if(e.response?.status === 400) {
         toast.dismiss();
@@ -167,6 +174,25 @@ const ProductDetails = () => {
       }
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleAddToCart = async () => {
+    if (Number(product.stock) === 0 || cartSubmitting) return;
+    try {
+      setCartSubmitting(true);
+      const response = await api.post("/api/cart", {
+        user_id: userid,
+        product_id: product.id,
+        quantity: qty,
+      });
+      toast.dismiss();
+      toast.success(`${product.name} added to cart!`);
+    } catch (e) {
+      toast.dismiss();
+      toast.error(e.response?.data?.error || "Failed to add to cart.");
+    } finally {
+      setCartSubmitting(false);
     }
   };
 
@@ -210,7 +236,7 @@ const ProductDetails = () => {
     product.discountprice &&
     Number(product.discountprice) < Number(product.price);
   const salePrice = hasDiscount
-    ? Number(product.discountprice)
+    ? Number(product.price) - Number(product.discountprice)
     : Number(product.price);
   const mrp = Number(product.price);
   const discountPercentage = hasDiscount
@@ -224,7 +250,7 @@ const ProductDetails = () => {
 
   return (
     <Layout>
-      <div className="min-h-screen px-4 md:px-6 py-16 pt-[130px] bg-[#F1E7E5] font-serif">
+      <div className="min-h-screen px-4 md:px-6 py-16 pt-[60px] bg-[#F1E7E5] font-serif">
         {/* Breadcrumb */}
         <nav className="max-w-6xl mx-auto text-sm mb-4 text-[#6B4226]">
           <ol className="flex flex-wrap gap-1">
@@ -381,15 +407,15 @@ const ProductDetails = () => {
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
                     className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0
+                      Number(product.stock) === 0 || cartSubmitting
                         ? "opacity-50 cursor-not-allowed"
                         : ""
                     }`}
                     aria-label="Add this product to your shopping cart"
-                    disabled={Number(product.stock) === 0}
-                    onClick={() => console.log("Add to cart", { id, qty })}
+                    disabled={Number(product.stock) === 0 || cartSubmitting}
+                    onClick={handleAddToCart}
                   >
-                    Add to Cart
+                    {cartSubmitting ? "Adding..." : "Add to Cart"}
                   </button>
                   <button
                     className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
@@ -606,8 +632,8 @@ const ProductDetails = () => {
                 related.discountprice &&
                 Number(related.discountprice) < Number(related.price);
               const relatedSalePrice = relatedHasDiscount
-                ? Number(related.discountprice)
-                : Number(related.price);
+                ? Number(related.price)
+                : Number(related.discountprice);
               const relatedImage =
                 related.product_images?.find((img) => img.is_hero)?.image_url ||
                 related.product_images?.[0]?.image_url ||

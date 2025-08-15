@@ -76,6 +76,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [cartItemCount, setCartItemCount] = useState(0); 
 
   const refs = useRef({});
   const navigate = useNavigate();
@@ -90,7 +91,6 @@ export default function Navbar() {
       localStorage.removeItem("token");
     }
   }
-  const cartItemCount = 3;
 
   // Fetch menus
   const fetchMenuData = useCallback(async () => {
@@ -122,9 +122,25 @@ export default function Navbar() {
     }
   }, [userRole]);
 
+  // Fetch cart item count
+  const fetchCartItemCount = useCallback(async () => {
+    if (!token) {
+      setCartItemCount(0);
+      return;
+    }
+    try {
+      const response = await api.get("/api/cartById");
+      setCartItemCount(response.data.length || 0);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to fetch cart items");
+      setCartItemCount(0);
+    }
+  }, [token]);
+
   useEffect(() => {
     fetchMenuData();
-  }, [fetchMenuData]);
+    fetchCartItemCount();
+  }, [fetchMenuData, fetchCartItemCount]);
 
   // Close dropdowns on outside click
   const handleClickOutside = useCallback((e) => {
@@ -134,6 +150,7 @@ export default function Navbar() {
       }
     });
   }, []);
+
   useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -291,9 +308,11 @@ export default function Navbar() {
           <li className="relative">
             <Link to="/cart">
               <FaShoppingCart size={20} />
-              <span className="absolute -top-2 -right-2 bg-red-700 text-white text-xs rounded-full px-1">
-                {cartItemCount}
-              </span>
+                {cartItemCount > 0 && (
+                <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
+                  {cartItemCount}
+                </span>
+              )}
             </Link>
           </li>
         </ul>
@@ -426,7 +445,7 @@ export default function Navbar() {
           <Link
             to="/cart"
             onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 border-b border-[#d4c4b6] relative"
+            className="block py-2 border-b align-items-center border-[#d4c4b6] relative"
           >
             Cart
             {cartItemCount > 0 && (

@@ -12,7 +12,7 @@ exports.createBanner = async (req, res) => {
 
     // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "Admin") {
       return res.status(403).json({ message: "Forbidden: Admins only" });
     }
 

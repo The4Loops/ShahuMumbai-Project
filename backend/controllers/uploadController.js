@@ -23,34 +23,40 @@ const uploadFile = (req, res) => {
     }
 
     let responseData;
+    
     if (req.file) {
-      // Single file upload
-      const imageUrl = cloudinary.url(req.file.filename, {
-        transformation: [
-          { width: 1000, crop: "scale" },
-          { quality: "auto" },
-          { fetch_format: "auto" },
-        ],
-      });
-      responseData = { url: imageUrl }; // Match frontend expectation
-    } else if (req.files) {
-      // Multiple file upload
-      const imageUrls = req.files.map((file) =>
-        cloudinary.url(file.filename, {
+      let fileUrl;
+
+      if (req.file.mimetype.startsWith("video")) {
+        fileUrl = cloudinary.url(req.file.filename, {
+          resource_type: "video", // tell Cloudinary it's a video
+          transformation: [{ quality: "auto" }, { fetch_format: "auto" }],
+        });
+      } else {
+        fileUrl = cloudinary.url(req.file.filename, {
           transformation: [
             { width: 1000, crop: "scale" },
             { quality: "auto" },
             { fetch_format: "auto" },
           ],
-        })
-      );
-      responseData = { imageUrls };
+        });
+      }
+
+      responseData = { url: fileUrl }; // Match frontend expectation
     }
 
     res.status(200).json(responseData);
   } catch (error) {
-    if (error instanceof multer.MulterError && error.code === "LIMIT_UNEXPECTED_FILE") {
-      return res.status(400).json({ message: "Unexpected field name. Expected 'image' for single upload or 'images' for multiple uploads." });
+    if (
+      error instanceof multer.MulterError &&
+      error.code === "LIMIT_UNEXPECTED_FILE"
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Unexpected field name. Expected 'image' for single upload or 'images' for multiple uploads.",
+        });
     }
     res.status(500).json({ message: "Upload failed", error: error.message });
   }
@@ -74,8 +80,16 @@ const uploadMultipleFiles = (req, res) => {
 
     res.status(200).json({ imageUrls });
   } catch (error) {
-    if (error instanceof multer.MulterError && error.code === "LIMIT_UNEXPECTED_FILE") {
-      return res.status(400).json({ message: "Unexpected field name. Expected 'images' for multiple uploads." });
+    if (
+      error instanceof multer.MulterError &&
+      error.code === "LIMIT_UNEXPECTED_FILE"
+    ) {
+      return res
+        .status(400)
+        .json({
+          message:
+            "Unexpected field name. Expected 'images' for multiple uploads.",
+        });
     }
     res.status(500).json({ message: "Upload failed", error: error.message });
   }

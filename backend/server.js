@@ -17,6 +17,7 @@ const navbarRoutes = require('./routes/navbarRoutes');
 const roleRoutes = require('./routes/roleRoutes');
 const menuRoutes = require('./routes/menuRoutes');
 const blogRoutes = require('./routes/blogRoutes');
+const cartRoutes = require('./routes/cartRoutes');
 
 const app = express();
 
@@ -55,6 +56,7 @@ app.use('/api/navbar', navbarRoutes);
 app.use('/api', roleRoutes);
 app.use('/api', menuRoutes);
 app.use('/api', blogRoutes);
+app.use('/api', cartRoutes);
 
 // Rate Limiting
 const limiter = rateLimit({
