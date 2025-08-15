@@ -57,7 +57,7 @@ const MENU_REGISTRY = [
   { id: "Team Management", label: "Team Management", icon: AiOutlineTeam, category: "People", component: TeamManagement },
   { id: "Menu Management", label: "Menu Management", icon: FiMenu, category: "System", component: MenuManagement },
   { id: "Role Management", label: "Role Management", icon: MdOutlineAnalytics, category: "System", component: RoleManagement },
-  { id: "Table", label: "Table", icon: AiOutlineTable, category: "Utilities", component: Tables },
+  { id: "Table", label: "Data Table Management", icon: AiOutlineTable, category: "Utilities", component: Tables },
 ];
 
 const getInitialFavorites = () => {
