@@ -1,13 +1,14 @@
-import React, { useState } from "react";
+import React, { useState, Suspense, lazy } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Box, Users, Tag, Image as ImageIcon, MessageSquare, FileText } from "lucide-react";
 
-import ProductsTable from "./tabs/ProductsTable";
-import UsersTable from "./tabs/UsersTable";
-import CategoriesTable from "./tabs/CategoriesTable";
-import BannersTable from "./tabs/BannersTable";
-import ReviewsTable from "./tabs/ReviewsTable";
-import BlogsTable from "./tabs/BlogsTable";
+// Lazy load all tab components
+const ProductsTable = lazy(() => import("./tabs/ProductsTable"));
+const UsersTable = lazy(() => import("./tabs/UsersTable"));
+const CategoriesTable = lazy(() => import("./tabs/CategoriesTable"));
+const BannersTable = lazy(() => import("./tabs/BannersTable"));
+const ReviewsTable = lazy(() => import("./tabs/ReviewsTable"));
+const BlogsTable = lazy(() => import("./tabs/BlogsTable"));
 
 const tabs = [
   { name: "Products", icon: Box },
@@ -64,7 +65,7 @@ export default function Tables() {
 
       {/* Active Table with Fade Animation */}
       <div className="p-4">
-        <AnimatePresence mode="wait">
+        <AnimatePresence>
           <motion.div
             key={activeTab}
             initial={{ opacity: 0, y: 10 }}
@@ -72,7 +73,9 @@ export default function Tables() {
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.25 }}
           >
-            <ActiveComponent />
+            <Suspense fallback={<div className="text-gray-500">Loading {activeTab}...</div>}>
+              <ActiveComponent />
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </div>

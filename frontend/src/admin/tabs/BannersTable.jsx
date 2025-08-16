@@ -1,285 +1,232 @@
 import React, { useState } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { motion, AnimatePresence } from "framer-motion";
+import { Pencil, X, Search } from "lucide-react";
 
-export default function BannerCards() {
+const BannerCards = () => {
   const [banners, setBanners] = useState([
     {
-      id: "1",
-      title: "Summer Sale – Up to 50% Off",
+      id: 1,
+      title: "Summer Sale",
+      description: "Up to 50% off on electronics",
       status: "Active",
-      created: "8/05/2025",
-      updated: "8/14/2025",
-      link: "https://example.com/summer",
-      image:
-        "https://images.unsplash.com/photo-1512436991641-6745cdb1723f?q=80&w=1200&auto=format&fit=crop",
+      image: "https://via.placeholder.com/150",
     },
     {
-      id: "2",
-      title: "New Arrivals • Wearables",
-      status: "Scheduled",
-      created: "8/10/2025",
-      updated: "8/15/2025",
-      link: "https://example.com/wearables",
-      image:
-        "https://images.unsplash.com/photo-1518443952249-9d55d73eba0d?q=80&w=1200&auto=format&fit=crop",
-    },
-    {
-      id: "3",
-      title: "Gaming Weekend Deals",
+      id: 2,
+      title: "New Arrivals",
+      description: "Check out the latest products",
       status: "Inactive",
-      created: "7/28/2025",
-      updated: "8/01/2025",
-      link: "https://example.com/gaming",
-      image:
-        "https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=1200&auto=format&fit=crop",
+      image: "https://via.placeholder.com/150",
+    },
+    {
+      id: 3,
+      title: "Festive Offer",
+      description: "Special discounts for Diwali",
+      status: "Active",
+      image: "https://via.placeholder.com/150",
     },
   ]);
 
-  const [viewBanner, setViewBanner] = useState(null);
-  const [editBanner, setEditBanner] = useState(null);
-  const [form, setForm] = useState({ title: "", status: "", link: "", image: "" });
+  const [editingBanner, setEditingBanner] = useState(null);
+  const [formData, setFormData] = useState({
+    title: "",
+    description: "",
+    status: "Active",
+    image: "",
+  });
+  const [search, setSearch] = useState("");
 
-  const handleDragEnd = (result) => {
-    if (!result.destination) return;
-    const reordered = Array.from(banners);
-    const [moved] = reordered.splice(result.source.index, 1);
-    reordered.splice(result.destination.index, 0, moved);
-    setBanners(reordered);
+  const handleEdit = (banner) => {
+    setEditingBanner(banner);
+    setFormData(banner);
   };
 
-  const handleEditClick = (banner) => {
-    setEditBanner(banner);
-    setForm({
-      title: banner.title,
-      status: banner.status,
-      link: banner.link,
-      image: banner.image,
-    });
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFormData({
+        ...formData,
+        image: URL.createObjectURL(file),
+      });
+    }
   };
 
   const handleSave = () => {
     setBanners((prev) =>
-      prev.map((b) =>
-        b.id === editBanner.id
-          ? { ...b, ...form, updated: new Date().toLocaleDateString() }
-          : b
-      )
+      prev.map((b) => (b.id === editingBanner.id ? formData : b))
     );
-    setEditBanner(null);
+    setEditingBanner(null);
   };
 
+  // Filter banners by search text
+  const filteredBanners = banners.filter(
+    (b) =>
+      b.title.toLowerCase().includes(search.toLowerCase()) ||
+      b.description.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
-    <div className="p-4 bg-gray-50 min-h-screen">
-      <h2 className="text-lg font-bold mb-4">Banners</h2>
+    <div className="p-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+        <h2 className="text-xl font-semibold">Banners</h2>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="banner-list" direction="horizontal">
-          {(provided) => (
-            <div
-              className="flex gap-4 flex-wrap"
-              {...provided.droppableProps}
-              ref={provided.innerRef}
-            >
-              {banners.map((banner, index) => (
-                <Draggable key={banner.id} draggableId={banner.id} index={index}>
-  {(provided) => (
-    <div
-      className="bg-white shadow-sm rounded-xl w-64 p-3 flex flex-col relative group hover:shadow-md hover:scale-[1.02] transition-transform duration-200"
-      ref={provided.innerRef}
-      {...provided.draggableProps}
-      {...provided.dragHandleProps}
-    >
-      <div className="relative">
-        <img
-          src={banner.image}
-          alt={banner.title}
-          className="rounded-lg w-full h-32 object-cover"
-        />
-
-        {/* Gradient & Blur Overlay */}
-        <div className="absolute inset-0 rounded-lg bg-gradient-to-t from-black/60 via-black/30 to-transparent opacity-0 group-hover:opacity-100 backdrop-blur-sm transition-all duration-200" />
-
-        {/* Hover Action Buttons */}
-        <div className="absolute inset-0 flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-          <button
-            onClick={() => setViewBanner(banner)}
-            className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-full shadow hover:bg-blue-600 transition"
-          >
-            View
-          </button>
-          <button
-            onClick={() => handleEditClick(banner)}
-            className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-full shadow hover:bg-green-600 transition"
-          >
-            Edit
-          </button>
-          <button
-            onClick={() =>
-              setBanners((prev) => prev.filter((b) => b.id !== banner.id))
-            }
-            className="px-3 py-1.5 text-sm bg-red-500 text-white rounded-full shadow hover:bg-red-600 transition"
-          >
-            Delete
-          </button>
+        {/* Search Bar */}
+        <div className="relative w-full sm:w-64">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <input
+            type="text"
+            placeholder="Search banners..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full border rounded-lg pl-10 pr-3 py-2 text-sm focus:ring-2 focus:ring-blue-500"
+          />
         </div>
       </div>
 
-      {/* Card Info */}
-      <p className="mt-3 font-semibold text-gray-800 line-clamp-2">
-        {banner.title}
-      </p>
-      <span
-        className={`text-xs px-2 py-1 mt-1 rounded-full w-fit ${
-          banner.status === "Active"
-            ? "bg-green-100 text-green-700"
-            : banner.status === "Scheduled"
-            ? "bg-yellow-100 text-yellow-700"
-            : "bg-red-100 text-red-700"
-        }`}
-      >
-        {banner.status}
-      </span>
-      <p className="text-xs text-gray-500 mt-2">Created: {banner.created}</p>
-      <p className="text-xs text-gray-500">Updated: {banner.updated}</p>
-      <a
-        href={banner.link}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-500 text-sm mt-1 hover:underline"
-      >
-        View Link
-      </a>
-    </div>
-  )}
-</Draggable>
-
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
-
-      {/* View Modal */}
-      <AnimatePresence>
-        {viewBanner && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-lg p-5 max-w-lg w-full shadow-lg relative"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
+      {/* Cards grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredBanners.length > 0 ? (
+          filteredBanners.map((banner) => (
+            <div
+              key={banner.id}
+              className="border rounded-xl shadow-sm hover:shadow-md transition p-4 bg-white flex flex-col"
             >
-              <button
-                onClick={() => setViewBanner(null)}
-                className="absolute top-2 right-2 text-gray-500 hover:text-black"
-              >
-                ✕
-              </button>
               <img
-                src={viewBanner.image}
-                alt={viewBanner.title}
-                className="rounded-lg w-full h-56 object-cover"
+                src={banner.image}
+                alt={banner.title}
+                className="w-full h-40 object-cover rounded-lg"
               />
-              <h3 className="mt-3 text-lg font-bold">{viewBanner.title}</h3>
-              <span
-                className={`text-xs px-2 py-1 mt-1 rounded-full inline-block ${
-                  viewBanner.status === "Active"
-                    ? "bg-green-100 text-green-700"
-                    : viewBanner.status === "Scheduled"
-                    ? "bg-yellow-100 text-yellow-700"
-                    : "bg-red-100 text-red-700"
-                }`}
-              >
-                {viewBanner.status}
-              </span>
-              <p className="text-sm text-gray-500 mt-2">
-                Created: {viewBanner.created}
-              </p>
-              <p className="text-sm text-gray-500">
-                Updated: {viewBanner.updated}
-              </p>
-              <a
-                href={viewBanner.link}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-500 text-sm mt-2 inline-block hover:underline"
-              >
-                Visit Link
-              </a>
-            </motion.div>
-          </motion.div>
+              <div className="mt-3 flex-1">
+                <h3 className="text-lg font-semibold">{banner.title}</h3>
+                <p className="text-gray-600 text-sm mt-1">{banner.description}</p>
+                <span
+                  className={`inline-block mt-2 px-2 py-1 rounded text-xs ${
+                    banner.status === "Active"
+                      ? "bg-green-100 text-green-600"
+                      : "bg-red-100 text-red-600"
+                  }`}
+                >
+                  {banner.status}
+                </span>
+              </div>
+              <div className="mt-4 flex justify-end">
+                <button
+                  onClick={() => handleEdit(banner)}
+                  className="p-2 rounded bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  <Pencil size={16} />
+                </button>
+              </div>
+            </div>
+          ))
+        ) : (
+          <p className="text-gray-500 col-span-full text-center">
+            No banners found
+          </p>
         )}
-      </AnimatePresence>
+      </div>
 
       {/* Edit Modal */}
       <AnimatePresence>
-        {editBanner && (
+        {editingBanner && (
           <motion.div
-            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
             <motion.div
-              className="bg-white rounded-lg p-5 max-w-lg w-full shadow-lg relative"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              exit={{ scale: 0.9 }}
+              className="bg-white rounded-2xl shadow-lg w-full max-w-lg p-6 relative"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
             >
+              {/* Close button */}
               <button
-                onClick={() => setEditBanner(null)}
-                className="absolute top-2 right-2 text-gray-500 hover:text-black"
+                onClick={() => setEditingBanner(null)}
+                className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100"
               >
-                ✕
+                <X size={20} />
               </button>
-              <h3 className="text-lg font-bold mb-4">Edit Banner</h3>
-              <input
-                type="text"
-                placeholder="Title"
-                value={form.title}
-                onChange={(e) => setForm({ ...form, title: e.target.value })}
-                className="w-full border rounded p-2 mb-2"
-              />
-              <select
-                value={form.status}
-                onChange={(e) => setForm({ ...form, status: e.target.value })}
-                className="w-full border rounded p-2 mb-2"
-              >
-                <option>Active</option>
-                <option>Scheduled</option>
-                <option>Inactive</option>
-              </select>
-              <input
-                type="text"
-                placeholder="Link"
-                value={form.link}
-                onChange={(e) => setForm({ ...form, link: e.target.value })}
-                className="w-full border rounded p-2 mb-2"
-              />
-              <input
-                type="text"
-                placeholder="Image URL"
-                value={form.image}
-                onChange={(e) => setForm({ ...form, image: e.target.value })}
-                className="w-full border rounded p-2 mb-2"
-              />
-              <button
-                onClick={handleSave}
-                className="w-full bg-green-500 text-white p-2 rounded hover:bg-green-600"
-              >
-                Save Changes
-              </button>
+
+              <h3 className="text-lg font-semibold mb-4">Edit Banner</h3>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Title</label>
+                  <input
+                    type="text"
+                    value={formData.title}
+                    onChange={(e) =>
+                      setFormData({ ...formData, title: e.target.value })
+                    }
+                    className="w-full border rounded-lg p-2"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    className="w-full border rounded-lg p-2"
+                    rows="3"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">Status</label>
+                  <select
+                    value={formData.status}
+                    onChange={(e) =>
+                      setFormData({ ...formData, status: e.target.value })
+                    }
+                    className="w-full border rounded-lg p-2"
+                  >
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Upload Image
+                  </label>
+                  <input type="file" onChange={handleImageChange} />
+                  {formData.image && (
+                    <img
+                      src={formData.image}
+                      alt="Preview"
+                      className="w-24 h-24 mt-2 rounded-md object-cover"
+                    />
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3 mt-6">
+                <button
+                  onClick={() => setEditingBanner(null)}
+                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSave}
+                  className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
+                >
+                  Save Changes
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
-}
+};
+
+export default BannerCards;
