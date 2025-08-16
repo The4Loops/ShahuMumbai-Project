@@ -308,7 +308,7 @@ export default function Navbar() {
           <li className="relative">
             <Link to="/cart">
               <FaShoppingCart size={20} />
-                {cartItemCount > 0 && (
+                {cartItemCount >= 0 && (
                 <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
                   {cartItemCount}
                 </span>
@@ -448,7 +448,7 @@ export default function Navbar() {
             className="block py-2 border-b align-items-center border-[#d4c4b6] relative"
           >
             Cart
-            {cartItemCount > 0 && (
+            {cartItemCount >= 0 && (
               <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
                 {cartItemCount}
               </span>

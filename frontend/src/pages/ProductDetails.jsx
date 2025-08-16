@@ -80,7 +80,10 @@ const ProductDetails = () => {
   const [qty, setQty] = useState(1);
   const sliderRef = useRef();
   const token = localStorage.getItem("token");
-  const decoded = jwtDecode(token);
+  var decoded = "";
+  if (token) {
+    decoded = jwtDecode(token);
+  }
   const userid = decoded?.id;
   const fullName = decoded?.fullname || "Anonymous";
 
@@ -90,14 +93,13 @@ const ProductDetails = () => {
   const [reviewCount, setReviewCount] = useState(0);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState(null);
-  
 
   // New review form
   const [reviewName, setReviewName] = useState(fullName);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [cartSubmitting, setCartSubmitting] = useState(false); 
+  const [cartSubmitting, setCartSubmitting] = useState(false);
 
   useEffect(() => {
     const fetchProduct = async () => {
@@ -160,17 +162,18 @@ const ProductDetails = () => {
       toast.dismiss();
       toast.success("Review submitted successfully!");
       setReviews([...reviews, response.data]);
-      const newAvg = ((avgRating * reviewCount) + Number(reviewRating)) / (reviewCount + 1);
+      const newAvg =
+        (avgRating * reviewCount + Number(reviewRating)) / (reviewCount + 1);
       setAvgRating(Number(newAvg.toFixed(1)));
       setReviewText("");
       setReviewRating(5);
     } catch (e) {
-      if(e.response?.status === 400) {
+      if (e.response?.status === 400) {
         toast.dismiss();
         toast.error(e.response?.data?.message || "Failed to submit review.");
-      }else{
+      } else {
         toast.dismiss();
-      toast.error("Failed to submit review."+e);
+        toast.error("Failed to submit review." + e);
       }
     } finally {
       setSubmitting(false);

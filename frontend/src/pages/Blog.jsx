@@ -88,10 +88,9 @@ const VintageArticlePage = () => {
         });
         setReviewData(initialReviewData);
         setShowReviewsSection(initialShowReviews);
-        toast.success("Blogs loaded successfully.");
       } catch (error) {
+        toast.dismiss();
         toast.error("Failed to load blogs or likes. Please try again.");
-        console.error("Error fetching blogs or likes:", error);
       }
     };
     fetchBlogsAndLikes();
@@ -119,6 +118,7 @@ const VintageArticlePage = () => {
   const handleReviewSubmit = async (blogId) => {
     const { rating, reviewName, reviewText } = reviewData[blogId] || {};
     if (!reviewName.trim() || !reviewText.trim() || rating === 0) {
+      toast.dismiss();
       toast.error("Please provide a name, review, and rating.");
       return;
     }
@@ -143,13 +143,15 @@ const VintageArticlePage = () => {
         ...prev,
         [blogId]: { ...prev[blogId], rating: 0, reviewName: fullName || "", reviewText: "" },
       }));
+      toast.dismiss();
       toast.success("Review submitted successfully.");
     } catch (error) {
       if (error.response?.data?.message === 'User has already reviewed this blog') {
+        toast.dismiss();
         toast.info("You have already reviewed this blog.");
       } else {
+        toast.dismiss();
         toast.error("Failed to submit review. Please try again.");
-        console.error("Error submitting review:", error);
       }
     }
   };
@@ -157,6 +159,7 @@ const VintageArticlePage = () => {
   const handleReplySubmit = async (blogId, reviewId) => {
     const { replyName, replyText } = reviewData[blogId] || {};
     if (!replyName.trim() || !replyText.trim()) {
+      toast.dismiss();
       toast.error("Please provide a name and reply.");
       return;
     }
@@ -187,15 +190,17 @@ const VintageArticlePage = () => {
         ...prev,
         [blogId]: { ...prev[blogId], replyName: fullName || "", replyText: "", replyToReviewId: null },
       }));
+      toast.dismiss();
       toast.success("Reply submitted successfully.");
     } catch (error) {
+      toast.dismiss();
       toast.error("Failed to submit reply. Please try again.");
-      console.error("Error submitting reply:", error);
     }
   };
 
   const handleLike = async (blogId) => {
     if (!userId) {
+      toast.dismiss();
       toast.error("User session not initialized.");
       return;
     }
@@ -208,19 +213,22 @@ const VintageArticlePage = () => {
         )
       );
       setLikedBlogs((prev) => [...prev, blogId]);
+      toast.dismiss();
       toast.success("Blog liked!");
     } catch (error) {
       if (error.response?.data?.message === "User has already liked this blog") {
+        toast.dismiss();
         toast.info("You have already liked this blog.");
       } else {
+        toast.dismiss();
         toast.error("Failed to like blog.");
-        console.error("Error liking blog:", error);
       }
     }
   };
 
   const toggleReviews = async (blogId) => {
     if (!userId) {
+      toast.dismiss();
       toast.error("User session not initialized.");
       return;
     }
@@ -235,7 +243,8 @@ const VintageArticlePage = () => {
           )
         );
       } catch (error) {
-        console.error("Error incrementing views:", error);
+        toast.dismiss();
+        toast.error("Error incrementing views.");
       }
     }
     setShowReviewsSection((prev) => ({
