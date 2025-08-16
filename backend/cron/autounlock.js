@@ -4,13 +4,13 @@ const supabase = require('../config/supabaseClient');
 const unlockAfterMinutes = 5;
 
 const autoUnlockUsers = async () => {
+
   const threshold = new Date(Date.now() - unlockAfterMinutes * 60 * 1000).toISOString();
 
   const { data: lockedUsers, error } = await supabase
     .from('users')
     .select('*')
     .eq('userlocked', 'Y')
-    .lte('lockeddate', threshold);
 
   if (error) {
     console.error('Error fetching locked users:', error.message);

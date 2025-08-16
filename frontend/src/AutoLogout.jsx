@@ -31,7 +31,7 @@ const useAutoLogout = () => {
    const handleLogout = () => {
     localStorage.removeItem('token');
     // Clear other local storage or session storage if needed
-    navigate('/account');
+    navigate('/');
     window.location.reload(); // Optional: to reset app state
   };
 };
