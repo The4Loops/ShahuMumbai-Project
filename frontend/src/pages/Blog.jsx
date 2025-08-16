@@ -364,7 +364,7 @@ const VintageArticlePage = () => {
                   <div className="flex flex-wrap items-center text-sm text-gray-500 gap-2 mb-4">
                     <span>{blog.category}</span>
                     <span>•</span>
-                    <span>{new Date(blog.publish_at).toLocaleDateString()}</span>
+                    <span>{new Date(blog.created_at).toLocaleDateString()}</span>
                     <span>•</span>
                     <span>8 min read</span>
                   </div>
