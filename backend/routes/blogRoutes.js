@@ -7,7 +7,7 @@ router.post("/admin/blogs", blogController.createOrUpdateBlog);
 router.put("/admin/blogs/:id", blogController.createOrUpdateBlog);
 router.delete("/admin/blogs/:id/reset", blogController.resetBlog);
 router.get("/admin/blogs/:id", blogController.getBlogById);
-router.get("/admin/blogs/drafts", blogController.getUserDrafts);
+router.get("/blogs/drafts", blogController.getUserDrafts);
 
 router.get('/blogs',blogController.getAllBlogs);
 router.get('/user/likes', blogController.getUserLikes);
