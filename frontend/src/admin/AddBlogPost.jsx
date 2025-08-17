@@ -52,7 +52,7 @@ const AddBlogPost = () => {
 
   const fetchDrafts = async () => {
     try {
-      const response = await api.get("/api/admin/blogs/drafts");
+      const response = await api.get("/api/blogs/drafts");
       setDrafts(response.data);
     } catch (err) {
       console.error("Error fetching drafts:", err);
