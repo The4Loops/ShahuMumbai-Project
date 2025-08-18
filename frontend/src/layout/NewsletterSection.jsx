@@ -1,80 +1,128 @@
-import React, { useState } from "react";
-import { motion } from "framer-motion";
-import { Mail } from "lucide-react";
-import Layout from "./Layout";
+import React, { useEffect, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { X, Mail } from "lucide-react";
 
-export default function NewsletterCard() {
+export default function NewsletterPopup() {
+  const [show, setShow] = useState(false);
   const [email, setEmail] = useState("");
+  const [subscribed, setSubscribed] = useState(false);
+  const [dontShowAgain, setDontShowAgain] = useState(false);
+
+  useEffect(() => {
+    const hasSeenPopup = localStorage.getItem("newsletterPopupShown");
+    if (!hasSeenPopup) {
+      setTimeout(() => setShow(true), 1500); // delay for natural feel
+    }
+  }, []);
+
+  const handleClose = () => {
+    setShow(false);
+    if (dontShowAgain) {
+      localStorage.setItem("newsletterPopupShown", "true"); // save opt-out
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    alert(`Subscribed with: ${email}`);
+    setSubscribed(true);
+    localStorage.setItem("newsletterPopupShown", "true"); // save on subscribe
     setEmail("");
+    setTimeout(handleClose, 2000); // auto-close after success
   };
 
   return (
-    <Layout>
-    <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 via-white to-blue-100 p-6">
-      <motion.div
-        initial={{ opacity: 0, y: 40 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.8 }}
-        className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 text-center relative overflow-hidden"
-      >
-        {/* Fun floating background circles */}
-        <div className="absolute -top-10 -right-10 w-40 h-40 bg-pink-200 rounded-full opacity-30 animate-pulse"></div>
-        <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-blue-200 rounded-full opacity-30 animate-bounce"></div>
-
-        {/* Icon */}
+    <AnimatePresence>
+      {show && (
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 120 }}
-          className="flex justify-center mb-4"
+          onClick={handleClose}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 flex items-center justify-center bg-black/50 backdrop-blur-sm z-50"
         >
-          <div className="p-4 bg-pink-100 rounded-full shadow-md">
-            <Mail className="w-8 h-8 text-pink-500" />
-          </div>
-        </motion.div>
-
-        {/* Title */}
-        <h2 className="text-2xl font-bold text-gray-800 mb-2">
-          Subscribe to our Newsletter
-        </h2>
-        <p className="text-gray-600 mb-6">
-          Stay updated with our latest collections, exclusive offers, and
-          vintage finds delivered straight to your inbox.
-        </p>
-
-        {/* Form */}
-        <form
-          onSubmit={handleSubmit}
-          className="flex items-center bg-gray-100 rounded-full overflow-hidden shadow-sm"
-        >
-          <input
-            type="email"
-            placeholder="Enter your email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="flex-1 px-4 py-2 bg-transparent outline-none text-gray-700"
-          />
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            type="submit"
-            className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 font-semibold rounded-full shadow-md"
+          <motion.div
+            onClick={(e) => e.stopPropagation()} // prevent closing when clicking inside
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="relative bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center"
           >
-            Subscribe
-          </motion.button>
-        </form>
+            {/* Close button */}
+            <button
+              onClick={handleClose}
+              aria-label="Close newsletter popup"
+              className="absolute top-3 right-3 text-gray-500 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
 
-        {/* Footer */}
-        <p className="mt-6 text-xs tracking-widest text-gray-500 uppercase">
-          Vintage Collection
-        </p>
-      </motion.div>
-    </div>
-    </Layout>
+            {/* Icon */}
+            <div className="flex justify-center mb-4">
+              <div className="p-4 bg-pink-100 rounded-full shadow-md">
+                <Mail className="w-8 h-8 text-pink-500" />
+              </div>
+            </div>
+
+            {/* Title */}
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              Subscribe to our Newsletter
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Stay updated with our latest collections, exclusive offers, and
+              vintage finds delivered straight to your inbox.
+            </p>
+
+            {/* Form or success message */}
+            {subscribed ? (
+              <p className="text-green-600 font-semibold">
+                Thanks for subscribing! 🎉
+              </p>
+            ) : (
+              <>
+                <form
+                  onSubmit={handleSubmit}
+                  className="flex items-center bg-gray-100 rounded-full overflow-hidden shadow-sm"
+                >
+                  <input
+                    type="email"
+                    placeholder="Enter your email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="flex-1 px-4 py-2 bg-transparent outline-none text-gray-700"
+                  />
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    type="submit"
+                    className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-6 py-2 font-semibold rounded-full shadow-md"
+                  >
+                    Subscribe
+                  </motion.button>
+                </form>
+
+                {/* Don't show again checkbox */}
+                <div className="mt-4 flex items-center justify-center space-x-2">
+                  <input
+                    id="dontShow"
+                    type="checkbox"
+                    checked={dontShowAgain}
+                    onChange={() => setDontShowAgain(!dontShowAgain)}
+                    className="w-4 h-4 text-pink-500 border-gray-300 rounded"
+                  />
+                  <label
+                    htmlFor="dontShow"
+                    className="text-sm text-gray-600 cursor-pointer"
+                  >
+                    Don’t show this popup again
+                  </label>
+                </div>
+              </>
+            )}
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }

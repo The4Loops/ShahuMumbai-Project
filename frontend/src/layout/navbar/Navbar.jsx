@@ -1,13 +1,13 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { FaUser, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
-import clsx from "clsx";
-import { jwtDecode } from "jwt-decode";
+import {jwtDecode} from "jwt-decode"; // ✅ fixed import
+import { motion, AnimatePresence } from "framer-motion";
 import Logo from "../../assets/ShahuLogo.png";
 import api from "../../supabase/axios";
 import { toast } from "react-toastify";
 
-// Dropdown section reusable
+// Reusable Dropdown section
 const DropdownSection = ({ title, links, onLinkClick }) => (
   <div className="min-w-[180px] mt-4 first:mt-0">
     {title && (
@@ -41,6 +41,7 @@ const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
   const handleMouseLeave = () => {
     timerRef.current = setTimeout(() => setOpen(false), 150);
   };
+
   return (
     <li
       ref={refEl}
@@ -53,19 +54,27 @@ const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
         role="button"
         tabIndex={0}
         aria-expanded={isOpen}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") setOpen(true);
+          if (e.key === "Escape") setOpen(false);
+        }}
       >
         {label}
       </span>
-      <div
-        className={clsx(
-          "absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white p-6 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[360px] transition-all duration-300 transform",
-          isOpen
-            ? "opacity-100 translate-y-2 pointer-events-auto"
-            : "opacity-0 translate-y-1 pointer-events-none"
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -5, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -5, scale: 0.98 }}
+            transition={{ duration: 0.2 }}
+            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white p-6 rounded-md border border-[#e6dcd2] shadow-lg z-10 text-sm min-w-[360px]"
+          >
+            {content}
+          </motion.div>
         )}
-      >
-        {content}
-      </div>
+      </AnimatePresence>
     </li>
   );
 };
@@ -98,7 +107,7 @@ export default function Navbar() {
     try {
       const res = await api.get("/api/navbar/menus");
       let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
-      // Filter menus and dropdown items based on user role
+
       sorted = sorted.map((menu) => ({
         ...menu,
         dropdown_items: userRole
@@ -107,10 +116,11 @@ export default function Navbar() {
             )
           : menu.dropdown_items,
       }));
-      // Hide Admin menu if not an admin
+
       if (userRole !== "Admin") {
         sorted = sorted.filter((m) => m.label.toLowerCase() !== "admin");
       }
+
       setMenus(sorted);
       const initDrop = {};
       sorted.forEach((m) => (initDrop[m.id] = false));
@@ -163,6 +173,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.clear();
+    toast.success("Logged out");
     navigate("/");
     setMobileMenuOpen(false);
   };
@@ -265,7 +276,7 @@ export default function Navbar() {
         </ul>
 
         {/* Account & Cart */}
-        <ul className="flex items-center gap-6 justify-end flex-[1]">
+        <ul className="flex items-center gap-6 justify-end flex-[1] relative">
           <li>
             <button
               onClick={() =>
@@ -276,38 +287,46 @@ export default function Navbar() {
             >
               <FaUser size={20} />
             </button>
-            {token && dropdown.account && (
-              <div className="absolute mt-2 bg-white border p-4 shadow">
-                <ul className="space-y-2">
-                  <li>
-                    <button onClick={() => handleProtectedClick("/profile")}>
-                      My Profile
-                    </button>
-                  </li>
-                  <li>
-                    <button onClick={() => handleProtectedClick("/myorder")}>
-                      Track Order
-                    </button>
-                  </li>
-                  <li>
-                    <Link
-                      to="/wishlist"
-                      onClick={() => setMobileMenuOpen(false)}
-                    >
-                      Wishlist
-                    </Link>
-                  </li>
-                  <li>
-                    <button onClick={handleLogout}>Logout</button>
-                  </li>
-                </ul>
-              </div>
-            )}
+            <AnimatePresence>
+              {token && dropdown.account && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute mt-2 bg-white border p-4 shadow right-0"
+                >
+                  <ul className="space-y-2 text-sm">
+                    <li>
+                      <button onClick={() => handleProtectedClick("/profile")}>
+                        My Profile
+                      </button>
+                    </li>
+                    <li>
+                      <button onClick={() => handleProtectedClick("/myorder")}>
+                        Track Order
+                      </button>
+                    </li>
+                    <li>
+                      <Link
+                        to="/wishlist"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Wishlist
+                      </Link>
+                    </li>
+                    <li>
+                      <button onClick={handleLogout}>Logout</button>
+                    </li>
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </li>
           <li className="relative">
             <Link to="/cart">
               <FaShoppingCart size={20} />
-              {cartItemCount >= 0 && (
+              {cartItemCount > 0 && (
                 <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
                   {cartItemCount}
                 </span>
@@ -318,50 +337,47 @@ export default function Navbar() {
       </div>
 
       {/* Mobile Navigation */}
-      {mobileMenuOpen && (
-        <div className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]">
-          {/* Mobile Menus */}
-          {menus.map((menu) => {
-            const hasDropdown =
-              menu.dropdown_items && menu.dropdown_items.length > 0;
-            if (hasDropdown) {
-              const sortedItems = [...menu.dropdown_items].sort(
-                (a, b) => a.order_index - b.order_index
-              );
-              return (
-                <div key={menu.id} className="border-b border-[#d4c4b6] pb-2">
-                  <button
-                    className="w-full flex justify-between items-center py-2"
-                    onClick={() =>
-                      setMobileDropdownOpen((prev) =>
-                        prev === menu.id ? null : menu.id
-                      )
-                    }
-                  >
-                    <span>{menu.label}</span>
-                    <span>{mobileDropdownOpen === menu.id ? "−" : "+"}</span>
-                  </button>
-                  {mobileDropdownOpen === menu.id && (
-                    <div className="pl-4 pt-1 space-y-2">
-                      {!sortedItems[0].links
-                        ? sortedItems.map(({ label, href }) => (
-                            <Link
-                              key={label}
-                              to={href}
-                              onClick={() => setMobileMenuOpen(false)}
-                              className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                            >
-                              {label}
-                            </Link>
-                          ))
-                        : sortedItems.map((section) => (
-                            <div key={section.title}>
-                              {section.title && (
-                                <p className="text-sm font-semibold text-[#6B4226] mt-2">
-                                  {section.title}
-                                </p>
-                              )}
-                              {section.links.map(({ label, href }) => (
+      <AnimatePresence>
+        {mobileMenuOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            transition={{ duration: 0.2 }}
+            className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]"
+          >
+            {/* Mobile Menus */}
+            {menus.map((menu) => {
+              const hasDropdown =
+                menu.dropdown_items && menu.dropdown_items.length > 0;
+              if (hasDropdown) {
+                const sortedItems = [...menu.dropdown_items].sort(
+                  (a, b) => a.order_index - b.order_index
+                );
+                return (
+                  <div key={menu.id} className="border-b border-[#d4c4b6] pb-2">
+                    <button
+                      className="w-full flex justify-between items-center py-2"
+                      onClick={() =>
+                        setMobileDropdownOpen((prev) =>
+                          prev === menu.id ? null : menu.id
+                        )
+                      }
+                    >
+                      <span>{menu.label}</span>
+                      <span>{mobileDropdownOpen === menu.id ? "−" : "+"}</span>
+                    </button>
+                    <AnimatePresence>
+                      {mobileDropdownOpen === menu.id && (
+                        <motion.div
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: "auto", opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="pl-4 pt-1 space-y-2 overflow-hidden"
+                        >
+                          {!sortedItems[0].links
+                            ? sortedItems.map(({ label, href }) => (
                                 <Link
                                   key={label}
                                   to={href}
@@ -370,91 +386,117 @@ export default function Navbar() {
                                 >
                                   {label}
                                 </Link>
+                              ))
+                            : sortedItems.map((section) => (
+                                <div key={section.title}>
+                                  {section.title && (
+                                    <p className="text-sm font-semibold text-[#6B4226] mt-2">
+                                      {section.title}
+                                    </p>
+                                  )}
+                                  {section.links.map(({ label, href }) => (
+                                    <Link
+                                      key={label}
+                                      to={href}
+                                      onClick={() => setMobileMenuOpen(false)}
+                                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                                    >
+                                      {label}
+                                    </Link>
+                                  ))}
+                                </div>
                               ))}
-                            </div>
-                          ))}
-                    </div>
-                  )}
-                </div>
-              );
-            }
-            return (
-              <Link
-                key={menu.id}
-                to={menu.href || "#"}
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-2 border-b border-[#d4c4b6]"
-              >
-                {menu.label}
-              </Link>
-            );
-          })}
-
-          {/* Account Menu Item */}
-          <div className="border-b border-[#d4c4b6] pb-2">
-            <button
-              className="w-full flex justify-between items-center py-2"
-              onClick={() =>
-                !token
-                  ? (navigate("/account"), setMobileMenuOpen(false))
-                  : setMobileDropdownOpen((prev) =>
-                      prev === "account" ? null : "account"
-                    )
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
               }
+              return (
+                <Link
+                  key={menu.id}
+                  to={menu.href || "#"}
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="block py-2 border-b border-[#d4c4b6]"
+                >
+                  {menu.label}
+                </Link>
+              );
+            })}
+
+            {/* Account Menu Item */}
+            <div className="border-b border-[#d4c4b6] pb-2">
+              <button
+                className="w-full flex justify-between items-center py-2"
+                onClick={() =>
+                  !token
+                    ? (navigate("/account"), setMobileMenuOpen(false))
+                    : setMobileDropdownOpen((prev) =>
+                        prev === "account" ? null : "account"
+                      )
+                }
+              >
+                <span>Account</span>
+                <span>{mobileDropdownOpen === "account" ? "−" : "+"}</span>
+              </button>
+
+              <AnimatePresence>
+                {mobileDropdownOpen === "account" && token && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="pl-4 pt-1 space-y-2 overflow-hidden"
+                  >
+                    <Link
+                      to="/profile"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                    >
+                      My Profile
+                    </Link>
+                    <Link
+                      to="/myorder"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                    >
+                      Track Order
+                    </Link>
+                    <Link
+                      to="/wishlist"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                    >
+                      Wishlist
+                    </Link>
+                    <button
+                      onClick={handleLogout}
+                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full"
+                    >
+                      Logout
+                    </button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Cart Menu Item */}
+            <Link
+              to="/cart"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block py-2 border-b align-items-center border-[#d4c4b6] relative"
             >
-              <span>Account</span>
-              <span>{mobileDropdownOpen === "account" ? "−" : "+"}</span>
-            </button>
-
-            {/* Account dropdown in mobile */}
-            {mobileDropdownOpen === "account" && token && (
-              <div className="pl-4 pt-1 space-y-2">
-                <Link
-                  to="/profile"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                >
-                  My Profile
-                </Link>
-                <Link
-                  to="/myorder"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                >
-                  Track Order
-                </Link>
-                <Link
-                  to="/wishlist"
-                  onClick={() => setMobileMenuOpen(false)}
-                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                >
-                  Wishlist
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full"
-                >
-                  Logout
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Cart Menu Item */}
-          <Link
-            to="/cart"
-            onClick={() => setMobileMenuOpen(false)}
-            className="block py-2 border-b align-items-center border-[#d4c4b6] relative"
-          >
-            Cart
-            {cartItemCount >= 0 && (
-              <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
-                {cartItemCount}
-              </span>
-            )}
-          </Link>
-        </div>
-      )}
+              Cart
+              {cartItemCount > 0 && (
+                <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
+                  {cartItemCount}
+                </span>
+              )}
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </nav>
   );
 }
