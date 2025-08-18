@@ -42,7 +42,7 @@ export const Ecom = {
     }),
 };
 
-// ---- Helpful non-ecom events ----
+
 export const UX = {
   search: (query) => track('search', { search_term: String(query || '') }),
   filterSort: (kind, value) => track('filter_sort', { kind, value }),

@@ -1,80 +1,231 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import api from "../supabase/axios";
+import {
+  LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
+  BarChart, Bar, Legend,
+} from "recharts";
 
-const metrics = [
-  { title: "Total Users", value: 134, delta: "+8%", trend: "up", series: [90, 102, 95, 110, 120, 126, 134] },
-  { title: "Returning Visitors", value: 27, delta: "+3", trend: "up", series: [20, 18, 19, 22, 24, 25, 27] },
-  { title: "Conversion Rate", value: "4.3%", delta: "-0.2%", trend: "down", series: [4.6, 4.8, 4.5, 4.4, 4.2, 4.3, 4.3] },
-];
+function Card({ title, value, sub }) {
+  return (
+    <div className="rounded-xl border border-[#EAD8D8] bg-white p-4">
+      <div className="text-xs text-gray-500">{title}</div>
+      <div className="mt-1 text-2xl font-semibold text-[#6B4226]">{value}</div>
+      {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
+    </div>
+  );
+}
 
-// Tiny inline sparkline (no dependencies)
-const Sparkline = ({ data = [], height = 36, strokeWidth = 2, className = "" }) => {
-  if (!data.length) return null;
-
-  const w = 120; // fixed width for consistency
-  const h = height;
-  const min = Math.min(...data);
-  const max = Math.max(...data);
-  const yRange = max - min || 1;
-
-  const points = data.map((d, i) => {
-    const x = (i / (data.length - 1)) * (w - strokeWidth) + strokeWidth / 2;
-    const y = h - ((d - min) / yRange) * (h - strokeWidth) - strokeWidth / 2;
-    return [x, y];
+export default function Analytics() {
+  const [from, setFrom] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() - 13);
+    return d.toISOString().slice(0,10);
   });
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0,10));
+  const [loading, setLoading] = useState(true);
+  const [kpis, setKpis] = useState({});
+  const [top, setTop] = useState([]);
+  const [daily, setDaily] = useState([]);
+  const [events, setEvents] = useState([]);
+  const [nameFilter, setNameFilter] = useState("");
+  const [limit, setLimit] = useState(50);
 
-  const dAttr = points.map((p, i) => (i === 0 ? `M ${p[0]} ${p[1]}` : `L ${p[0]} ${p[1]}`)).join(" ");
+  const loadSummary = async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get("/api/analytics/summary", { params: { from, to } });
+      setKpis(data.kpis || {});
+      setTop(data.topProducts || []);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const [lastX, lastY] = points[points.length - 1];
+  const loadDaily = async () => {
+    const { data } = await api.get("/api/analytics/daily", { params: { from, to } });
+    setDaily(data.data || []);
+  };
+
+  const loadEvents = async () => {
+    const { data } = await api.get("/api/analytics/events", {
+      params: { limit, name: nameFilter || undefined },
+    });
+    setEvents(data.events || []);
+  };
+
+  useEffect(() => { loadSummary(); loadDaily(); /* initial */ }, []);
+  useEffect(() => { loadEvents(); }, [nameFilter, limit]);
+  const refreshRange = () => { loadSummary(); loadDaily(); };
+
+  // Pivot daily into series per event name for a grouped chart
+  const dailyPivot = useMemo(() => {
+    const days = Array.from(new Set(daily.map(d => d.day.slice(0,10)))).sort();
+    const names = Array.from(new Set(daily.map(d => d.name)));
+    const map = new Map();
+    daily.forEach(d => {
+      const key = d.day.slice(0,10);
+      if (!map.has(key)) map.set(key, { day: key });
+      map.get(key)[d.name] = d.count;
+    });
+    const rows = days.map(day => {
+      const row = map.get(day) || { day };
+      names.forEach(n => { if (!row[n]) row[n] = 0; });
+      return row;
+    });
+    return { rows, names };
+  }, [daily]);
 
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className={className} aria-hidden="true">
-      <path d={dAttr} fill="none" stroke="currentColor" strokeWidth={strokeWidth} />
-      <circle cx={lastX} cy={lastY} r={strokeWidth + 1} fill="currentColor" />
-    </svg>
-  );
-};
-
-const MetricCard = ({ title, value, delta, trend, series }) => {
-  const trendColor =
-    trend === "up" ? "text-emerald-700 bg-emerald-100 border-emerald-200" :
-    trend === "down" ? "text-rose-700 bg-rose-100 border-rose-200" :
-    "text-[#6B4226] bg-[#F7F0EE] border-[#E6DCD2]";
-
-  return (
-    <div className="bg-white p-5 sm:p-6 rounded-xl border border-[#E6DCD2] shadow-sm hover:shadow transition">
-      <div className="flex items-start justify-between gap-3">
+    <div className="space-y-6">
+      {/* Filters */}
+      <div className="flex flex-wrap items-end gap-3">
         <div>
-          <h3 className="text-sm font-medium text-[#6B4226]/80">{title}</h3>
-          <p className="text-3xl font-bold text-[#6B4226] mt-1">{value}</p>
+          <label className="block text-xs text-gray-500">From</label>
+          <input type="date" value={from} onChange={e => setFrom(e.target.value)} className="border rounded px-2 py-1" />
         </div>
+        <div>
+          <label className="block text-xs text-gray-500">To</label>
+          <input type="date" value={to} onChange={e => setTo(e.target.value)} className="border rounded px-2 py-1" />
+        </div>
+        <button onClick={refreshRange} className="h-9 px-4 bg-black text-white rounded hover:bg-gray-800">
+          Apply
+        </button>
 
-        {delta && (
-          <span className={`text-xs px-2 py-1 rounded-full border ${trendColor}`}>
-            {trend === "up" ? "▲" : trend === "down" ? "▼" : "•"} {delta}
-          </span>
-        )}
+        <div className="ml-auto flex items-end gap-2">
+          <div>
+            <label className="block text-xs text-gray-500">Event filter</label>
+            <input
+              value={nameFilter}
+              onChange={(e) => setNameFilter(e.target.value)}
+              placeholder="e.g. add_to_cart"
+              className="border rounded px-2 py-1"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-500">Rows</label>
+            <select value={limit} onChange={(e) => setLimit(Number(e.target.value))} className="border rounded px-2 py-1">
+              {[25,50,100,200].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-4 flex items-center justify-end">
-        <Sparkline
-          data={series}
-          className="text-[#D4A5A5]"
-          height={36}
-          strokeWidth={2}
-        />
+      {/* KPI cards */}
+      {loading ? (
+        <div className="text-gray-500">Loading summary…</div>
+      ) : (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card title="Total Events" value={kpis.total_events ?? 0} />
+          <Card title="Unique Sessions" value={kpis.unique_sessions ?? 0} />
+          <Card title="Unique Users" value={kpis.unique_users ?? 0} />
+          <Card title="Views" value={kpis.view_item ?? 0} />
+          <Card title="Add to Cart" value={kpis.add_to_cart ?? 0} />
+          <Card title="Begin Checkout" value={kpis.begin_checkout ?? 0} />
+          <Card title="Purchases" value={kpis.purchase ?? 0} />
+          <Card
+            title="ATC → Purchase"
+            value={
+              kpis.add_to_cart
+                ? `${(((kpis.purchase || 0) / kpis.add_to_cart) * 100).toFixed(1)}%`
+                : "—"
+            }
+            sub="Conversion"
+          />
+        </div>
+      )}
+
+      {/* Daily chart */}
+      <div className="rounded-xl border border-[#EAD8D8] bg-white p-4">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-[#6B4226]">Events per day</h3>
+        </div>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            {dailyPivot.names.length <= 1 ? (
+              <LineChart data={dailyPivot.rows}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey={dailyPivot.names[0] || "view_item"} strokeWidth={2} dot={false} />
+              </LineChart>
+            ) : (
+              <BarChart data={dailyPivot.rows}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="day" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                {dailyPivot.names.map(n => (
+                  <Bar key={n} dataKey={n} stackId="a" />
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Top products */}
+      <div className="rounded-xl border border-[#EAD8D8] bg-white p-4">
+        <div className="font-semibold mb-3 text-[#6B4226]">Top Products (Add to Cart)</div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 border-b">
+                <th className="py-2 pr-4">Product</th>
+                <th className="py-2">Adds</th>
+              </tr>
+            </thead>
+            <tbody>
+              {top.map((row, i) => (
+                <tr key={i} className="border-b last:border-0">
+                  <td className="py-2 pr-4">{row.product_title}</td>
+                  <td className="py-2">{row.add_to_cart_count}</td>
+                </tr>
+              ))}
+              {!top.length && (
+                <tr><td colSpan={2} className="py-3 text-gray-500">No data in range.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Recent events */}
+      <div className="rounded-xl border border-[#EAD8D8] bg-white p-4">
+        <div className="font-semibold mb-3 text-[#6B4226]">Recent Events</div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead>
+              <tr className="text-left text-gray-500 border-b">
+                <th className="py-2 pr-4">When</th>
+                <th className="py-2 pr-4">Event</th>
+                <th className="py-2 pr-4">User</th>
+                <th className="py-2 pr-4">Title / Item</th>
+                <th className="py-2">Value / Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {events.map(ev => {
+                const title = ev.props?.title || ev.props?.item_name || '';
+                const value = ev.props?.price || ev.props?.value || '';
+                const qty = ev.props?.quantity || '';
+                return (
+                  <tr key={ev.id} className="border-b last:border-0">
+                    <td className="py-2 pr-4">{new Date(ev.occurred_at).toLocaleString()}</td>
+                    <td className="py-2 pr-4">{ev.name}</td>
+                    <td className="py-2 pr-4">{ev.user_id || (ev.anon_id ? ev.anon_id.slice(0,8) : '')}</td>
+                    <td className="py-2 pr-4 truncate max-w-[240px]" title={title}>{title}</td>
+                    <td className="py-2">{value ? `₹${value}` : ''}{qty ? `  x${qty}` : ''}</td>
+                  </tr>
+                );
+              })}
+              {!events.length && (
+                <tr><td colSpan={5} className="py-3 text-gray-500">No events yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );
-};
-
-const Analytics = () => {
-  return (
-    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-      {metrics.map((m, idx) => (
-        <MetricCard key={idx} {...m} />
-      ))}
-    </div>
-  );
-};
-
-export default Analytics;
+}
