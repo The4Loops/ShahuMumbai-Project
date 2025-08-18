@@ -168,7 +168,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-[#EDE1DF] shadow-md font-serif">
+    <nav className="fixed top-0 w-full z-50 bg-transparent backdrop-blur-sm shadow-md font-serif">
       {/* Top Bar */}
       <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
         <Link
@@ -190,7 +190,7 @@ export default function Navbar() {
       </div>
 
       {/* Desktop Navigation */}
-      <div className="hidden lg:flex items-center py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1]">
+      <div className="hidden lg:flex items-center py-3 px-20 bg-transparent backdrop-blur-sm border-t border-[#e0d8d1]">
         {/* Search */}
         <div className="flex justify-start flex-[1]">
           <input

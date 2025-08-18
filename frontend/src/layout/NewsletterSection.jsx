@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Mail } from "lucide-react";
+import Layout from "./Layout";
 
 export default function NewsletterCard() {
   const [email, setEmail] = useState("");
@@ -12,6 +13,7 @@ export default function NewsletterCard() {
   };
 
   return (
+    <Layout>
     <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-pink-100 via-white to-blue-100 p-6">
       <motion.div
         initial={{ opacity: 0, y: 40 }}
@@ -73,5 +75,6 @@ export default function NewsletterCard() {
         </p>
       </motion.div>
     </div>
+    </Layout>
   );
 }
