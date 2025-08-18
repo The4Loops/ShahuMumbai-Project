@@ -24,6 +24,7 @@ import Checkout from "./pages/Checkout";
 import useAutoLogout from "./AutoLogout";
 import Blog from "./pages/Blog";
 import Returns from "./pages/Returns";
+import NewsletterCard from "./layout/NewsletterSection";
 
 function App() {
   useAutoLogout(); // Initialize auto logout functionality
@@ -61,6 +62,7 @@ function App() {
         <Route path="/checkout" element={<Checkout/>} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/returns" element={<Returns />} />
+        <Route path="/newsletter" element={<NewsletterCard />} />
       </Routes>
     </div>
   );
