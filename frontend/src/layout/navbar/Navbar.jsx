@@ -179,7 +179,7 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-transparent backdrop-blur-sm shadow-md font-serif">
+    <nav className="fixed top-0 w-full z-50 bg-transparent backdrop-blur-lg shadow-md font-serif">
       {/* Top Bar */}
       <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
         <Link
@@ -189,7 +189,7 @@ export default function Navbar() {
           <img
             src={Logo}
             alt="Shahu Mumbai Logo"
-            className="h-16 object-contain"
+            className="h-24 object-contain"
           />
         </Link>
         <button
@@ -203,11 +203,11 @@ export default function Navbar() {
       {/* Desktop Navigation */}
       <div className="hidden lg:flex items-center py-3 px-20 bg-transparent backdrop-blur-sm border-t border-[#e0d8d1]">
         {/* Search */}
-        <div className="flex justify-start flex-[1]">
+        <div className="flex justify-start bg-transparent backdrop-blur-lg flex-[1]">
           <input
             type="text"
             placeholder="Search"
-            className="w-[300px] px-2 py-1.5 rounded-full border border-gray-300"
+            className="w-[300px] px-2 py-1.5 bg-transparent backdrop-blur-sm font-bold rounded-full border border-gray-300"
           />
         </div>
         <ul className="flex items-center gap-8 flex-[1]">
@@ -266,7 +266,7 @@ export default function Navbar() {
               <li key={menu.id}>
                 <Link
                   to={menu.href || "#"}
-                  className="hover:text-[#D4A5A5] text-[#6B4226] font-medium"
+                  className="hover:text-[#D4A5A5] text-[#6B4226] font-normal"
                 >
                   {menu.label}
                 </Link>

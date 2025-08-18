@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, Edit, Trash2, X, Search, Plus } from "lucide-react";
+import { Eye, Edit, Trash2, X, Search } from "lucide-react";
 import useSearch from "./useSearch";
 
 function ProductsTab() {
@@ -23,11 +23,6 @@ function ProductsTab() {
     if (stock > 20) return { label: "In Stock", color: "bg-green-100 text-green-700" };
     if (stock > 0) return { label: "Low Stock", color: "bg-yellow-100 text-yellow-700" };
     return { label: "Out of Stock", color: "bg-red-100 text-red-700" };
-  };
-
-  const handleOpenAdd = () => {
-    setModalProduct({ name: "", category: "", price: "", stock: 0 });
-    setIsEditing(false);
   };
 
   const handleOpenEdit = (product) => {
@@ -58,7 +53,7 @@ function ProductsTab() {
 
   return (
     <div className="p-4">
-      {/* Search + Add */}
+      {/* Search */}
       <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
         <div className="flex flex-1 items-center gap-2 border border-gray-300 rounded-md px-3 py-2">
           <Search size={18} className="text-gray-500" />
@@ -70,12 +65,6 @@ function ProductsTab() {
             className="w-full focus:outline-none"
           />
         </div>
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center justify-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition font-semibold"
-        >
-          <Plus size={16} /> Add Product
-        </button>
       </div>
 
       {/* Desktop Table */}
@@ -232,7 +221,7 @@ function ProductsTab() {
               <button onClick={() => setModalProduct(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
                 <X size={20} />
               </button>
-              <h2 className="text-xl font-semibold mb-4">{isEditing ? "Edit Product" : "Add Product"}</h2>
+              <h2 className="text-xl font-semibold mb-4">Edit Product</h2>
               <div className="space-y-4">
                 {["name", "category", "price", "stock"].map((field) => (
                   <div key={field} className="flex flex-col">
@@ -255,7 +244,7 @@ function ProductsTab() {
                     Cancel
                   </button>
                   <button onClick={handleSave} className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">
-                    {isEditing ? "Save Changes" : "Add Product"}
+                    Save Changes
                   </button>
                 </div>
               </div>

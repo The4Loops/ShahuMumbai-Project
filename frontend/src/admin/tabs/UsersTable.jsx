@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import { Eye, Edit, Trash2, X, Search, Plus } from "lucide-react";
+import { Eye, Edit, Trash2, X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
 // Avatar Upload Component
@@ -91,21 +91,14 @@ function UserTab() {
       u.role.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Open Add Modal
-  const handleAddUser = () => {
-    setCurrentUser(null);
-    setAvatarPreview(null);
-    setIsAddEditModalOpen(true);
-  };
-
-  // Open Edit Modal
+  // Edit user
   const handleEditUser = (user) => {
     setCurrentUser(user);
     setAvatarPreview(user.avatar || null);
     setIsAddEditModalOpen(true);
   };
 
-  // Save Add/Edit
+  // Save user (add/edit)
   const handleSaveUser = (e) => {
     e.preventDefault();
     const form = e.target;
@@ -136,7 +129,7 @@ function UserTab() {
     setIsAddEditModalOpen(false);
   };
 
-  // Open Delete Modal
+  // Delete user
   const handleDeleteUser = (user) => {
     setCurrentUser(user);
     setIsDeleteModalOpen(true);
@@ -145,34 +138,24 @@ function UserTab() {
   const confirmDeleteUser = () => {
     setUsers(users.filter((u) => u.id !== currentUser.id));
     setIsDeleteModalOpen(false);
-    // clear currentUser to avoid stale reference
     setCurrentUser(null);
   };
 
   return (
     <div className="p-4">
-      {/* Search + Add */}
-      <div className="mb-4 flex flex-col sm:flex-row gap-2 sm:items-center">
-        <div className="flex items-center gap-2 flex-1">
-          <Search size={18} className="text-gray-500" />
-          <input
-            type="text"
-            placeholder="Search users..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-        <button
-          onClick={handleAddUser}
-          className="flex items-center justify-center gap-1 bg-blue-600 text-white px-3 py-2 rounded-md hover:bg-blue-700 transition"
-        >
-          <Plus size={16} />
-          Add User
-        </button>
+      {/* Search Bar Only */}
+      <div className="mb-4 flex items-center gap-2">
+        <Search size={18} className="text-gray-500" />
+        <input
+          type="text"
+          placeholder="Search users..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+        />
       </div>
 
-      {/* Table (shown on sm and up) */}
+      {/* Desktop Table */}
       <div className="overflow-x-auto hidden sm:block">
         <table className="min-w-full border-collapse bg-white rounded-xl shadow-sm border border-gray-200">
           <thead className="bg-gray-50 sticky top-0 z-10">
@@ -245,7 +228,7 @@ function UserTab() {
         </table>
       </div>
 
-      {/* Mobile Card Layout (shown under sm) */}
+      {/* Mobile Card Layout */}
       <div className="space-y-3 sm:hidden">
         {filteredUsers.length > 0 ? (
           filteredUsers.map((user) => (
@@ -306,7 +289,6 @@ function UserTab() {
           <p className="text-center text-gray-500">No users found</p>
         )}
       </div>
-
       {/* Add/Edit Modal */}
       <AnimatePresence>
         {isAddEditModalOpen && (
