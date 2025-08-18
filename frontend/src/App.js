@@ -25,14 +25,19 @@ import useAutoLogout from "./AutoLogout";
 import Blog from "./pages/Blog";
 import Returns from "./pages/Returns";
 import NewsletterPopup from "./layout/NewsletterSection";
+import PageTracker from "./PageTracker"; 
 
 function App() {
   useAutoLogout(); // Initialize auto logout functionality
+
   return (
     <div>
+      {/* PageTracker uses router hooks; it's fine because App is wrapped in BrowserRouter in index.js */}
+      <PageTracker />
+
       <ToastContainer
         position="top-right"
-        autoClose={4000} // Auto dismiss after 4s
+        autoClose={4000}
         hideProgressBar={false}
         newestOnTop
         closeOnClick
@@ -40,6 +45,7 @@ function App() {
         draggable
         pauseOnHover
       />
+
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/home" element={<HomePage />} />
@@ -57,12 +63,13 @@ function App() {
         <Route path="/products/:id" element={<ProductDetails />} />
         <Route path="/admin" element={<AdminPanel />} />
         <Route path="/myorder" element={<MyOrder />} />
-        <Route path="/wishlist" element={<Wishlist/>} />
+        <Route path="/wishlist" element={<Wishlist />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/checkout" element={<Checkout/>} />
+        <Route path="/checkout" element={<Checkout />} />
         <Route path="/blog" element={<Blog />} />
         <Route path="/returns" element={<Returns />} />
       </Routes>
+
       <NewsletterPopup />
     </div>
   );

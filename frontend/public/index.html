@@ -4,16 +4,25 @@
   <meta charset="utf-8" />
   <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta http-equiv="Content-Security-Policy" content="
+   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self';
+    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms;
     style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
     font-src 'self' data:;
-    connect-src 'self' http://localhost:5000 https://tnmbwlmyankpmkasqbjd.supabase.co;
-    img-src 'self' data: blob: http://res.cloudinary.com/;
+    connect-src 'self'
+      http://localhost:5000
+      https://tnmbwlmyankpmkasqbjd.supabase.co
+      https://www.google-analytics.com
+      https://region1.google-analytics.com
+      https://stats.g.doubleclick.net
+      https://www.googletagmanager.com
+      https://www.clarity.ms
+      https://c.clarity.ms
+      https://*.bing.com;
+    img-src 'self' data: blob: http://res.cloudinary.com/ https://www.google-analytics.com https://stats.g.doubleclick.net;
     media-src 'self' http://res.cloudinary.com/;
     object-src 'none';
-">
+  ">
   <meta name="theme-color" content="#000000" />
   <!--
       manifest.json provides metadata used when your web app is installed on a
@@ -54,6 +63,23 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
+      <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXX"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){ dataLayer.push(arguments); }
+    gtag('js', new Date());
+    // We'll send page views from React Router (so turn off auto)
+    gtag('config', 'G-XXXXXXX', { send_page_view: false });
+  </script>
+
+  <!-- ✅ Microsoft Clarity (free session replays & heatmaps) -->
+  <script type="text/javascript">
+    (function(c,l,a,r,i,t,y){
+      c[a]=c[a]||function(){(c[a].q=c[a].q||[]).push(arguments)};
+      t=l.createElement(r);t.async=1;t.src="https://www.clarity.ms/tag/"+i;
+      y=l.getElementsByTagName(r)[0];y.parentNode.insertBefore(t,y);
+    })(window, document, "clarity", "script", "abcd1234");
+  </script>
 </body>
 
 </html>

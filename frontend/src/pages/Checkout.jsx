@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { FaLock, FaCreditCard, FaUniversity, FaMobileAlt } from "react-icons/fa";
 import { MdEmail, MdPhone, MdPerson, MdHome } from "react-icons/md";
 import Layout from "../layout/Layout";
+import { Ecom } from "../analytics"; // ✅ added
 
 const product = {
   name: "Premium Vintage Silk Scarf",
@@ -72,8 +73,61 @@ function Checkout() {
       return;
     }
 
-    setToken(generateToken());
+    // ✅ GA4: add_shipping_info when submitting (we have address now)
+    try {
+      Ecom.addShippingInfo(
+        [
+          {
+            id: "SKU-1",
+            title: product.name,
+            category: "Checkout",
+            price: selectedPrice,
+            quantity: 1,
+          },
+        ],
+        "Standard"
+      );
+    } catch {}
+
+    // ✅ GA4: add_payment_info (with selected method)
+    try {
+      Ecom.addPaymentInfo(
+        [
+          {
+            id: "SKU-1",
+            title: product.name,
+            category: "Checkout",
+            price: selectedPrice,
+            quantity: 1,
+          },
+        ],
+        paymentMethod.toLowerCase().replace(" ", "_") || "card"
+      );
+    } catch {}
+
+    const newToken = generateToken();
+    setToken(newToken);
     setIsModalOpen(true);
+
+    // ✅ GA4: purchase event after "success"
+    try {
+      Ecom.purchase({
+        transactionId: newToken,
+        items: [
+          {
+            id: "SKU-1",
+            title: product.name,
+            category: "Checkout",
+            price: selectedPrice,
+            quantity: 1,
+          },
+        ],
+        value: selectedPrice,
+        tax: 0,
+        shipping: 0,
+        coupon: undefined,
+      });
+    } catch {}
 
     setFormData({ name: "", email: "", phone: "", address: "" });
     setCredentials({

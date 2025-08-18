@@ -2,6 +2,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { AiOutlineShoppingCart, AiOutlineDelete } from "react-icons/ai";
 import Layout from "../layout/Layout";
+import { Ecom, UX } from "../analytics"; // ✅ added
 
 const wishlistItems = [
   {
@@ -82,10 +83,42 @@ const Wishlist = () => {
             </p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
-            <button className="flex items-center gap-2 border border-red-500 text-red-500 px-4 py-2 rounded hover:bg-red-50 text-sm font-medium">
+            <button
+              className="flex items-center gap-2 border border-red-500 text-red-500 px-4 py-2 rounded hover:bg-red-50 text-sm font-medium"
+              onClick={() => {
+                // ✅ GA4: clear wishlist (track as multiple removes)
+                try {
+                  wishlistItems.forEach((it) =>
+                    UX.removeFromWishlist({
+                      id: it.id,
+                      item_id: it.id,
+                      item_name: it.title,
+                      category: it.category,
+                      price: it.price,
+                    })
+                  );
+                } catch {}
+              }}
+            >
               <AiOutlineDelete size={16} /> Clear All
             </button>
-            <button className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded hover:bg-gray-800 text-sm font-medium">
+            <button
+              className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded hover:bg-gray-800 text-sm font-medium"
+              onClick={() => {
+                // ✅ GA4: add all in-stock to cart (analytics only)
+                try {
+                  inStockItems.forEach((it) =>
+                    Ecom.addToCart({
+                      id: it.id,
+                      title: it.title,
+                      category: it.category,
+                      price: it.price,
+                      quantity: 1,
+                    })
+                  );
+                } catch {}
+              }}
+            >
               <AiOutlineShoppingCart size={16} /> Add All to Cart (
               {inStockItems.length})
             </button>
@@ -152,7 +185,21 @@ const Wishlist = () => {
                   )}
                 </div>
                 <div className="flex gap-2">
-                  <button className="flex-1 text-sm bg-pink-100 text-pink-600 px-3 py-1 rounded flex items-center justify-center gap-1">
+                  <button
+                    className="flex-1 text-sm bg-pink-100 text-pink-600 px-3 py-1 rounded flex items-center justify-center gap-1"
+                    onClick={() => {
+                      // ✅ GA4: remove_from_wishlist
+                      try {
+                        UX.removeFromWishlist({
+                          id: item.id,
+                          item_id: item.id,
+                          item_name: item.title,
+                          category: item.category,
+                          price: item.price,
+                        });
+                      } catch {}
+                    }}
+                  >
                     <AiOutlineDelete size={14} /> Remove
                   </button>
                   <button
@@ -162,6 +209,19 @@ const Wishlist = () => {
                         : "bg-gray-300 text-gray-600 cursor-not-allowed"
                     }`}
                     disabled={!item.inStock}
+                    onClick={() => {
+                      if (!item.inStock) return;
+                      // ✅ GA4: add_to_cart (from wishlist)
+                      try {
+                        Ecom.addToCart({
+                          id: item.id,
+                          title: item.title,
+                          category: item.category,
+                          price: item.price,
+                          quantity: 1,
+                        });
+                      } catch {}
+                    }}
                   >
                     {item.inStock ? (
                       <AiOutlineShoppingCart size={14} />

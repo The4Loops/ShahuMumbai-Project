@@ -6,6 +6,7 @@ import Layout from "../layout/Layout";
 import { useNavigate } from "react-router-dom";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
+import { Ecom } from "../analytics";
 
 const categoryColors = {
   Accessories: "bg-yellow-50",
@@ -41,6 +42,22 @@ function Cart() {
             ?.image_url,
         }));
         setCartItems(formattedItems);
+
+        // ✅ GA4: view_cart after items load
+        try {
+          if (formattedItems.length) {
+            Ecom.viewCart(
+              formattedItems.map((i) => ({
+                id: i.id,
+                title: i.title,
+                category: i.category,
+                price: i.price,
+                quantity: i.quantity,
+              })),
+              formattedItems.reduce((a, i) => a + i.price * i.quantity, 0)
+            );
+          }
+        } catch {}
       } catch (error) {
         console.error("Error fetching cart data:", error);
         toast.dismiss();
@@ -66,6 +83,7 @@ function Cart() {
           item.id === id ? { ...item, quantity: newQuantity } : item
         )
       );
+      Ecom.addToCart({ ...item, quantity: newQuantity, id });
       toast.dismiss();
       toast.success("Quantity updated!");
     } catch (error) {
@@ -78,7 +96,9 @@ function Cart() {
   const handleRemove = async (id) => {
     try {
       await api.delete(`/api/cart/${id}`);
+      const removed = cartItems.find((it) => it.id === id);
       setCartItems((items) => items.filter((item) => item.id !== id));
+      if (removed) Ecom.removeFromCart(removed);
       toast.dismiss();
       toast.success("Item removed from cart!");
     } catch (error) {
@@ -206,7 +226,17 @@ function Cart() {
                     value={promoCode}
                     onChange={(e) => setPromoCode(e.target.value)}
                   />
-                  <button className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm">
+                  <button
+                    className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm"
+                    onClick={() => {
+                      // ✅ GA4: applying coupon (no validation logic changed)
+                      try {
+                        window.gtag?.("event", "apply_promotion", {
+                          coupon: promoCode || undefined,
+                        });
+                      } catch {}
+                    }}
+                  >
                     Apply
                   </button>
                 </div>
@@ -235,7 +265,20 @@ function Cart() {
               </div>
 
               <button
-                onClick={() => navigate("/checkout")}
+                onClick={() => {
+                  // ✅ GA4: begin_checkout
+                  try {
+                    const gaItems = cartItems.map((i) => ({
+                      id: i.id,
+                      title: i.title,
+                      category: i.category,
+                      price: i.price,
+                      quantity: i.quantity,
+                    }));
+                    Ecom.beginCheckout(gaItems, subtotal);
+                  } catch {}
+                  navigate("/checkout");
+                }}
                 className="mt-6 w-full bg-black text-white py-2 rounded-lg hover:bg-gray-800 transition"
               >
                 Proceed to Checkout

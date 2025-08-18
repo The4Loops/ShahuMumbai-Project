@@ -11,6 +11,7 @@ import RelatedCard from "../components/RelatedCard";
 import api from "../supabase/axios";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
+import { Ecom } from "../analytics"; // ✅ added
 
 // Carousel Arrows
 const NextArrow = ({ onClick }) => (
@@ -116,6 +117,19 @@ const ProductDetails = () => {
         );
 
         document.title = `${productResponse.data.name} - YourBrand`;
+
+        // ✅ GA4: view_item after product is fetched
+        try {
+          const p = productResponse.data;
+          Ecom.viewItem({
+            id: p.id,
+            title: p.name,
+            category: p?.categories?.name,
+            price:
+              Number(p.price) - (Number(p.discountprice || 0) || 0),
+            quantity: 1,
+          });
+        } catch {}
       } catch (err) {
         setError("Failed to fetch product details. Please try again later.");
       } finally {
@@ -191,6 +205,18 @@ const ProductDetails = () => {
       });
       toast.dismiss();
       toast.success(`${product.name} added to cart!`);
+
+      // ✅ GA4: add_to_cart after successful API
+      try {
+        Ecom.addToCart({
+          id: product.id,
+          title: product.name,
+          category: product?.categories?.name,
+          price:
+            Number(product.price) - (Number(product.discountprice || 0) || 0),
+          quantity: qty,
+        });
+      } catch {}
     } catch (e) {
       toast.dismiss();
       toast.error(e.response?.data?.error || "Failed to add to cart.");
