@@ -76,7 +76,7 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [cartItemCount, setCartItemCount] = useState(0); 
+  const [cartItemCount, setCartItemCount] = useState(0);
 
   const refs = useRef({});
   const navigate = useNavigate();
@@ -99,21 +99,21 @@ export default function Navbar() {
       const res = await api.get("/api/navbar/menus");
       let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
       // Filter menus and dropdown items based on user role
-      sorted = sorted.map(menu => ({
+      sorted = sorted.map((menu) => ({
         ...menu,
         dropdown_items: userRole
           ? menu.dropdown_items.filter(
-              item => item.roles.length === 0 || item.roles.includes(userRole)
+              (item) => item.roles.length === 0 || item.roles.includes(userRole)
             )
           : menu.dropdown_items,
       }));
       // Hide Admin menu if not an admin
       if (userRole !== "Admin") {
-        sorted = sorted.filter(m => m.label.toLowerCase() !== "admin");
+        sorted = sorted.filter((m) => m.label.toLowerCase() !== "admin");
       }
       setMenus(sorted);
       const initDrop = {};
-      sorted.forEach(m => (initDrop[m.id] = false));
+      sorted.forEach((m) => (initDrop[m.id] = false));
       setDropdown({ ...initDrop, account: false });
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load menus");
@@ -191,6 +191,14 @@ export default function Navbar() {
 
       {/* Desktop Navigation */}
       <div className="hidden lg:flex items-center py-3 px-20 bg-[#F1E7E5] border-t border-[#e0d8d1]">
+        {/* Search */}
+        <div className="flex justify-start flex-[1]">
+          <input
+            type="text"
+            placeholder="Search"
+            className="w-[300px] px-2 py-1.5 rounded-full border border-gray-300"
+          />
+        </div>
         <ul className="flex items-center gap-8 flex-[1]">
           {menus.map((menu) => {
             const hasDropdown =
@@ -256,15 +264,6 @@ export default function Navbar() {
           })}
         </ul>
 
-        {/* Search */}
-        <div className="flex justify-center flex-[1]">
-          <input
-            type="text"
-            placeholder="Search"
-            className="w-[250px] px-3 py-1.5 rounded-full border border-gray-300"
-          />
-        </div>
-
         {/* Account & Cart */}
         <ul className="flex items-center gap-6 justify-end flex-[1]">
           <li>
@@ -308,7 +307,7 @@ export default function Navbar() {
           <li className="relative">
             <Link to="/cart">
               <FaShoppingCart size={20} />
-                {cartItemCount >= 0 && (
+              {cartItemCount >= 0 && (
                 <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
                   {cartItemCount}
                 </span>
