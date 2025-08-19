@@ -15,6 +15,7 @@ import Communications from "./Communications";
 import MenuManagement from "./MenuManagement";
 import RoleManagement from "./RoleManagement";
 import SubscribersTable from "./SubscribersTable";
+import News from "./News";
 
 import {
   FaBars,
@@ -60,6 +61,8 @@ const MENU_REGISTRY = [
   { id: "Role Management", label: "Role Management", icon: MdOutlineAnalytics, category: "System", component: RoleManagement },
   { id: "Table", label: "Data Table Management", icon: AiOutlineTable, category: "Utilities", component: Tables },
   { id: "Subscribers Table", label: "Subscribers Table Management", icon: AiOutlineTable, category: "Utilities", component: SubscribersTable },
+    { id: "News", label: "News Management", icon: AiOutlineTable, category: "Utilities", component: News },
+
 ];
 
 const getInitialFavorites = () => {
