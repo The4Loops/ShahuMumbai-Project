@@ -380,7 +380,7 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
                 </>
               ) : (
                 <div className="w-full flex justify-center">
-                  <span className="text-[10px] text-gray-400 rotate-180 writing-mode-vertical-rl">
+                  <span className="text-[10px] text-gray-400 writing-mode-vertical-rl">
                     {cat}
                   </span>
                 </div>
