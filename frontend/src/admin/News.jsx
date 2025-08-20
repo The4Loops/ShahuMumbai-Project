@@ -11,7 +11,7 @@ export default function NewsletterEmail() {
     title: "Hello Subscriber 👋",
     content:
       "Welcome to our monthly newsletter! Here’s what we’ve been up to and what’s coming next. We’re excited to share our latest updates, insights, and exclusive offers with you.",
-    featuredTitle: "✨ Featured Update",
+    featuredTitle: "✨ Upcoming Waitlist",
     featuredText:
       "We just launched a brand new feature to make your experience even better. Check it out and let us know your thoughts!",
     heroImage: Hero,
@@ -323,14 +323,14 @@ export default function NewsletterEmail() {
               <img
                 src={newsletter.logo}
                 alt="Logo Preview"
-                className="h-24 w-24 mb-2 rounded-full border-4 border-white shadow-lg"
+                className="h-24 w-24 mb-2 rounded-full"
               />
             </div>
           ) : (
             <img
               src={newsletter.logo}
               alt="Logo"
-              className="h-24 w-24 mb-2 rounded-full border-4 border-white shadow-lg"
+              className="h-24 w-24 mb-2 rounded-full "
             />
           )}
           <p className="text-sm opacity-90">
