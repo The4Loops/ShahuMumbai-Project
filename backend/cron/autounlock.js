@@ -12,10 +12,37 @@ const autoUnlockUsers = async () => {
     .select('*')
     .eq('userlocked', 'Y')
 
+  // if (error) {
+  //   console.error('Error fetching locked users:', error.message);
+  //   return;
+  // }
+
   if (error) {
-    console.error('Error fetching locked users:', error.message);
-    return;
+  console.error("=== Locked Users Fetch Error ===");
+  console.error("Timestamp:", new Date().toISOString());
+  console.error("Function:", "fetchLockedUsers");
+  
+  // Log full error object
+  console.error("Error object:", error);
+
+  // Log message separately for clarity
+  console.error("Error message:", error.message);
+
+  // Log stack if available
+  if (error.stack) {
+    console.error("Stack trace:", error.stack);
   }
+
+  // Optionally include context data
+  console.error("Additional context:", {
+    endpoint: "/api/users/locked",
+    params: { /* whatever params you passed */ },
+  });
+
+  console.error("================================");
+  return;
+}
+
 
   for (const user of lockedUsers) {
     const { error: updateErr } = await supabase
