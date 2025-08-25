@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const STATUS = ["All", "Pending", "Shipped", "Delivered"];
 
@@ -16,24 +16,47 @@ const statusBadge = (s) => {
 const OrderDashboard = () => {
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
+  const [orders, setOrders] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  const orders = [
-    { id: "ORD123", customer: "Riya",  status: "Pending"   },
-    { id: "ORD124", customer: "Aarav", status: "Shipped"   },
-    { id: "ORD125", customer: "Kunal", status: "Delivered" },
-  ];
+  // simple pagination (optional)
+  const [limit] = useState(50);
+  const [offset, setOffset] = useState(0);
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return orders.filter((o) => {
-      const matchesStatus = filter === "All" || o.status === filter;
-      const matchesQuery =
-        !q ||
-        o.id.toLowerCase().includes(q) ||
-        o.customer.toLowerCase().includes(q);
-      return matchesStatus && matchesQuery;
-    });
-  }, [orders, filter, query]);
+  const load = async () => {
+    try {
+      setLoading(true);
+      const params = new URLSearchParams({
+        status: filter,
+        q: query,
+        limit: String(limit),
+        offset: String(offset),
+      });
+      const r = await fetch(`/api/orders?${params.toString()}`);
+      const j = await r.json();
+      setOrders(j.orders || []);
+      setTotal(j.total || 0);
+    } catch (e) {
+      console.error(e);
+      setOrders([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { 
+    load();
+     /* eslint-disable-next-line */ 
+    }, [filter, offset]);
+  // Debounce query typing a bit:
+  useEffect(() => {
+    const t = setTimeout(() => load(), 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line
+  }, [query]);
+
+  const filtered = useMemo(() => orders, [orders]);
 
   return (
     <div className="font-serif">
@@ -43,7 +66,7 @@ const OrderDashboard = () => {
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
           <select
             value={filter}
-            onChange={(e) => setFilter(e.target.value)}
+            onChange={(e) => { setFilter(e.target.value); setOffset(0); }}
             className="rounded-md px-3 py-2 border border-[#E6DCD2] bg-white text-[#6B4226] focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
             aria-label="Filter by status"
           >
@@ -55,12 +78,14 @@ const OrderDashboard = () => {
           <input
             type="text"
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => { setQuery(e.target.value); setOffset(0); }}
             placeholder="Search by ID or customer…"
             className="rounded-md px-3 py-2 border border-[#E6DCD2] text-[#6B4226] placeholder-[#6B4226]/50 focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
           />
         </div>
       </div>
+
+      {loading && <div className="p-3 text-sm text-[#6B4226]/70">Loading…</div>}
 
       {/* Mobile cards */}
       <div className="grid grid-cols-1 gap-3 md:hidden">
@@ -78,7 +103,7 @@ const OrderDashboard = () => {
             </span>
           </div>
         ))}
-        {filtered.length === 0 && (
+        {!loading && filtered.length === 0 && (
           <p className="text-sm text-[#6B4226]/70">No orders match your filters.</p>
         )}
       </div>
@@ -105,7 +130,7 @@ const OrderDashboard = () => {
                 </td>
               </tr>
             ))}
-            {filtered.length === 0 && (
+            {!loading && filtered.length === 0 && (
               <tr>
                 <td colSpan={3} className="p-3 text-sm text-[#6B4226]/70">
                   No orders match your filters.
@@ -114,6 +139,25 @@ const OrderDashboard = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* (Optional) simple paging controls */}
+      <div className="mt-3 flex items-center gap-3 text-sm text-[#6B4226]">
+        <button
+          onClick={() => setOffset(Math.max(offset - limit, 0))}
+          className="px-3 py-1.5 border rounded disabled:opacity-50"
+          disabled={offset === 0}
+        >
+          Prev
+        </button>
+        <button
+          onClick={() => setOffset(offset + limit)}
+          className="px-3 py-1.5 border rounded disabled:opacity-50"
+          disabled={orders.length < limit}
+        >
+          Next
+        </button>
+        <span className="ml-auto">Total: {total}</span>
       </div>
     </div>
   );

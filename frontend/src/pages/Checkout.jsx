@@ -68,80 +68,100 @@ function Checkout() {
     );
   };
 
-  const handleSubmit = () => {
-    if (!isValid()) {
+const handleSubmit = async () => {
+  if (!isValid()) return;
+
+  try {
+    Ecom.addShippingInfo(
+      [{ id: "SKU-1", title: product.name, category: "Checkout", price: selectedPrice, quantity: 1 }],
+      "Standard"
+    );
+  } catch {}
+
+  const pm = (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_");
+  try {
+    Ecom.addPaymentInfo(
+      [{ id: "SKU-1", title: product.name, category: "Checkout", price: selectedPrice, quantity: 1 }],
+      pm || "card"
+    );
+  } catch {}
+
+  const newToken = generateToken();
+  setToken(newToken);
+
+  try {
+    const resp = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        customer: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          anon_id: "web|guest",
+        },
+        items: [
+          {
+            // product_id: "<products.id uuid>",
+            product_title: product.name,
+            unit_price: selectedPrice,
+            qty: 1,
+          },
+        ],
+        currency: "INR",
+        payment_method: pm || "card",
+        coupon: null,
+        shipping_total: 0,
+        tax_total: 0,
+        discount_total: 0,
+        status: "paid",
+        payment_status: "paid",
+        meta: { transaction_token: newToken },
+      }),
+    });
+
+    const j = await resp.json();
+    if (!resp.ok || !j.ok) {
+      console.error("Checkout failed", j);
+      alert("Something went wrong creating your order. Please try again.");
       return;
     }
 
-    // ✅ GA4: add_shipping_info when submitting (we have address now)
-    try {
-      Ecom.addShippingInfo(
-        [
-          {
-            id: "SKU-1",
-            title: product.name,
-            category: "Checkout",
-            price: selectedPrice,
-            quantity: 1,
-          },
-        ],
-        "Standard"
-      );
-    } catch {}
-
-    // ✅ GA4: add_payment_info (with selected method)
-    try {
-      Ecom.addPaymentInfo(
-        [
-          {
-            id: "SKU-1",
-            title: product.name,
-            category: "Checkout",
-            price: selectedPrice,
-            quantity: 1,
-          },
-        ],
-        paymentMethod.toLowerCase().replace(" ", "_") || "card"
-      );
-    } catch {}
-
-    const newToken = generateToken();
-    setToken(newToken);
     setIsModalOpen(true);
 
-    // ✅ GA4: purchase event after "success"
     try {
       Ecom.purchase({
-        transactionId: newToken,
-        items: [
-          {
-            id: "SKU-1",
-            title: product.name,
-            category: "Checkout",
-            price: selectedPrice,
-            quantity: 1,
-          },
-        ],
+        transactionId: j.order_number || newToken, 
+        items: [{ id: "SKU-1", title: product.name, category: "Checkout", price: selectedPrice, quantity: 1 }],
         value: selectedPrice,
         tax: 0,
         shipping: 0,
         coupon: undefined,
       });
     } catch {}
+  } catch (err) {
+    console.error(err);
+    alert("Network error during checkout.");
+    return;
+  }
 
-    setFormData({ name: "", email: "", phone: "", address: "" });
-    setCredentials({
-      cardNumber: "",
-      expiry: "",
-      cvv: "",
-      upiId: "",
-      bankName: "",
-      netbankingUserId: "",
-      netbankingPassword: "",
-      netbankingOtp: "",
-    });
-    setPaymentMethod("");
-  };
+  // Reset form
+  setFormData({ name: "", email: "", phone: "", address: "" });
+  setCredentials({
+    cardNumber: "",
+    expiry: "",
+    cvv: "",
+    upiId: "",
+    bankName: "",
+    netbankingUserId: "",
+    netbankingPassword: "",
+    netbankingOtp: "",
+  });
+  setPaymentMethod("");
+};
+
+
 
   const renderPaymentFields = () => {
     switch (paymentMethod) {

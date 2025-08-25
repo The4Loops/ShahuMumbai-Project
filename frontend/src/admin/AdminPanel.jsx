@@ -44,6 +44,16 @@ import {
   CartesianGrid,
 } from "recharts";
 
+const API_BASE = process.env.REACT_APP_SERVER_API_BASE_URL || "";
+const apiUrl = (path, params) => `${API_BASE}${path}${params ? `?${params}` : ""}`;
+
+// currency helper (keep yours)
+const formatINR = (n) =>
+  typeof n === "number" && !Number.isNaN(n)
+    ? `₹${Math.round(n).toLocaleString("en-IN")}`
+    : "₹0";
+
+
 
 const MENU_REGISTRY = [
   { id: "Order Dashboard", label: "Order Dashboard", icon: FiPackage, category: "Orders", component: OrderDashboard },
@@ -371,7 +381,7 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
                           </button>
                         );
                       })}
-                      {/* “More…” opens palette to avoid long lists */}
+                     
                       {items.length > 6 && (
                         <div className="px-2 text-xs text-gray-500">+ {items.length - 6} more (use Search)</div>
                       )}
@@ -394,47 +404,100 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
 };
 
 
+
 const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
-  // mock data (replace with real API later)
-  const kpis = [
-    { label: "Revenue (30d)", value: "₹12.4L", diff: "+8.2%" },
-    { label: "Orders (30d)", value: "1,083", diff: "+3.1%" },
-    { label: "Avg. Order", value: "₹1,145", diff: "+1.4%" },
-    { label: "Refunds", value: "1.6%", diff: "-0.3%" },
-  ];
-  const sales = [
-    { d: "Aug 1", v: 310 }, { d: "Aug 3", v: 420 }, { d: "Aug 5", v: 390 },
-    { d: "Aug 7", v: 520 }, { d: "Aug 9", v: 480 }, { d: "Aug 11", v: 560 },
-    { d: "Aug 13", v: 610 },
-  ];
-  const topProducts = [
-    { id: 1, name: "Modern Tote", sales: 54 },
-    { id: 2, name: "Vintage Bag", sales: 39 },
-    { id: 3, name: "Ethnic Clutch", sales: 29 },
-    { id: 4, name: "Silk Scarf", sales: 22 },
-    { id: 5, name: "Handloom Shirt", sales: 19 },
-  ];
-  const recentOrders = [
-    { id: "INV-10214", customer: "A. Sharma", total: "₹2,990", status: "Paid" },
-    { id: "INV-10213", customer: "R. Mehta", total: "₹1,245", status: "Pending" },
-    { id: "INV-10212", customer: "K. Patel", total: "₹3,780", status: "Paid" },
-    { id: "INV-10211", customer: "S. Gupta", total: "₹1,090", status: "Paid" },
-    { id: "INV-10210", customer: "N. Iyer", total: "₹2,150", status: "Refunded" },
-  ];
+  // state that replaces mock data
+  const [kpiCards, setKpiCards] = useState([]);
+  const [sales, setSales] = useState([]); // [{ d, v }]
+  const [topProducts, setTopProducts] = useState([]); // [{ id, name, sales }]
+  const [recentOrders, setRecentOrders] = useState([]); // [{ id, customer, total, status }]
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        // --- date window (last 30d)
+        const from = new Date(Date.now() - 29 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+        const to = new Date().toISOString().slice(0, 10);
+
+        // 1) Summary (KPIs + Top Products)
+        const p1 = new URLSearchParams({ from, to, top_limit: "5" });
+        const r1 = await fetch(apiUrl('/api/dashboard/summary', p1.toString()));
+        if (!r1.ok) throw new Error('summary fetch failed');
+        const { kpis, topProducts: tp } = await r1.json();
+
+        setKpiCards([
+          { label: "Revenue (30d)", value: formatINR(Number(kpis?.revenue_30d || 0)), diff: "" },
+          { label: "Orders (30d)", value: String(kpis?.orders_30d ?? 0), diff: "" },
+          { label: "Avg. Order", value: formatINR(Number(kpis?.avg_order_value || 0)), diff: "" },
+          { label: "Refunds", value: `${Number(kpis?.refund_rate_pct || 0).toFixed(1)}%`, diff: "" },
+        ]);
+
+        setTopProducts(
+          (tp || []).map((t, i) => ({
+            id: i + 1,
+            name: t.product_title,
+            sales: Number(t.qty || t.purchases || 0),
+          }))
+        );
+
+        // 2) Sales chart (revenue)
+        const p2 = new URLSearchParams({ from, to, metric: "revenue" });
+        const r2 = await fetch(apiUrl('/api/dashboard/sales', p2.toString()));
+        if (!r2.ok) throw new Error('sales fetch failed');
+        const j2 = await r2.json();
+        setSales(
+          (j2.data || []).map((row) => ({
+            d: new Date(row.day).toLocaleString("en-IN", { month: "short", day: "numeric" }),
+            v: Number(row.value || 0),
+          }))
+        );
+
+        // 3) Recent orders
+        const r3 = await fetch(apiUrl('/api/dashboard/recent-orders', 'limit=5'));
+        if (!r3.ok) throw new Error('recent-orders fetch failed');
+        const j3 = await r3.json();
+        setRecentOrders(
+          (j3.orders || []).map((o) => ({
+            id: o.order_id,
+            customer: o.customer,
+            total: formatINR(Number(o.total || 0)),
+            status: o.status?.charAt(0).toUpperCase() + o.status?.slice(1),
+          }))
+        );
+      } catch (e) {
+        console.error(e);
+        setError("Failed to load dashboard data.");
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
 
   return (
     <div className="space-y-6">
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {kpis.map((k) => (
-          <div key={k.label} className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
-            <div className="text-xs text-gray-500">{k.label}</div>
-            <div className="mt-1 text-2xl font-semibold text-[#6B4226]">{k.value}</div>
-            <div className={`text-xs mt-1 ${k.diff.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
-              {k.diff} vs last 30d
+        {(loading && !kpiCards.length ? Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="rounded-2xl border border-[#EAD8D8] bg-white p-4 animate-pulse h-24" />
+        )) : kpiCards).map((k) =>
+          typeof k === "object" ? (
+            <div key={k.label} className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
+              <div className="text-xs text-gray-500">{k.label}</div>
+              <div className="mt-1 text-2xl font-semibold text-[#6B4226]">{k.value}</div>
+              {k.diff && (
+                <div className={`text-xs mt-1 ${k.diff.startsWith("+") ? "text-green-600" : "text-red-600"}`}>
+                  {k.diff} vs last 30d
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          ) : null
+        )}
       </div>
 
       {/* Middle: Sales + Top Products */}
@@ -451,15 +514,19 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             </button>
           </div>
           <div className="h-56">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={sales}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="d" />
-                <YAxis />
-                <Tooltip />
-                <Line type="monotone" dataKey="v" strokeWidth={2} dot={false} />
-              </LineChart>
-            </ResponsiveContainer>
+            {loading && !sales.length ? (
+              <div className="h-full animate-pulse bg-gray-100 rounded-lg" />
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={sales}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="d" />
+                  <YAxis />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="v" strokeWidth={2} dot={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
@@ -475,17 +542,23 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             </button>
           </div>
           <ul className="space-y-2 max-h-56 overflow-auto pr-1">
-            {topProducts.map((p, i) => (
-              <li key={p.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
-                <div className="flex items-center gap-3">
-                  <div className="w-7 h-7 rounded bg-[#fff7f7] text-[#6B4226] flex items-center justify-center text-xs">
-                    #{i + 1}
+            {loading && !topProducts.length ? (
+              Array.from({ length: 5 }).map((_, i) => (
+                <li key={i} className="h-10 rounded-lg border border-gray-200 animate-pulse" />
+              ))
+            ) : (
+              topProducts.map((p, i) => (
+                <li key={p.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded bg-[#fff7f7] text-[#6B4226] flex items-center justify-center text-xs">
+                      #{i + 1}
+                    </div>
+                    <div className="text-sm text-[#6B4226]">{p.name}</div>
                   </div>
-                  <div className="text-sm text-[#6B4226]">{p.name}</div>
-                </div>
-                <div className="text-sm text-gray-600">{p.sales}</div>
-              </li>
-            ))}
+                  <div className="text-sm text-gray-600">{p.sales}</div>
+                </li>
+              ))
+            )}
           </ul>
         </div>
       </div>
@@ -501,43 +574,52 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             View All
           </button>
         </div>
+
+        {error && <div className="text-sm text-red-600 mb-2">{error}</div>}
+
         <div className="max-h-60 overflow-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-gray-500">
-                <th className="py-2 pr-3">Order</th>
-                <th className="py-2 pr-3">Customer</th>
-                <th className="py-2 pr-3">Total</th>
-                <th className="py-2">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentOrders.map((o) => (
-                <tr key={o.id} className="border-t">
-                  <td className="py-2 pr-3 text-[#6B4226]">{o.id}</td>
-                  <td className="py-2 pr-3">{o.customer}</td>
-                  <td className="py-2 pr-3">{o.total}</td>
-                  <td className="py-2">
-                    <span
-                      className={`px-2 py-1 rounded text-xs ${
-                        o.status === "Paid"
-                          ? "bg-green-100 text-green-700"
-                          : o.status === "Pending"
-                          ? "bg-yellow-100 text-yellow-700"
-                          : "bg-red-100 text-red-700"
-                      }`}
-                    >
-                      {o.status}
-                    </span>
-                  </td>
+          {loading && !recentOrders.length ? (
+            <div className="h-32 animate-pulse bg-gray-100 rounded-lg" />
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-500">
+                  <th className="py-2 pr-3">Order</th>
+                  <th className="py-2 pr-3">Customer</th>
+                  <th className="py-2 pr-3">Total</th>
+                  <th className="py-2">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {recentOrders.map((o) => (
+                  <tr key={o.id} className="border-t">
+                    <td className="py-2 pr-3 text-[#6B4226]">{o.id}</td>
+                    <td className="py-2 pr-3">{o.customer}</td>
+                    <td className="py-2 pr-3">{o.total}</td>
+                    <td className="py-2">
+                      <span
+                        className={`px-2 py-1 rounded text-xs ${
+                          o.status === "Paid"
+                            ? "bg-green-100 text-green-700"
+                            : o.status === "Pending"
+                            ? "bg-yellow-100 text-yellow-700"
+                            : o.status === "Refunded"
+                            ? "bg-red-100 text-red-700"
+                            : "bg-gray-100 text-gray-700"
+                        }`}
+                      >
+                        {o.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
-      {/* Quick Launch (just a few, to avoid scroll) */}
+      {/* Quick Launch (unchanged) */}
       <div className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-semibold text-[#6B4226]">Quick Launch</h3>
@@ -569,6 +651,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
     </div>
   );
 };
+
 
 
 const Palette = ({ items, onClose, onSelect }) => {
