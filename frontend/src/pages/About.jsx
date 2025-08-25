@@ -27,13 +27,19 @@ function About() {
   return (
     <Layout>
       <div className="bg-[#F1E7E5] text-[#3B2E1E]">
-        
-        {/* ABOUT US */}
+
+        {/* OUR STORY */}
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 items-center">
           <AnimatedSection className="text-left">
-            <h1 className="text-3xl font-bold mb-4">About Us</h1>
-            <p className="text-sm text-[#6B6B6B]">
-              Shahu Mumbai is the iconic brand born from one man's extraordinary vision to renew the Thai silk industry. Founded in 1950 by Bhumi— an American architect, art collector, and cultural pioneer — the brand helped bring Thai silk to global prominence.
+            <h1 className="text-3xl font-bold mb-4">Our Story</h1>
+            <p className="text-sm text-[#6B6B6B] leading-relaxed">
+              Shahu is a luxury fashion house of Ancient Indian roots meeting timeless 
+              and effortless luxury. Founded in Mumbai by <span className="font-medium">Bhumi Shahu</span> 
+              while pursuing her degree in New York, the brand was born out of her vision 
+              to give rightful credit to Indian artisans and to create truly handmade fashion. 
+              Unlike much of the modern luxury industry that produces in bulk, Shahu is built 
+              on authenticity, transparency, and craftsmanship, ensuring every piece carries 
+              culture, meaning, and a soul.
             </p>
           </AnimatedSection>
           <div
@@ -45,8 +51,8 @@ function About() {
 
         {/* QUOTE */}
         <section className="text-center py-6 text-lg italic text-[#3B2E1E]">
-          <p>"Thai silk is not just a fabric, it's a story."</p>
-          <p className="mt-2 text-sm text-[#6B6B6B]">- Shahu Mumbai</p>
+          <p>"Fashion is not just worn, it’s lived through heritage and soul."</p>
+          <p className="mt-2 text-sm text-[#6B6B6B]">- Shahu</p>
         </section>
 
         {/* THE CRAFT */}
@@ -58,8 +64,11 @@ function About() {
           />
           <AnimatedSection>
             <h2 className="text-2xl font-semibold mb-4">The Craft</h2>
-            <p className="text-sm text-[#6B6B6B]">
-              At Shahu, craftsmanship is at the heart of everything we do. As one of the world’s leading producers of handwoven fabric, we are renowned for our exceptional Thai silk. Our vertically integrated process ensures uncompromising quality in every step.
+            <p className="text-sm text-[#6B6B6B] leading-relaxed">
+              At Shahu, craftsmanship is at the heart of everything we do. Each design is a 
+              celebration of India’s artistic heritage, combining intricate handwork with 
+              contemporary silhouettes. Every piece is made slowly, thoughtfully, and 
+              sustainably—an heirloom of culture and beauty.
             </p>
           </AnimatedSection>
         </section>
@@ -99,8 +108,11 @@ function About() {
         <section className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 items-center">
           <div>
             <h2 className="text-2xl font-semibold mb-4">The Shahu Mumbai Foundation</h2>
-            <p className="text-sm text-[#6B6B6B]">
-              The Foundation preserves the legacy of the man who redefined Thai silk. It supports cultural heritage, education, and the arts, and also oversees the iconic Shahu Mumbai in the U.S.A.
+            <p className="text-sm text-[#6B6B6B] leading-relaxed">
+              The Foundation preserves the legacy of Indian artisans and promotes 
+              cultural heritage, education, and the arts. It also supports community-driven 
+              initiatives while ensuring that Shahu’s philosophy of authenticity and 
+              sustainability continues for generations.
             </p>
             <div className="grid grid-cols-2 gap-4 mt-4">
               {[
