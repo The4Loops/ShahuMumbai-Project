@@ -14,35 +14,119 @@ const PrivacyPopup = ({ onClose }) => {
         {/* Content */}
         <h1 className="text-2xl sm:text-3xl font-bold mb-4">Privacy Policy</h1>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          At Shahu Mumbai, your privacy is important to us. This Privacy Policy explains how we collect, use, and protect your personal information.
+          At Shahu, your privacy is of utmost importance to us. We are committed
+          to protecting your personal information and ensuring a safe and secure
+          shopping experience. This Privacy Policy explains how we collect, use,
+          and safeguard your data when you interact with our website, products,
+          and services.
         </p>
 
-        <h2 className="text-lg sm:text-xl font-semibold mb-2">Information We Collect</h2>
+        {/* Information We Collect */}
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">
+          Information We Collect
+        </h2>
+        <ul className="list-disc list-inside text-gray-600 mb-4 text-sm sm:text-base space-y-2">
+          <li>
+            Personal details such as name, email address, phone number, and
+            shipping/billing address.
+          </li>
+          <li>
+            Payment information (processed securely through our payment partners;
+            we do not store full card details unless you choose to save them for
+            future use).
+          </li>
+          <li>
+            Browsing information such as IP address, device type, and pages
+            visited on our site.
+          </li>
+          <li>
+            Any information you voluntarily share with us (e.g., customer
+            support queries, sign-ups, or surveys).
+          </li>
+        </ul>
+
+        {/* How We Use */}
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">
+          How We Use Your Information
+        </h2>
+        <ul className="list-disc list-inside text-gray-600 mb-4 text-sm sm:text-base space-y-2">
+          <li>Process and fulfill your orders.</li>
+          <li>
+            Communicate with you regarding your purchases, updates, and brand
+            news.
+          </li>
+          <li>Improve our website, products, and customer experience.</li>
+          <li>Provide personalized recommendations and exclusive offers.</li>
+          <li>Comply with legal and regulatory obligations.</li>
+        </ul>
+
+        {/* Sharing */}
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">
+          Sharing Your Information
+        </h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          We may collect information such as your name, email address, phone number, shipping address, and payment details when you place an order or sign up for our newsletter.
+          Shahu Mumbai does not sell, trade, or rent your personal data. We may
+          share information only with:
         </p>
+        <ul className="list-disc list-inside text-gray-600 mb-4 text-sm sm:text-base space-y-2">
+          <li>
+            Trusted third-party service providers who help us operate our
+            website, process payments, or deliver orders.
+          </li>
+          <li>
+            Legal authorities if required by law or to protect our rights in
+            cases of disputes.
+          </li>
+        </ul>
 
-        <h2 className="text-lg sm:text-xl font-semibold mb-2">How We Use Your Information</h2>
-        <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          We use your information to process orders, improve our services, send marketing communications, and respond to your inquiries.
-        </p>
-
+        {/* Data Security */}
         <h2 className="text-lg sm:text-xl font-semibold mb-2">Data Security</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          We implement industry-standard measures to protect your personal information from unauthorized access, disclosure, or misuse.
+          We implement industry-standard security measures to protect your
+          personal information. While no method of transmission over the
+          internet is 100% secure, we take all reasonable steps to ensure your
+          data is handled with care.
         </p>
 
+        {/* Cookies */}
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">Cookies</h2>
+        <p className="text-gray-600 mb-4 text-sm sm:text-base">
+          Our website uses cookies and similar technologies to enhance browsing,
+          analyze performance, and personalize content. You can disable cookies
+          in your browser, but some features may not function properly.
+        </p>
+
+        {/* Your Rights */}
         <h2 className="text-lg sm:text-xl font-semibold mb-2">Your Rights</h2>
+        <ul className="list-disc list-inside text-gray-600 mb-4 text-sm sm:text-base space-y-2">
+          <li>Access, correct, or delete your personal data.</li>
+          <li>Opt out of marketing communications.</li>
+          <li>Request details on how your data is used.</li>
+        </ul>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          You may request access, correction, or deletion of your personal information at any time by contacting us.
+          To exercise these rights, contact us at{" "}
+          <a
+            href="mailto:bhumi.founder@shahumumbai.com"
+            className="text-blue-600 underline"
+          >
+            bhumi.founder@shahumumbai.com
+          </a>
+          .
         </p>
 
-        <h2 className="text-lg sm:text-xl font-semibold mb-2">Changes to This Policy</h2>
+        {/* Updates */}
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">
+          Updates to This Policy
+        </h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          We may update this Privacy Policy from time to time. Any changes will be posted on this page with an updated effective date.
+          We may update this Privacy Policy from time to time. The updated
+          version will always be available on our website with a “Last Updated”
+          date.
         </p>
 
-        <p className="text-gray-500 text-xs sm:text-sm mt-6">Effective Date: January 1, 2025</p>
+        <p className="text-gray-500 text-xs sm:text-sm mt-6">
+          Last Updated: January 1, 2025
+        </p>
       </div>
 
       <style>{`
