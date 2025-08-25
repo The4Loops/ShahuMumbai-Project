@@ -66,13 +66,13 @@ const Footer = () => {
                 onClick={() => openPopup("privacy")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Privacy
+                Privacy Policy
               </button>
               <button
                 onClick={() => openPopup("terms")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Terms
+                Terms & Conditions
               </button>
             </div>
 

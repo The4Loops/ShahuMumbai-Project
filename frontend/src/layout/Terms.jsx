@@ -16,44 +16,55 @@ const TermsPopup = ({ onClose }) => {
         {/* Content */}
         <h1 className="text-2xl sm:text-3xl font-bold mb-4">Terms & Conditions</h1>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          Welcome to Shahu Mumbai! By accessing or using our website, you agree
-          to comply with and be bound by the following terms and conditions.
+          By using Shahu Mumbai’s website, products, and services, you agree to
+          the following terms:
         </p>
 
-        <h2 className="text-lg sm:text-xl font-semibold mb-2">Use of Our Website</h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">Use of Services</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          You agree to use our website for lawful purposes only. You must not
-          engage in any activity that disrupts or interferes with our services.
+          You agree to use our website and services for lawful purposes only.
+          Misuse of the website, including attempts to breach security or engage
+          in fraudulent activities, is strictly prohibited.
         </p>
 
         <h2 className="text-lg sm:text-xl font-semibold mb-2">Orders & Payments</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          All orders are subject to acceptance and availability. Prices are
-          subject to change without notice.
+          All orders are subject to acceptance and availability. Payments are
+          processed securely through trusted partners. Shahu Mumbai reserves the
+          right to refuse or cancel any order due to suspicious activity or stock
+          limitations.
+        </p>
+
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">Shipping & Delivery</h2>
+        <p className="text-gray-600 mb-4 text-sm sm:text-base">
+          Delivery timelines are estimates and may vary based on location and
+          circumstances. Customers are responsible for providing accurate shipping
+          details.
         </p>
 
         <h2 className="text-lg sm:text-xl font-semibold mb-2">Returns & Refunds</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          Please refer to our Returns Policy for details on returning or
-          exchanging products.
+          Our return and refund policy applies as stated on the website at the
+          time of purchase.
         </p>
 
         <h2 className="text-lg sm:text-xl font-semibold mb-2">Intellectual Property</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          All content on this site, including text, graphics, logos, and images,
-          is the property of Shahu Mumbai and may not be used without permission.
+          All content on our website (logos, designs, text, and images) is the
+          property of Shahu Mumbai and cannot be used without prior written
+          permission.
         </p>
 
         <h2 className="text-lg sm:text-xl font-semibold mb-2">Limitation of Liability</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          We are not liable for any damages arising from the use or inability to
-          use our website or products.
+          Shahu Mumbai is not liable for indirect, incidental, or consequential
+          damages arising from use of our website or services.
         </p>
 
-        <h2 className="text-lg sm:text-xl font-semibold mb-2">Changes to Terms</h2>
+        <h2 className="text-lg sm:text-xl font-semibold mb-2">Governing Law</h2>
         <p className="text-gray-600 mb-4 text-sm sm:text-base">
-          We reserve the right to modify these terms at any time. Changes will
-          be posted on this page with an updated date.
+          These terms are governed by the laws of India. Any disputes will be
+          subject to the exclusive jurisdiction of Mumbai courts.
         </p>
 
         <p className="text-gray-500 text-xs sm:text-sm mt-6">

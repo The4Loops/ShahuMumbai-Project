@@ -1,4 +1,4 @@
-import { Routes, Route, BrowserRouter } from "react-router-dom";
+import { Routes, Route, } from "react-router-dom";
 import "./App.css";
 import HomePage from "./pages/HomePage";
 import Account from "./pages/Account";
@@ -52,7 +52,7 @@ function App() {
         <Route path="/account" element={<Account />} />
         <Route path="/products" element={<Products />} />
         <Route path="/cart" element={<Cart />} />
-        <Route path="/Service" element={<ServicePage />} />
+        <Route path="/Services" element={<ServicePage />} />
         <Route path="/contactus" element={<ContactUs />} />
         <Route path="/ourphilosophy" element={<OurPhilosophy />} />
         <Route path="/heritagetimeline" element={<HeritageTimeline />} />

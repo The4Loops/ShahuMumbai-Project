@@ -1,28 +1,30 @@
 import React from "react";
 import Layout from "../layout/Layout";
-import { motion } from "framer-motion";
 
 const HeritageTimeline = () => {
   const milestones = [
     {
-      year: "1995",
-      title: "Our Beginning",
-      description: "Started as a small local store selling handcrafted goods.",
+      year: "5,000 – 10,000 years ago",
+      title: "Inspiration",
+      description: "Rooted in lost Indian art and history.",
+      titleColor: "text-amber-700",
+      dotColor: "bg-amber-700",
     },
     {
-      year: "2005",
-      title: "First Online Store",
-      description: "Launched our e-commerce website to reach customers nationwide.",
+      year: "Textile Traditions",
+      title: "Celebrating Heritage",
+      description:
+        "The Indian Subcontinent, home to the richest textile legacies.",
+      titleColor: "text-red-600",
+      dotColor: "bg-red-600",
     },
     {
-      year: "2015",
-      title: "Global Expansion",
-      description: "Opened warehouses in Europe and Asia for faster delivery.",
-    },
-    {
-      year: "2023",
-      title: "Sustainability Focus",
-      description: "Transitioned to eco-friendly packaging and carbon-neutral shipping.",
+      year: "Today",
+      title: "Modern Elegance",
+      description:
+        "Bridging ancient techniques with modern aesthetics, Shahu continues India’s story of elegance.",
+      titleColor: "text-blue-600",
+      dotColor: "bg-blue-600",
     },
   ];
 
@@ -31,42 +33,41 @@ const HeritageTimeline = () => {
       <section className="bg-[#F1E7E5] py-12 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Our Heritage</h2>
+
           <div className="relative">
-            {/* Vertical line in the middle */}
-            <div className="absolute left-1/2 transform -translate-x-1/2 w-1 bg-gray-300 h-full"></div>
+            {/* Timeline vertical line */}
+            <div className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 bottom-0 w-[2px] bg-gray-300 z-0 hidden md:block" />
 
             {milestones.map((item, index) => (
-              <motion.div
+              <div
                 key={index}
-                className={`mb-12 flex w-full flex-col md:flex-row items-center ${
-                  index % 2 === 0 ? "md:justify-start" : "md:justify-end"
-                }`}
-                initial={{ opacity: 0, y: 50 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.6, delay: index * 0.2 }}
-                viewport={{ once: true }}
+                className={`relative mb-12 flex flex-col md:flex-row items-center 
+                  ${index % 2 === 0 ? "md:justify-start" : "md:justify-end"} 
+                  animate-fadeUp`}
+                style={{ animationDelay: `${index * 0.2}s` }}
               >
-                <div className="w-full md:w-1/2 px-6">
-                  <div className="bg-white p-6 rounded-lg shadow-lg relative">
-                    {/* Dot */}
-                    <div
-                      className={`absolute top-6 w-4 h-4 bg-blue-500 rounded-full border-4 border-[#F1E7E5] ${
-                        index % 2 === 0 ? "md:-right-8 left-1/2 transform -translate-x-1/2 md:translate-x-0" : "md:-left-8 left-1/2 transform -translate-x-1/2 md:translate-x-0"
-                      }`}
-                    ></div>
+                {/* Dot */}
+                <span
+                  className={`absolute left-1/2 md:top-1/2 -translate-x-1/2 md:-translate-y-1/2 ${item.dotColor} w-4 h-4 rounded-full ring-4 ring-[#F1E7E5] z-20`}
+                />
 
+                {/* Card */}
+                <div
+                  className={`w-full md:w-1/2 px-6 mt-6 md:mt-0 ${
+                    index % 2 === 0 ? "md:pr-12" : "md:pl-12"
+                  }`}
+                >
+                  <div className="bg-white p-6 rounded-lg shadow-lg">
                     <time className="block text-sm text-gray-500">
                       {item.year}
                     </time>
-                    <h3 className="text-lg font-semibold text-gray-900">
+                    <h3 className={`text-lg font-semibold ${item.titleColor}`}>
                       {item.title}
                     </h3>
-                    <p className="text-base text-gray-600">
-                      {item.description}
-                    </p>
+                    <p className="text-base text-gray-600">{item.description}</p>
                   </div>
                 </div>
-              </motion.div>
+              </div>
             ))}
           </div>
         </div>
