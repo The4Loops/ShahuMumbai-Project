@@ -71,7 +71,7 @@ const MENU_REGISTRY = [
   { id: "Role Management", label: "Role Management", icon: MdOutlineAnalytics, category: "System", component: RoleManagement },
   { id: "Table", label: "Data Table Management", icon: AiOutlineTable, category: "Utilities", component: Tables },
   { id: "Subscribers Table", label: "Subscribers Table Management", icon: AiOutlineTable, category: "Utilities", component: SubscribersTable },
-    { id: "News", label: "News Management", icon: AiOutlineTable, category: "Utilities", component: News },
+  { id: "News", label: "News Management", icon: AiOutlineTable, category: "Utilities", component: News },
 
 ];
 

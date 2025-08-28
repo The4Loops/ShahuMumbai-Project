@@ -18,6 +18,8 @@ module.exports = {
       'fade-in': 'fadeIn 0.2s ease-in-out',
         'slide-in-left': 'slideLeft 0.4s ease-out',
         'slide-in-right': 'slideRight 0.4s ease-out',
+        fadeIn: "fadeIn 0.8s ease-out forwards",
+        fadeUp: "fadeUp 0.8s ease-out forwards",
     },
     fontFamily: {
       serif: ['"Playfair Display"', 'serif'],
@@ -28,6 +30,10 @@ module.exports = {
         '0%': { opacity: '0', transform: 'translateY(-8px)' },
         '100%': { opacity: '1', transform: 'translateY(0)' },
       },
+        fadeUp: {
+          "0%": { opacity: 0, transform: "translateY(20px)" },
+          "100%": { opacity: 1, transform: "translateY(0)" },
+        },
       slideLeft: {
           '0%': { opacity: '0', transform: 'translateX(-30px)' },
           '100%': { opacity: '1', transform: 'translateX(0)' },

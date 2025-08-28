@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../supabase/axios";
-import { toast } from 'react-toastify';
+import { toast } from "react-toastify";
+import { useLocation, useParams } from "react-router-dom";
 
 const slugify = (text) =>
   text
@@ -12,6 +13,14 @@ const slugify = (text) =>
     .replace(/-+/g, "-");
 
 const AddBlogPost = () => {
+  const location = useLocation();
+  const { id } = useParams();
+
+  const [loading, setLoading] = useState(false);
+
+  // Blog passed via navigation (optional)
+  const editingBlog = location.state?.blog || null;
+
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [slugTouched, setSlugTouched] = useState(false);
@@ -20,8 +29,8 @@ const AddBlogPost = () => {
   const [cover, setCover] = useState(null);
   const [coverPreview, setCoverPreview] = useState(null);
   const [category, setCategory] = useState("");
-  const [tags, setTags] = useState(""); // comma-separated
-  const [status, setStatus] = useState("DRAFT"); // DRAFT | PUBLISHED
+  const [tags, setTags] = useState("");
+  const [status, setStatus] = useState("DRAFT");
   const [publishAt, setPublishAt] = useState("");
   const [metaTitle, setMetaTitle] = useState("");
   const [metaDescription, setMetaDescription] = useState("");
@@ -34,6 +43,49 @@ const AddBlogPost = () => {
     () => ["Announcements", "Guides", "Releases", "Behind the Scenes"],
     []
   );
+
+  // Prefill if editingBlog passed via state
+  useEffect(() => {
+    if (editingBlog) {
+      prefillForm(editingBlog);
+    }
+  }, [editingBlog]);
+
+  // Fetch if no blog passed but id exists
+  useEffect(() => {
+    const fetchBlogById = async () => {
+      if (!id || editingBlog) return;
+      setLoading(true);
+      try {
+        const response = await api.get(`/api/blogs/${id}`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
+        prefillForm(response.data);
+      } catch (err) {
+        console.error("Error fetching blog:", err);
+        toast.error("Failed to load blog for editing.");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchBlogById();
+  }, [id, editingBlog]);
+
+  const prefillForm = (blog) => {
+    setSelectedDraftId(blog.id);
+    setTitle(blog.title || "");
+    setSlug(blog.slug || "");
+    setSlugTouched(true);
+    setExcerpt(blog.excerpt || "");
+    setContent(blog.content || "");
+    setCoverPreview(blog.cover_image || null);
+    setCategory(blog.category || "");
+    setTags(blog.tags ? blog.tags.join(", ") : "");
+    setStatus(blog.status || "DRAFT");
+    setPublishAt(blog.publish_at || "");
+    setMetaTitle(blog.meta_title || "");
+    setMetaDescription(blog.meta_description || "");
+  };
 
   useEffect(() => {
     const update = () => setIsMobile(window.innerWidth < 1024);
@@ -109,7 +161,7 @@ const AddBlogPost = () => {
       if (cover) {
         coverImageUrl = await uploadCoverImage();
       } else if (selectedDraftId && coverPreview) {
-        coverImageUrl = coverPreview; // Use existing URL if editing without new upload
+        coverImageUrl = coverPreview;
       }
 
       const payload = {
@@ -144,370 +196,193 @@ const AddBlogPost = () => {
       });
 
       toast.success("Blog post saved successfully.");
-      setSelectedDraftId(null);
-      setTitle("");
-      setSlug("");
-      setSlugTouched(false);
-      setExcerpt("");
-      setContent("");
-      setCover(null);
-      setCoverPreview(null);
-      setCategory("");
-      setTags("");
-      setStatus("DRAFT");
-      setPublishAt("");
-      setMetaTitle("");
-      setMetaDescription("");
+      handleReset();
       fetchDrafts();
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (e) {
       toast.error(
-        e?.response?.data?.detail || "Failed to save the blog post. Please try again."
+        e?.response?.data?.detail ||
+          "Failed to save the blog post. Please try again."
       );
     } finally {
       setSubmitting(false);
     }
   };
 
-  const handleReset = async () => {
-    if (selectedDraftId) {
-      try {
-        await api.delete(`/api/admin/blogs/${selectedDraftId}/reset`);
-        toast.success("Draft reset successfully.");
-        setSelectedDraftId(null);
-        setTitle("");
-        setSlug("");
-        setSlugTouched(false);
-        setExcerpt("");
-        setContent("");
-        setCover(null);
-        setCoverPreview(null);
-        setCategory("");
-        setTags("");
-        setStatus("DRAFT");
-        setPublishAt("");
-        setMetaTitle("");
-        setMetaDescription("");
-        fetchDrafts();
-      } catch (e) {
-        toast.error(e?.response?.data?.detail || "Failed to reset draft.");
-      }
-    } else {
-      setTitle("");
-      setSlug("");
-      setSlugTouched(false);
-      setExcerpt("");
-      setContent("");
-      setCover(null);
-      setCoverPreview(null);
-      setCategory("");
-      setTags("");
-      setStatus("DRAFT");
-      setPublishAt("");
-      setMetaTitle("");
-      setMetaDescription("");
-    }
+  const handleReset = () => {
+    setTitle("");
+    setSlug("");
+    setSlugTouched(false);
+    setExcerpt("");
+    setContent("");
+    setCover(null);
+    setCoverPreview(null);
+    setCategory("");
+    setTags("");
+    setStatus("DRAFT");
+    setPublishAt("");
+    setMetaTitle("");
+    setMetaDescription("");
+    setSelectedDraftId(null);
   };
 
   const loadDraft = (draft) => {
-    setSelectedDraftId(draft.id);
-    setTitle(draft.title);
-    setSlug(draft.slug);
-    setSlugTouched(true);
-    setExcerpt(draft.excerpt);
-    setContent(draft.content);
-    setCoverPreview(draft.cover_image || null); // Use existing URL
-    setCategory(draft.category);
-    setTags(draft.tags ? draft.tags.join(", ") : "");
-    setStatus(draft.status);
-    setPublishAt(draft.publish_at || "");
-    setMetaTitle(draft.meta_title || "");
-    setMetaDescription(draft.meta_description || "");
+    prefillForm(draft);
   };
 
-  const inputBase =
-    "w-full border border-[#D4A5A5] rounded-md px-3 py-3 focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]";
+  if (loading) return <p className="p-6">Loading blog...</p>;
 
   return (
-    <div className="font-serif">
-      <h2 className="text-2xl lg:text-3xl font-bold text-[#6B4226] mb-4 lg:mb-6">
-        Add Blog Post
+    <div className="font-serif p-6">
+      <h2 className="text-2xl lg:text-3xl font-bold text-[#6B4226] mb-6">
+        {id || editingBlog ? "Edit Blog Post" : "Add Blog Post"}
       </h2>
 
-      {/* Drafts List */}
+      <div className="grid lg:grid-cols-2 gap-6">
+        {/* Left side */}
+        <div>
+          <label className="block font-medium">Title</label>
+          <input
+            className="w-full border rounded p-2 mb-3"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+          />
+
+          <label className="block font-medium">Slug</label>
+          <input
+            className="w-full border rounded p-2 mb-3"
+            value={slug}
+            onChange={(e) => {
+              setSlug(e.target.value);
+              setSlugTouched(true);
+            }}
+          />
+
+          <label className="block font-medium">Excerpt</label>
+          <textarea
+            className="w-full border rounded p-2 mb-3"
+            value={excerpt}
+            onChange={(e) => setExcerpt(e.target.value)}
+          />
+
+          <label className="block font-medium">Content</label>
+          <textarea
+            className="w-full border rounded p-2 mb-3 min-h-[150px]"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+          />
+
+          <label className="block font-medium">Category</label>
+          <select
+            className="w-full border rounded p-2 mb-3"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            <option value="">Select category</option>
+            {categories.map((c) => (
+              <option key={c}>{c}</option>
+            ))}
+          </select>
+
+          <label className="block font-medium">Tags (comma separated)</label>
+          <input
+            className="w-full border rounded p-2 mb-3"
+            value={tags}
+            onChange={(e) => setTags(e.target.value)}
+          />
+
+          <label className="block font-medium">Cover Image</label>
+          <input
+            type="file"
+            accept="image/*"
+            className="mb-3"
+            onChange={onPickCover}
+          />
+          {coverPreview && (
+            <img
+              src={coverPreview}
+              alt="Cover Preview"
+              className="w-full h-48 object-cover rounded mb-3"
+            />
+          )}
+        </div>
+
+        {/* Right side */}
+        <div>
+          <label className="block font-medium">Status</label>
+          <select
+            className="w-full border rounded p-2 mb-3"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="DRAFT">Draft</option>
+            <option value="PUBLISHED">Published</option>
+          </select>
+
+          <label className="block font-medium">Publish At</label>
+          <input
+            type="datetime-local"
+            className="w-full border rounded p-2 mb-3"
+            value={publishAt}
+            onChange={(e) => setPublishAt(e.target.value)}
+          />
+
+          <label className="block font-medium">Meta Title</label>
+          <input
+            className="w-full border rounded p-2 mb-3"
+            value={metaTitle}
+            onChange={(e) => setMetaTitle(e.target.value)}
+          />
+
+          <label className="block font-medium">Meta Description</label>
+          <textarea
+            className="w-full border rounded p-2 mb-3"
+            value={metaDescription}
+            onChange={(e) => setMetaDescription(e.target.value)}
+          />
+
+          <div className="flex gap-3">
+            <button
+              onClick={() => handleSubmit(false)}
+              disabled={submitting}
+              className="bg-yellow-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              Save Draft
+            </button>
+            <button
+              onClick={() => handleSubmit(true)}
+              disabled={submitting}
+              className="bg-green-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              Publish
+            </button>
+            <button
+              onClick={handleReset}
+              className="bg-gray-400 text-white px-4 py-2 rounded"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      </div>
+
       {drafts.length > 0 && (
-        <div className="mb-6">
-          <h3 className="text-lg font-semibold text-[#6B4226] mb-2">
-            Saved Drafts
-          </h3>
+        <div className="mt-6">
+          <h3 className="font-bold mb-2">Load Draft</h3>
           <ul className="space-y-2">
-            {drafts.map((draft) => (
-              <li
-                key={draft.id}
-                className="p-2 border border-[#D4A5A5] rounded-md cursor-pointer hover:bg-[#f3dede]"
-                onClick={() => loadDraft(draft)}
-              >
-                {draft.title} (Last updated: {new Date(draft.updated_at).toLocaleString()})
+            {drafts.map((d) => (
+              <li key={d.id}>
+                <button
+                  className="underline text-blue-600"
+                  onClick={() => loadDraft(d)}
+                >
+                  {d.title}
+                </button>
               </li>
             ))}
           </ul>
         </div>
       )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
-        {/* Main column */}
-        <div className="lg:col-span-2 space-y-4 lg:space-y-6">
-          {/* Title */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-1">
-              Title *
-            </label>
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className={inputBase}
-              placeholder="Enter a compelling headline"
-            />
-          </div>
-
-          {/* Slug */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-1">
-              Slug *
-            </label>
-            <input
-              type="text"
-              value={slug}
-              onChange={(e) => {
-                setSlug(slugify(e.target.value));
-                setSlugTouched(true);
-              }}
-              className={inputBase}
-              placeholder="auto-generated-from-title"
-              inputMode="latin"
-            />
-            <p className="text-xs text-[#6B4226]/70 mt-1 break-all">
-              URL: <i>/blog/{slug || "your-slug"}</i>
-            </p>
-          </div>
-
-          {/* Excerpt */}
-          <div>
-            <div className="flex items-center justify-between">
-              <label className="block text-sm font-medium text-[#6B4226] mb-1">
-                Excerpt *
-              </label>
-              <span className="text-xs text-[#6B4226]/60">
-                {excerpt.length}/160
-              </span>
-            </div>
-            <textarea
-              value={excerpt}
-              onChange={(e) => setExcerpt(e.target.value.slice(0, 160))}
-              rows={3}
-              className={inputBase}
-              placeholder="Short summary shown on listing cards"
-            />
-          </div>
-
-          {/* Content */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-1">
-              Content *
-            </label>
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              rows={isMobile ? 10 : 12}
-              className={inputBase}
-              placeholder="Write your post content (Markdown supported if your backend parses it)"
-            />
-          </div>
-        </div>
-
-        {/* Side column */}
-        <div className="space-y-4 lg:space-y-6">
-          {/* Cover image */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-2">
-              Cover Image
-            </label>
-            <input
-              type="file"
-              name="image"
-              accept="image/*"
-              onChange={onPickCover}
-              className="w-full text-sm"
-            />
-            {coverPreview && (
-              <img
-                src={coverPreview}
-                alt="Cover Preview"
-                className="mt-3 rounded-md border border-[#D4A5A5] max-h-56 object-cover w-full"
-              />
-            )}
-          </div>
-
-          {/* Category */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-1">
-              Category *
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className={`${inputBase} bg-white`}
-            >
-              <option value="">Select a category</option>
-              {categories.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Tags */}
-          <div>
-            <label className="block text-sm font-medium text-[#6B4226] mb-1">
-              Tags
-            </label>
-            <input
-              type="text"
-              value={tags}
-              onChange={(e) => setTags(e.target.value)}
-              className={inputBase}
-              placeholder="e.g. coffee, brewing, guides"
-            />
-            <p className="text-xs text-[#6B4226]/70 mt-1">
-              Separate tags with commas.
-            </p>
-          </div>
-
-          {/* Status & schedule */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[#6B4226] mb-1">
-                Status
-              </label>
-              <select
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
-                className={`${inputBase} bg-white`}
-              >
-                <option value="DRAFT">Draft</option>
-                <option value="PUBLISHED">Published</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-[#6B4226] mb-1">
-                Publish At (optional)
-              </label>
-              <input
-                type="datetime-local"
-                value={publishAt}
-                onChange={(e) => setPublishAt(e.target.value)}
-                className={inputBase}
-              />
-              <p className="text-xs text-[#6B4226]/70 mt-1">
-                Leave empty to publish immediately.
-              </p>
-            </div>
-          </div>
-
-          {/* SEO */}
-          <div className="pt-2 border-t border-[#D4A5A5]">
-            <h3 className="text-sm font-semibold text-[#6B4226] mb-3">
-              SEO (optional)
-            </h3>
-            <label className="block text-sm text-[#6B4226] mb-1">
-              Meta Title
-            </label>
-            <input
-              type="text"
-              value={metaTitle}
-              onChange={(e) => setMetaTitle(e.target.value)}
-              className={inputBase + " mb-3"}
-              placeholder="Override page title for SEO"
-            />
-            <div className="flex items-center justify-between">
-              <label className="block text-sm text-[#6B4226] mb-1">
-                Meta Description
-              </label>
-              <span className="text-xs text-[#6B4226]/60">
-                {metaDescription.length}/160
-              </span>
-            </div>
-            <textarea
-              rows={3}
-              value={metaDescription}
-              onChange={(e) => setMetaDescription(e.target.value.slice(0, 160))}
-              className={inputBase}
-              placeholder="Short description for search engines"
-            />
-          </div>
-        </div>
-      </div>
-
-      {/* Actions (desktop) */}
-      <div className="mt-6 lg:mt-8 hidden sm:flex flex-wrap gap-3">
-        <button
-          disabled={submitting}
-          onClick={() => handleSubmit(false)}
-          className="px-5 py-2.5 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
-        >
-          Save as Draft
-        </button>
-        <button
-          disabled={submitting}
-          onClick={() => handleSubmit(true)}
-          className="px-5 py-2.5 rounded-md bg-[#D4A5A5] text-white hover:opacity-90 disabled:opacity-60"
-        >
-          Publish
-        </button>
-        <button
-          type="button"
-          disabled={submitting}
-          onClick={handleReset}
-          className="px-5 py-2.5 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#f3dede] disabled:opacity-60"
-        >
-          Reset
-        </button>
-      </div>
-
-      {/* Sticky action bar (mobile) */}
-      <div className="sm:hidden">
-        <div className="h-16" />
-        <div
-          className="fixed left-0 right-0 bottom-0 z-20 bg-white/95 backdrop-blur border-t border-[#E6DCD2] px-4 py-[10px] flex items-center gap-2 justify-between"
-          style={{ paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 10px)" }}
-        >
-          <button
-            disabled={submitting}
-            onClick={() => handleSubmit(false)}
-            className="flex-1 px-4 py-2 rounded-md border border-[#D4A5A5] text-[#6B4226] disabled:opacity-60"
-          >
-            Draft
-          </button>
-          <button
-            disabled={submitting}
-            onClick={() => handleSubmit(true)}
-            className="flex-[1.2] px-4 py-2 rounded-md bg-[#D4A5A5] text-white disabled:opacity-60"
-          >
-            Publish
-          </button>
-          <button
-            type="button"
-            disabled={submitting}
-            onClick={handleReset}
-            className="px-3 py-2 rounded-md border border-[#E6DCD2] text-[#6B4226] disabled:opacity-60"
-            title="Reset"
-          >
-            Reset
-          </button>
-        </div>
-      </div>
     </div>
   );
 };

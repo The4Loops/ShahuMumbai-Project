@@ -1,6 +1,5 @@
 import React, { useState, useRef } from "react";
 import { Eye, Edit, Trash2, X, Search } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
 
 // Avatar Upload Component
 const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
@@ -170,11 +169,7 @@ function UserTab() {
           <tbody>
             {filteredUsers.length > 0 ? (
               filteredUsers.map((user) => (
-                <motion.tr
-                  key={user.id}
-                  layoutId={String(user.id)}
-                  className="border-b border-gray-100 hover:bg-gray-50"
-                >
+                <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 flex items-center gap-3">
                     <div className="w-10 h-10 flex items-center justify-center rounded-full overflow-hidden bg-gray-200">
                       {user.avatar ? (
@@ -215,7 +210,7 @@ function UserTab() {
                       <Trash2 size={18} />
                     </button>
                   </td>
-                </motion.tr>
+                </tr>
               ))
             ) : (
               <tr>
@@ -232,11 +227,7 @@ function UserTab() {
       <div className="space-y-3 sm:hidden">
         {filteredUsers.length > 0 ? (
           filteredUsers.map((user) => (
-            <motion.div
-              key={user.id}
-              layoutId={String(user.id)}
-              className="bg-white p-4 rounded-lg shadow-sm border border-gray-200"
-            >
+            <div key={user.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 flex items-center justify-center rounded-full overflow-hidden bg-gray-200">
                   {user.avatar ? (
@@ -283,183 +274,150 @@ function UserTab() {
                   <Trash2 size={16} />
                 </button>
               </div>
-            </motion.div>
+            </div>
           ))
         ) : (
           <p className="text-center text-gray-500">No users found</p>
         )}
       </div>
+
       {/* Add/Edit Modal */}
-      <AnimatePresence>
-        {isAddEditModalOpen && (
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
+      {isAddEditModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+          <form
+            onSubmit={handleSaveUser}
+            className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative"
           >
-            <motion.form
-              onSubmit={handleSaveUser}
-              className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+            <button
+              onClick={() => setIsAddEditModalOpen(false)}
+              type="button"
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
             >
-              <button
-                onClick={() => setIsAddEditModalOpen(false)}
-                type="button"
-                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-              <h2 className="text-lg font-semibold mb-4">{currentUser ? "Edit User" : "Add User"}</h2>
+              <X size={20} />
+            </button>
+            <h2 className="text-lg font-semibold mb-4">{currentUser ? "Edit User" : "Add User"}</h2>
 
-              <AvatarUpload
-                avatarPreview={avatarPreview}
-                setAvatarPreview={setAvatarPreview}
-                name={currentUser?.name || ""}
+            <AvatarUpload
+              avatarPreview={avatarPreview}
+              setAvatarPreview={setAvatarPreview}
+              name={currentUser?.name || ""}
+            />
+            <label className="block text-sm font-medium text-gray-700 text-center mb-4">
+              Click to Upload
+            </label>
+
+            <div className="space-y-3">
+              <input
+                name="name"
+                defaultValue={currentUser?.name || ""}
+                placeholder="Name"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />
-              <label className="block text-sm font-medium text-gray-700 text-center mb-4">
-                Click to Upload
-              </label>
+              <input
+                name="email"
+                defaultValue={currentUser?.email || ""}
+                placeholder="Email"
+                type="email"
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <select
+                name="role"
+                defaultValue={currentUser?.role || roles[1]}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                {roles.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+              <select
+                name="status"
+                defaultValue={currentUser?.status || statuses[0]}
+                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                {statuses.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              <div className="space-y-3">
-                <input
-                  name="name"
-                  defaultValue={currentUser?.name || ""}
-                  placeholder="Name"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                <input
-                  name="email"
-                  defaultValue={currentUser?.email || ""}
-                  placeholder="Email"
-                  type="email"
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                />
-                <select
-                  name="role"
-                  defaultValue={currentUser?.role || roles[1]}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                >
-                  {roles.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  name="status"
-                  defaultValue={currentUser?.status || statuses[0]}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                >
-                  {statuses.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddEditModalOpen(false)}
-                  className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button type="submit" className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700">
-                  Save
-                </button>
-              </div>
-            </motion.form>
-          </motion.div>
-        )}
-      </AnimatePresence>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setIsAddEditModalOpen(false)}
+                className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button type="submit" className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700">
+                Save
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* View Modal */}
-      <AnimatePresence>
-        {selectedUser && (
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
+      {selectedUser && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative">
+            <button
+              onClick={() => setSelectedUser(null)}
+              type="button"
+              className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
             >
-              <button
-                onClick={() => setSelectedUser(null)}
-                type="button"
-                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-              <h2 className="text-lg font-semibold mb-4">User Details</h2>
-              <div className="w-24 h-24 rounded-full overflow-hidden mb-4 mx-auto">
-                {selectedUser.avatar ? (
-                  <img src={selectedUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-200 text-2xl text-gray-500">
-                    {selectedUser.name[0]}
-                  </div>
-                )}
-              </div>
-              <p><strong>Name:</strong> {selectedUser.name}</p>
-              <p><strong>Email:</strong> {selectedUser.email}</p>
-              <p><strong>Role:</strong> {selectedUser.role}</p>
-              <p><strong>Status:</strong> {selectedUser.status}</p>
-              <p><strong>Joined:</strong> {selectedUser.joined}</p>
-              <p><strong>Last Active:</strong> {selectedUser.last}</p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <X size={20} />
+            </button>
+            <h2 className="text-lg font-semibold mb-4">User Details</h2>
+            <div className="w-24 h-24 rounded-full overflow-hidden mb-4 mx-auto">
+              {selectedUser.avatar ? (
+                <img src={selectedUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-200 text-2xl text-gray-500">
+                  {selectedUser.name[0]}
+                </div>
+              )}
+            </div>
+            <p><strong>Name:</strong> {selectedUser.name}</p>
+            <p><strong>Email:</strong> {selectedUser.email}</p>
+            <p><strong>Role:</strong> {selectedUser.role}</p>
+            <p><strong>Status:</strong> {selectedUser.status}</p>
+            <p><strong>Joined:</strong> {selectedUser.joined}</p>
+            <p><strong>Last Active:</strong> {selectedUser.last}</p>
+          </div>
+        </div>
+      )}
 
       {/* Delete Confirmation Modal */}
-      <AnimatePresence>
-        {isDeleteModalOpen && (
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative"
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-            >
-              <h2 className="text-lg font-semibold mb-4">Delete User</h2>
-              <p>
-                Are you sure you want to delete <strong>{currentUser?.name}</strong>?
-              </p>
-              <div className="mt-4 flex justify-end gap-2">
-                <button
-                  onClick={() => setIsDeleteModalOpen(false)}
-                  type="button"
-                  className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={confirmDeleteUser}
-                  type="button"
-                  className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700"
-                >
-                  Delete
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {isDeleteModalOpen && (
+        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative">
+            <h2 className="text-lg font-semibold mb-4">Delete User</h2>
+            <p>
+              Are you sure you want to delete <strong>{currentUser?.name}</strong>?
+            </p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                onClick={() => setIsDeleteModalOpen(false)}
+                type="button"
+                className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmDeleteUser}
+                type="button"
+                className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
