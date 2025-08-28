@@ -1,5 +1,7 @@
-import React, { useState, useRef } from "react";
-import { Eye, Edit, Trash2, X, Search } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import { Eye, Edit, Trash2, X, Search, ChevronLeft, ChevronRight } from "lucide-react";
+import api from "../../supabase/axios";
+import { toast } from "react-toastify";
 
 // Avatar Upload Component
 const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
@@ -49,29 +51,7 @@ const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
 };
 
 function UserTab() {
-  const [users, setUsers] = useState([
-    {
-      id: 1,
-      name: "4 Loops",
-      email: "4loops2025@gmail.com",
-      role: "Admin",
-      status: "Active",
-      joined: "8/15/2025",
-      last: "8/16/2025",
-      avatar: null,
-    },
-    {
-      id: 2,
-      name: "Aman Gupta",
-      email: "gaman0324@gmail.com",
-      role: "User",
-      status: "Active",
-      joined: "8/15/2025",
-      last: "8/15/2025",
-      avatar: null,
-    },
-  ]);
-
+  const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedUser, setSelectedUser] = useState(null);
   const [isAddEditModalOpen, setIsAddEditModalOpen] = useState(false);
@@ -79,16 +59,49 @@ function UserTab() {
   const [currentUser, setCurrentUser] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
+  // ✅ Pagination
+  const [page, setPage] = useState(1);
+  const [limit] = useState(5);
+  const [totalUsers, setTotalUsers] = useState(0);
+
   const roles = ["Admin", "User", "Editor", "Moderator"];
   const statuses = ["Active", "Inactive"];
 
-  // Filter users based on search query
-  const filteredUsers = users.filter(
-    (u) =>
-      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      u.role.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // ✅ Fetch only "Users" from API with pagination + search
+  const fetchUsers = async () => {
+    try {
+      const response = await api.get("/api/users", {
+        params: {
+          role: "Users",
+          search: searchQuery || undefined,
+          page,
+          limit,
+        },
+      });
+
+      const data = response.data;
+      const mappedUsers = data.users.map((u) => ({
+        id: u.id,
+        name: u.full_name,
+        email: u.email,
+        role: u.role,
+        status: u.active ? "Active" : "Inactive",
+        joined: u.joined || "N/A",
+        last: u.last_login || "Never",
+        avatar: null,
+      }));
+
+      setUsers(mappedUsers);
+      setTotalUsers(data.total || mappedUsers.length);
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "Failed to fetch users");
+    }
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, [page, searchQuery]);
 
   // Edit user
   const handleEditUser = (user) => {
@@ -97,8 +110,8 @@ function UserTab() {
     setIsAddEditModalOpen(true);
   };
 
-  // Save user (add/edit)
-  const handleSaveUser = (e) => {
+  // Save user
+  const handleSaveUser = async (e) => {
     e.preventDefault();
     const form = e.target;
     const name = form.name.value.trim();
@@ -106,50 +119,63 @@ function UserTab() {
     const role = form.role.value;
     const status = form.status.value;
 
-    if (!name || !email) return alert("Name and Email are required!");
+    if (!name || !email) return toast.error("Name and Email are required!");
 
-    const newUser = {
-      id: currentUser ? currentUser.id : users.length + 1,
-      name,
-      email,
-      role,
-      status,
-      joined: currentUser ? currentUser.joined : new Date().toLocaleDateString(),
-      last: new Date().toLocaleDateString(),
-      avatar: avatarPreview,
-    };
-
-    if (currentUser) {
-      setUsers(users.map((u) => (u.id === currentUser.id ? newUser : u)));
-    } else {
-      setUsers([newUser, ...users]);
+    try {
+      if (currentUser) {
+        await api.put(`/api/users/${currentUser.id}`, {
+          full_name: name,
+          email,
+          role,
+          active: status === "Active",
+        });
+        toast.success("User updated successfully");
+      } else {
+        await api.post("/api/users", {
+          full_name: name,
+          email,
+          password: "password123", // ⚠️ must provide password when creating
+          role,
+          active: status === "Active",
+        });
+        toast.success("User created successfully");
+      }
+      setIsAddEditModalOpen(false);
+      fetchUsers();
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "Failed to save user");
     }
-
-    setIsAddEditModalOpen(false);
   };
 
   // Delete user
-  const handleDeleteUser = (user) => {
-    setCurrentUser(user);
-    setIsDeleteModalOpen(true);
+  const confirmDeleteUser = async () => {
+    try {
+      await api.delete(`/api/users/${currentUser.id}`);
+      toast.success("User deleted successfully");
+      setIsDeleteModalOpen(false);
+      fetchUsers();
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "Failed to delete user");
+    }
   };
 
-  const confirmDeleteUser = () => {
-    setUsers(users.filter((u) => u.id !== currentUser.id));
-    setIsDeleteModalOpen(false);
-    setCurrentUser(null);
-  };
+  const totalPages = Math.ceil(totalUsers / limit);
 
   return (
     <div className="p-4">
-      {/* Search Bar Only */}
+      {/* 🔍 Search Bar */}
       <div className="mb-4 flex items-center gap-2">
         <Search size={18} className="text-gray-500" />
         <input
           type="text"
           placeholder="Search users..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {
+            setSearchQuery(e.target.value);
+            setPage(1); // reset page when searching
+          }}
           className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
       </div>
@@ -167,8 +193,8 @@ function UserTab() {
             </tr>
           </thead>
           <tbody>
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
+            {users.length > 0 ? (
+              users.map((user) => (
                 <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 flex items-center gap-3">
                     <div className="w-10 h-10 flex items-center justify-center rounded-full overflow-hidden bg-gray-200">
@@ -206,7 +232,7 @@ function UserTab() {
                     <button onClick={() => handleEditUser(user)} className="p-2 rounded-full hover:bg-green-100 text-green-600">
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => handleDeleteUser(user)} className="p-2 rounded-full hover:bg-red-100 text-red-600">
+                    <button onClick={() => { setCurrentUser(user); setIsDeleteModalOpen(true); }} className="p-2 rounded-full hover:bg-red-100 text-red-600">
                       <Trash2 size={18} />
                     </button>
                   </td>
@@ -223,65 +249,30 @@ function UserTab() {
         </table>
       </div>
 
-      {/* Mobile Card Layout */}
-      <div className="space-y-3 sm:hidden">
-        {filteredUsers.length > 0 ? (
-          filteredUsers.map((user) => (
-            <div key={user.id} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 flex items-center justify-center rounded-full overflow-hidden bg-gray-200">
-                  {user.avatar ? (
-                    <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
-                  ) : (
-                    <span className="text-gray-500 font-semibold text-lg">{user.name[0]}</span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{user.name}</div>
-                  <div className="text-gray-500 text-sm truncate">{user.email}</div>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="text-xs text-gray-500">Joined</div>
-                  <div className="text-sm font-medium">{user.joined}</div>
-                </div>
-              </div>
+      {/* ✅ Pagination Controls */}
+      {totalPages > 1 && (
+        <div className="flex justify-center items-center gap-4 mt-4">
+          <button
+            disabled={page === 1}
+            onClick={() => setPage(page - 1)}
+            className="p-2 border rounded disabled:opacity-50"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <span className="text-sm text-gray-600">
+            Page {page} of {totalPages}
+          </span>
+          <button
+            disabled={page === totalPages}
+            onClick={() => setPage(page + 1)}
+            className="p-2 border rounded disabled:opacity-50"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
 
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <div className="text-sm mr-2">Role: <span className="font-medium">{user.role}</span></div>
-                <div>
-                  <span
-                    className={`${
-                      user.status === "Active"
-                        ? "bg-green-100 text-green-700"
-                        : "bg-gray-100 text-gray-500"
-                    } text-xs px-2 py-0.5 rounded-full`}
-                  >
-                    {user.status}
-                  </span>
-                </div>
-              </div>
-
-              <div className="text-xs text-gray-500 mt-1">Last: {user.last}</div>
-
-              <div className="flex gap-2 mt-3">
-                <button onClick={() => setSelectedUser(user)} className="p-2 rounded-md bg-blue-50 text-blue-600">
-                  <Eye size={16} />
-                </button>
-                <button onClick={() => handleEditUser(user)} className="p-2 rounded-md bg-green-50 text-green-600">
-                  <Edit size={16} />
-                </button>
-                <button onClick={() => handleDeleteUser(user)} className="p-2 rounded-md bg-red-50 text-red-600">
-                  <Trash2 size={16} />
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <p className="text-center text-gray-500">No users found</p>
-        )}
-      </div>
-
-      {/* Add/Edit Modal */}
+      {/* Keep your Add/Edit, View and Delete Modals same as before */}
       {isAddEditModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <form
@@ -360,7 +351,6 @@ function UserTab() {
         </div>
       )}
 
-      {/* View Modal */}
       {selectedUser && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative">
@@ -391,7 +381,6 @@ function UserTab() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative">
