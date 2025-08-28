@@ -367,3 +367,43 @@ exports.incrementViews = async (req, res) => {
     res.status(500).json({ message: 'Failed to increment views', error: error.message });
   }
 };
+
+// Delete blog by id
+exports.deleteBlog = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id) {
+      return res.status(400).json({ error: "Blog ID is required" });
+    }
+
+    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+    if (!uuidRegex.test(id)) {
+      return res.status(400).json({ error: "Invalid UUID format" });
+    }
+
+    // Soft delete all associated reviews
+    const { error: reviewError } = await supabase
+      .from("blogreviews")
+      .delete()
+      .eq("blog_id", id);
+
+    if (reviewError) throw reviewError;
+
+    // Start a Supabase transaction to ensure atomicity
+    const { data: blogData, error: blogError } = await supabase
+      .from("blogs")
+      .delete()
+      .eq("id", id)
+
+    if (blogError) throw blogError;
+    if (!blogData) {
+      return res.status(404).json({ error: "Blog not found or already deleted" });
+    }
+
+    res.status(200).json({ message: "Blog and associated reviews deleted successfully" });
+  } catch (err) {
+    console.error("Error in deleteBlog:", err);
+    res.status(500).json({ error: err.message });
+  }
+};

@@ -6,7 +6,7 @@ import { toast } from "react-toastify";
 
 // You can replace this with any hosted placeholder image you prefer
 const FALLBACK_IMAGE =
-  "https://via.placeholder.com/800x400.png?text=No+Image+Available";
+  "";
 
 function BlogsTable() {
   const [blogs, setBlogs] = useState([]);
@@ -29,7 +29,6 @@ function BlogsTable() {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       setBlogs(response.data || []);
-      toast.success("Blogs loaded successfully!");
     } catch (error) {
       console.error("Error fetching blogs:", error);
       toast.error(error.response?.data?.message || "Failed to fetch blogs");
@@ -47,12 +46,12 @@ function BlogsTable() {
     if (!window.confirm("Are you sure you want to delete this blog?")) return;
 
     try {
-      await api.delete(`/api/blogs/${id}`, {
+      await api.delete(`/api/admin/blogs/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       toast.success("Blog deleted successfully!");
-      setSelectedBlog(null);
       fetchBlogs();
+      setSelectedBlog(null);
     } catch (error) {
       console.error("Error deleting blog:", error);
       toast.error(error.response?.data?.message || "Failed to delete blog");
@@ -96,8 +95,8 @@ function BlogsTable() {
           className="border border-gray-300 rounded-lg px-3 py-2"
         >
           <option value="All">All</option>
-          <option value="Published">Published</option>
-          <option value="Draft">Draft</option>
+          <option value="PUBLISHED">Published</option>
+          <option value="DRAFT">Draft</option>
         </select>
       </div>
 
@@ -109,7 +108,7 @@ function BlogsTable() {
       ) : (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {currentBlogs.map((blog) => {
-            const imageUrl = getImageUrl(blog.imagePath);
+            const imageUrl = getImageUrl(blog.cover_image);
             return (
               <div
                 key={blog.id}
@@ -122,14 +121,9 @@ function BlogsTable() {
                     src={imageUrl}
                     alt={blog.title}
                     className="w-full h-40 object-cover rounded-md mb-3"
-                    onError={(e) => (e.target.src = FALLBACK_IMAGE)}
                   />
                 ) : (
-                  <img
-                    src={FALLBACK_IMAGE}
-                    alt="No Image"
-                    className="w-full h-40 object-cover rounded-md mb-3"
-                  />
+                  ""
                 )}
 
                 <h3 className="text-lg font-semibold mb-2 line-clamp-2">
@@ -154,7 +148,7 @@ function BlogsTable() {
                     {blog.status}
                   </span>
                   <span className="text-sm text-gray-500">
-                    {new Date(blog.createdAt).toLocaleDateString()}
+                    {new Date(blog.created_at).toLocaleDateString()}
                   </span>
                 </div>
               </div>
@@ -198,10 +192,9 @@ function BlogsTable() {
           >
             {/* Image at top */}
             <img
-              src={getImageUrl(selectedBlog.imagePath) || FALLBACK_IMAGE}
+              src={getImageUrl(selectedBlog.cover_image)}
               alt={selectedBlog.title}
               className="w-full h-64 object-cover rounded-t-xl"
-              onError={(e) => (e.target.src = FALLBACK_IMAGE)}
             />
 
             {/* Scrollable content */}
@@ -209,7 +202,7 @@ function BlogsTable() {
               <h2 className="text-2xl font-bold mb-3">{selectedBlog.title}</h2>
               <p className="text-gray-600 mb-2">
                 By {selectedBlog.author || "Unknown"} •{" "}
-                {new Date(selectedBlog.createdAt).toLocaleDateString()}
+                {new Date(selectedBlog.created_at).toLocaleDateString()}
               </p>
               <div className="text-sm text-gray-800 whitespace-pre-line">
                 {selectedBlog.content}
