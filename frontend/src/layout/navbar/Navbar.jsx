@@ -316,6 +316,14 @@ export default function Navbar() {
                       </Link>
                     </li>
                     <li>
+                      <Link
+                        to="/waitlist"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        Waitlist
+                      </Link>
+                    </li>
+                    <li>
                       <button onClick={handleLogout}>Logout</button>
                     </li>
                   </ul>
