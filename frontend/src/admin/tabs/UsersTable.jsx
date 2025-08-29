@@ -64,7 +64,7 @@ function UserTab() {
   const [limit] = useState(5);
   const [totalUsers, setTotalUsers] = useState(0);
 
-  const roles = ["Admin", "User", "Editor", "Moderator"];
+  const roles = ["Admin", "Users", "Editor", "Moderator"];
   const statuses = ["Active", "Inactive"];
 
   // ✅ Fetch only "Users" from API with pagination + search
@@ -78,7 +78,6 @@ function UserTab() {
           limit,
         },
       });
-
       const data = response.data;
       const mappedUsers = data.users.map((u) => ({
         id: u.id,
@@ -140,8 +139,8 @@ function UserTab() {
         });
         toast.success("User created successfully");
       }
-      setIsAddEditModalOpen(false);
       fetchUsers();
+      setIsAddEditModalOpen(false);
     } catch (error) {
       toast.dismiss();
       toast.error(error.response?.data?.error || "Failed to save user");

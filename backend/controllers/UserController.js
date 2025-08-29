@@ -135,11 +135,11 @@ exports.updateUser = async (req, res) => {
     const { data: roleData } = await supabase
       .from("roles")
       .select("id")
-      .eq("label", role || "user")
+      .eq("label", role || "Users")
       .single();
 
     if (!roleData) {
-      return res.status(400).json({ error: `Role '${role || "user"}' not found` });
+      return res.status(400).json({ error: `Role '${role || "Users"}' not found` });
     }
 
     const updates = {
