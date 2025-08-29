@@ -26,6 +26,7 @@ import Blog from "./pages/Blog";
 import Returns from "./pages/Returns";
 import NewsletterPopup from "./layout/NewsletterSection";
 import PageTracker from "./PageTracker"; 
+import BlogsView from "./layout/BlogsView";
 
 function App() {
   useAutoLogout(); // Initialize auto logout functionality
@@ -67,6 +68,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/blog" element={<Blog />} />
+        <Route path="/blogsview" element={<BlogsView />} />
         <Route path="/returns" element={<Returns />} />
       </Routes>
 

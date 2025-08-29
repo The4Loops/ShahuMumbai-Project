@@ -6,7 +6,6 @@ import {
   FaEye,
   FaHeart,
   FaRegHeart,
-  FaCommentDots,
   FaStar,
   FaRegStar,
   FaTwitter,
@@ -15,10 +14,11 @@ import {
 } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "react-toastify";
-import { v4 as uuidv4 } from 'uuid';
-import {jwtDecode} from 'jwt-decode';
+import { v4 as uuidv4 } from "uuid";
+import { jwtDecode } from "jwt-decode";
 import api from "../supabase/axios";
 import Layout from "../layout/Layout";
+import { Link } from "react-router-dom";
 
 const VintageArticlePage = () => {
   const [blogs, setBlogs] = useState([]);
@@ -31,17 +31,26 @@ const VintageArticlePage = () => {
   const [likedBlogs, setLikedBlogs] = useState([]);
   const [fullName, setFullName] = useState(null);
 
-  const categories = ["Announcements", "Guides", "Releases", "Behind the Scenes"];
+  const categories = [
+    "Announcements",
+    "Guides",
+    "Releases",
+    "Behind the Scenes",
+  ];
 
   // Initialize user ID and decode token for full name
   useEffect(() => {
-    const storedUserId = localStorage.getItem('user_id');
-    const token = localStorage.getItem('token');
+    const storedUserId = localStorage.getItem("user_id");
+    const token = localStorage.getItem("token");
 
     if (token) {
       try {
         const decoded = jwtDecode(token);
-        const name = decoded.user_metadata?.fullname || decoded.fullname || decoded.email || 'Anonymous';
+        const name =
+          decoded.user_metadata?.fullname ||
+          decoded.fullname ||
+          decoded.email ||
+          "Anonymous";
         setFullName(name);
         setUserId(decoded.sub || storedUserId || uuidv4());
       } catch (err) {
@@ -54,7 +63,7 @@ const VintageArticlePage = () => {
 
     if (!storedUserId && !token) {
       const newUserId = uuidv4();
-      localStorage.setItem('user_id', newUserId);
+      localStorage.setItem("user_id", newUserId);
       setUserId(newUserId);
     } else if (storedUserId) {
       setUserId(storedUserId);
@@ -70,7 +79,9 @@ const VintageArticlePage = () => {
         const blogsResponse = await api.get("/api/blogs");
         setBlogs(blogsResponse.data);
 
-        const likesResponse = await api.get(`/api/user/likes?user_id=${userId}`);
+        const likesResponse = await api.get(
+          `/api/user/likes?user_id=${userId}`
+        );
         setLikedBlogs(likesResponse.data.likedBlogIds || []);
 
         const initialReviewData = {};
@@ -97,11 +108,14 @@ const VintageArticlePage = () => {
   }, [userId, fullName]);
 
   const filteredBlogs = blogs
-    .filter((blog) =>
-      (blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        blog.tags.some((tag) => tag.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        blog.excerpt.toLowerCase().includes(searchTerm.toLowerCase())) &&
-      (categoryFilter ? blog.category === categoryFilter : true)
+    .filter(
+      (blog) =>
+        (blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          blog.tags.some((tag) =>
+            tag.toLowerCase().includes(searchTerm.toLowerCase())
+          ) ||
+          blog.excerpt.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (categoryFilter ? blog.category === categoryFilter : true)
     )
     .sort((a, b) =>
       sortOrder === "Newest First"
@@ -110,9 +124,11 @@ const VintageArticlePage = () => {
     );
 
   const hasUserReviewed = (blogId) => {
-    const blog = blogs.find(b => b.id === blogId);
+    const blog = blogs.find((b) => b.id === blogId);
     if (!blog || !blog.reviews) return false;
-    return blog.reviews.some(review => review.user_id === userId && review.parent_id === null);
+    return blog.reviews.some(
+      (review) => review.user_id === userId && review.parent_id === null
+    );
   };
 
   const handleReviewSubmit = async (blogId) => {
@@ -130,7 +146,10 @@ const VintageArticlePage = () => {
         text: reviewText,
         stars: rating,
       };
-      const response = await api.post(`/api/blogs/${blogId}/reviews`, newReview);
+      const response = await api.post(
+        `/api/blogs/${blogId}/reviews`,
+        newReview
+      );
       const addedReview = response.data;
       setBlogs((prevBlogs) =>
         prevBlogs.map((blog) =>
@@ -141,12 +160,19 @@ const VintageArticlePage = () => {
       );
       setReviewData((prev) => ({
         ...prev,
-        [blogId]: { ...prev[blogId], rating: 0, reviewName: fullName || "", reviewText: "" },
+        [blogId]: {
+          ...prev[blogId],
+          rating: 0,
+          reviewName: fullName || "",
+          reviewText: "",
+        },
       }));
       toast.dismiss();
       toast.success("Review submitted successfully.");
     } catch (error) {
-      if (error.response?.data?.message === 'User has already reviewed this blog') {
+      if (
+        error.response?.data?.message === "User has already reviewed this blog"
+      ) {
         toast.dismiss();
         toast.info("You have already reviewed this blog.");
       } else {
@@ -170,7 +196,10 @@ const VintageArticlePage = () => {
         name: replyName,
         text: replyText,
       };
-      const response = await api.post(`/api/blogs/${blogId}/reviews/${reviewId}/replies`, newReply);
+      const response = await api.post(
+        `/api/blogs/${blogId}/reviews/${reviewId}/replies`,
+        newReply
+      );
       const addedReply = response.data;
       setBlogs((prevBlogs) =>
         prevBlogs.map((blog) =>
@@ -188,7 +217,12 @@ const VintageArticlePage = () => {
       );
       setReviewData((prev) => ({
         ...prev,
-        [blogId]: { ...prev[blogId], replyName: fullName || "", replyText: "", replyToReviewId: null },
+        [blogId]: {
+          ...prev[blogId],
+          replyName: fullName || "",
+          replyText: "",
+          replyToReviewId: null,
+        },
       }));
       toast.dismiss();
       toast.success("Reply submitted successfully.");
@@ -206,7 +240,9 @@ const VintageArticlePage = () => {
     }
 
     try {
-      const response = await api.post(`/api/blogs/${blogId}/like`, { user_id: userId });
+      const response = await api.post(`/api/blogs/${blogId}/like`, {
+        user_id: userId,
+      });
       setBlogs((prevBlogs) =>
         prevBlogs.map((blog) =>
           blog.id === blogId ? { ...blog, likes: response.data.likes } : blog
@@ -216,7 +252,9 @@ const VintageArticlePage = () => {
       toast.dismiss();
       toast.success("Blog liked!");
     } catch (error) {
-      if (error.response?.data?.message === "User has already liked this blog") {
+      if (
+        error.response?.data?.message === "User has already liked this blog"
+      ) {
         toast.dismiss();
         toast.info("You have already liked this blog.");
       } else {
@@ -236,7 +274,9 @@ const VintageArticlePage = () => {
     const isShowing = showReviewsSection[blogId];
     if (!isShowing) {
       try {
-        const response = await api.post(`/api/blogs/${blogId}/view`, { user_id: userId });
+        const response = await api.post(`/api/blogs/${blogId}/view`, {
+          user_id: userId,
+        });
         setBlogs((prevBlogs) =>
           prevBlogs.map((blog) =>
             blog.id === blogId ? { ...blog, views: response.data.views } : blog
@@ -256,9 +296,17 @@ const VintageArticlePage = () => {
   const getShareUrls = (blog) => {
     const url = `${window.location.origin}/blog/${blog.slug}`;
     return {
-      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(blog.title)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(blog.excerpt)}`,
+      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(
+        url
+      )}&text=${encodeURIComponent(blog.title)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        url
+      )}`,
+      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(
+        url
+      )}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(
+        blog.excerpt
+      )}`,
     };
   };
 
@@ -331,7 +379,8 @@ const VintageArticlePage = () => {
             const totalReviews = (blog.reviews || []).length;
             const ratingsData = [5, 4, 3, 2, 1].map((stars) => ({
               stars,
-              count: (blog.reviews || []).filter((r) => r.stars === stars).length,
+              count: (blog.reviews || []).filter((r) => r.stars === stars)
+                .length,
             }));
             const shareUrls = getShareUrls(blog);
             const isLiked = likedBlogs.includes(blog.id);
@@ -364,7 +413,9 @@ const VintageArticlePage = () => {
                   <div className="flex flex-wrap items-center text-sm text-gray-500 gap-2 mb-4">
                     <span>{blog.category}</span>
                     <span>•</span>
-                    <span>{new Date(blog.created_at).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(blog.created_at).toLocaleDateString()}
+                    </span>
                     <span>•</span>
                     <span>8 min read</span>
                   </div>
@@ -379,19 +430,21 @@ const VintageArticlePage = () => {
                     ))}
                   </div>
                   <p className="text-gray-700 mb-4">{blog.excerpt}</p>
-                  <a
-                    href={`/blog/${blog.slug}`}
+                  <Link
+                    to={`/blogsview`}
                     className="text-[#6d4c41] hover:underline"
                   >
                     Read More
-                  </a>
+                  </Link>
 
                   <div className="mt-3">
                     <button
                       onClick={() => toggleReviews(blog.id)}
                       className="text-[#8d6e63] text-sm font-medium hover:underline transition"
                     >
-                      {showReviewsSection[blog.id] ? "Hide Reviews" : "Show Reviews"}
+                      {showReviewsSection[blog.id]
+                        ? "Hide Reviews"
+                        : "Show Reviews"}
                     </button>
                   </div>
 
@@ -411,13 +464,25 @@ const VintageArticlePage = () => {
                       {blog.likes || 0}
                     </div>
                     <div className="flex items-center gap-2">
-                      <a href={shareUrls.twitter} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={shareUrls.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <FaTwitter className="text-[#1DA1F2] hover:opacity-80" />
                       </a>
-                      <a href={shareUrls.facebook} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={shareUrls.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <FaFacebook className="text-[#3b5998] hover:opacity-80" />
                       </a>
-                      <a href={shareUrls.linkedin} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={shareUrls.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <FaLinkedin className="text-[#0077b5] hover:opacity-80" />
                       </a>
                     </div>
@@ -439,8 +504,10 @@ const VintageArticlePage = () => {
                             <span className="text-3xl font-bold">
                               {totalReviews > 0
                                 ? (
-                                    (blog.reviews || []).reduce((sum, r) => sum + r.stars, 0) /
-                                    totalReviews
+                                    (blog.reviews || []).reduce(
+                                      (sum, r) => sum + r.stars,
+                                      0
+                                    ) / totalReviews
                                   ).toFixed(1)
                                 : "0.0"}
                             </span>
@@ -448,8 +515,10 @@ const VintageArticlePage = () => {
                               {[...Array(5)].map((_, i) =>
                                 i <
                                 Math.round(
-                                  (blog.reviews || []).reduce((sum, r) => sum + r.stars, 0) /
-                                    totalReviews
+                                  (blog.reviews || []).reduce(
+                                    (sum, r) => sum + r.stars,
+                                    0
+                                  ) / totalReviews
                                 ) ? (
                                   <FaStar key={i} />
                                 ) : (
@@ -468,7 +537,10 @@ const VintageArticlePage = () => {
                                 ? Math.round((count / totalReviews) * 100)
                                 : 0;
                               return (
-                                <div key={stars} className="flex items-center gap-2 text-sm">
+                                <div
+                                  key={stars}
+                                  className="flex items-center gap-2 text-sm"
+                                >
                                   <span className="w-12">{stars} star</span>
                                   <div className="flex-1 bg-gray-200 rounded h-3 overflow-hidden">
                                     <div
@@ -476,32 +548,45 @@ const VintageArticlePage = () => {
                                       style={{ width: `${percentage}%` }}
                                     ></div>
                                   </div>
-                                  <span className="w-6 text-right text-gray-500">{count}</span>
+                                  <span className="w-6 text-right text-gray-500">
+                                    {count}
+                                  </span>
                                 </div>
                               );
                             })}
                           </div>
 
                           <div className="mt-6">
-                            <h4 className="font-medium text-[#5d4037] mb-2">Add Your Review</h4>
+                            <h4 className="font-medium text-[#5d4037] mb-2">
+                              Add Your Review
+                            </h4>
                             {hasReviewed ? (
-                              <p className="text-gray-600">You have already reviewed this blog.</p>
+                              <p className="text-gray-600">
+                                You have already reviewed this blog.
+                              </p>
                             ) : (
                               <>
                                 <input
                                   type="text"
-                                  placeholder={fullName ? fullName : "Enter your name"}
+                                  placeholder={
+                                    fullName ? fullName : "Enter your name"
+                                  }
                                   value={reviewData[blog.id]?.reviewName || ""}
                                   onChange={(e) =>
                                     !fullName &&
                                     setReviewData((prev) => ({
                                       ...prev,
-                                      [blog.id]: { ...prev[blog.id], reviewName: e.target.value },
+                                      [blog.id]: {
+                                        ...prev[blog.id],
+                                        reviewName: e.target.value,
+                                      },
                                     }))
                                   }
                                   readOnly={!!fullName}
                                   className={`w-full mb-2 p-2 border rounded ${
-                                    fullName ? "bg-gray-100 cursor-not-allowed" : ""
+                                    fullName
+                                      ? "bg-gray-100 cursor-not-allowed"
+                                      : ""
                                   }`}
                                 />
                                 <textarea
@@ -510,7 +595,10 @@ const VintageArticlePage = () => {
                                   onChange={(e) =>
                                     setReviewData((prev) => ({
                                       ...prev,
-                                      [blog.id]: { ...prev[blog.id], reviewText: e.target.value },
+                                      [blog.id]: {
+                                        ...prev[blog.id],
+                                        reviewText: e.target.value,
+                                      },
                                     }))
                                   }
                                   className="w-full mb-2 p-2 border rounded"
@@ -524,14 +612,20 @@ const VintageArticlePage = () => {
                                         !hasReviewed &&
                                         setReviewData((prev) => ({
                                           ...prev,
-                                          [blog.id]: { ...prev[blog.id], rating: star },
+                                          [blog.id]: {
+                                            ...prev[blog.id],
+                                            rating: star,
+                                          },
                                         }))
                                       }
                                       className={`cursor-pointer text-xl ${
-                                        (reviewData[blog.id]?.rating || 0) >= star
+                                        (reviewData[blog.id]?.rating || 0) >=
+                                        star
                                           ? "text-yellow-500"
                                           : "text-gray-300"
-                                      } ${hasReviewed ? "cursor-not-allowed" : ""}`}
+                                      } ${
+                                        hasReviewed ? "cursor-not-allowed" : ""
+                                      }`}
                                     >
                                       <FaStar />
                                     </span>
@@ -540,7 +634,9 @@ const VintageArticlePage = () => {
                                 <button
                                   onClick={() => handleReviewSubmit(blog.id)}
                                   className={`bg-[#8d6e63] text-white px-4 py-2 rounded hover:bg-[#6d4c41] transition ${
-                                    hasReviewed ? "opacity-50 cursor-not-allowed" : ""
+                                    hasReviewed
+                                      ? "opacity-50 cursor-not-allowed"
+                                      : ""
                                   }`}
                                   disabled={hasReviewed}
                                 >
@@ -554,17 +650,27 @@ const VintageArticlePage = () => {
                             {(blog.reviews || []).map((review) => (
                               <div key={review.id} className="border-t pt-4">
                                 <div className="flex items-center gap-2 mb-1">
-                                  <span className="font-semibold">{review.name}</span>
-                                  <span className="text-gray-400 text-sm">{review.date}</span>
+                                  <span className="font-semibold">
+                                    {review.name}
+                                  </span>
+                                  <span className="text-gray-400 text-sm">
+                                    {review.date}
+                                  </span>
                                 </div>
                                 {review.stars && (
                                   <div className="flex items-center gap-1 text-yellow-500 mb-1">
                                     {[...Array(5)].map((_, i) =>
-                                      i < review.stars ? <FaStar key={i} /> : <FaRegStar key={i} />
+                                      i < review.stars ? (
+                                        <FaStar key={i} />
+                                      ) : (
+                                        <FaRegStar key={i} />
+                                      )
                                     )}
                                   </div>
                                 )}
-                                <p className="text-gray-700 mb-2">{review.text}</p>
+                                <p className="text-gray-700 mb-2">
+                                  {review.text}
+                                </p>
                                 <button
                                   onClick={() =>
                                     setReviewData((prev) => ({
@@ -572,46 +678,69 @@ const VintageArticlePage = () => {
                                       [blog.id]: {
                                         ...prev[blog.id],
                                         replyToReviewId:
-                                          prev[blog.id].replyToReviewId === review.id ? null : review.id,
+                                          prev[blog.id].replyToReviewId ===
+                                          review.id
+                                            ? null
+                                            : review.id,
                                       },
                                     }))
                                   }
                                   className="text-sm text-[#8d6e63] hover:underline"
                                 >
-                                  {reviewData[blog.id]?.replyToReviewId === review.id ? "Cancel Reply" : "Reply"}
+                                  {reviewData[blog.id]?.replyToReviewId ===
+                                  review.id
+                                    ? "Cancel Reply"
+                                    : "Reply"}
                                 </button>
 
-                                {reviewData[blog.id]?.replyToReviewId === review.id && (
+                                {reviewData[blog.id]?.replyToReviewId ===
+                                  review.id && (
                                   <div className="mt-2 ml-4 space-y-2">
                                     <input
                                       type="text"
-                                      placeholder={fullName ? fullName : "Enter your name"}
-                                      value={reviewData[blog.id]?.replyName || ""}
+                                      placeholder={
+                                        fullName ? fullName : "Enter your name"
+                                      }
+                                      value={
+                                        reviewData[blog.id]?.replyName || ""
+                                      }
                                       onChange={(e) =>
                                         !fullName &&
                                         setReviewData((prev) => ({
                                           ...prev,
-                                          [blog.id]: { ...prev[blog.id], replyName: e.target.value },
+                                          [blog.id]: {
+                                            ...prev[blog.id],
+                                            replyName: e.target.value,
+                                          },
                                         }))
                                       }
                                       readOnly={!!fullName}
                                       className={`w-full mb-1 p-2 border rounded ${
-                                        fullName ? "bg-gray-100 cursor-not-allowed" : ""
+                                        fullName
+                                          ? "bg-gray-100 cursor-not-allowed"
+                                          : ""
                                       }`}
                                     />
                                     <textarea
                                       placeholder="Your Reply"
-                                      value={reviewData[blog.id]?.replyText || ""}
+                                      value={
+                                        reviewData[blog.id]?.replyText || ""
+                                      }
                                       onChange={(e) =>
                                         setReviewData((prev) => ({
                                           ...prev,
-                                          [blog.id]: { ...prev[blog.id], replyText: e.target.value },
+                                          [blog.id]: {
+                                            ...prev[blog.id],
+                                            replyText: e.target.value,
+                                          },
                                         }))
                                       }
                                       className="w-full mb-1 p-2 border rounded"
                                     />
                                     <button
-                                      onClick={() => handleReplySubmit(blog.id, review.id)}
+                                      onClick={() =>
+                                        handleReplySubmit(blog.id, review.id)
+                                      }
                                       className="bg-[#8d6e63] text-white px-3 py-1 rounded hover:bg-[#6d4c41] transition text-sm"
                                     >
                                       Submit Reply
@@ -624,10 +753,16 @@ const VintageArticlePage = () => {
                                     {review.replies.map((reply) => (
                                       <div key={reply.id}>
                                         <div className="flex items-center gap-2 text-sm">
-                                          <span className="font-medium">{reply.name}</span>
-                                          <span className="text-gray-400">{reply.date}</span>
+                                          <span className="font-medium">
+                                            {reply.name}
+                                          </span>
+                                          <span className="text-gray-400">
+                                            {reply.date}
+                                          </span>
                                         </div>
-                                        <p className="text-gray-600 text-sm">{reply.text}</p>
+                                        <p className="text-gray-600 text-sm">
+                                          {reply.text}
+                                        </p>
                                       </div>
                                     ))}
                                   </div>
