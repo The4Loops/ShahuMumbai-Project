@@ -73,17 +73,18 @@ exports.getAllUsers = async (req, res) => {
   if (authError) return res.status(403).json({ error: "Unauthorized: Admin access required" });
 
   try {
-    const { search, role, status } = req.query;
+    const { search, role, status, excludeRole } = req.query;
     let query = supabase
       .from("users")
       .select("id, full_name, email, roles!role_id(label), active, joined, last_login");
 
+    // Search by name or email
     if (search) {
       query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
     }
 
-    if (role) {
-      // Fetch role_id for the given role label
+    // Filter by role
+    if (role && role !== "All") {
       const { data: roleData, error: roleError } = await supabase
         .from("roles")
         .select("id")
@@ -95,8 +96,24 @@ exports.getAllUsers = async (req, res) => {
       }
       query = query.eq("role_id", roleData.id);
     }
-    if (status) {
+
+    // Filter by status
+    if (status && status !== "All") {
       query = query.eq("active", status === "active" ? "Y" : "N");
+    }
+
+    // Exclude specific role (e.g., Users)
+    if (excludeRole) {
+      const { data: excludeRoleData, error: excludeRoleError } = await supabase
+        .from("roles")
+        .select("id")
+        .eq("label", excludeRole)
+        .single();
+
+      if (excludeRoleError || !excludeRoleData) {
+        return res.status(400).json({ error: `Exclude role '${excludeRole}' not found` });
+      }
+      query = query.neq("role_id", excludeRoleData.id); // Use neq to exclude the role
     }
 
     const { data, error } = await query;

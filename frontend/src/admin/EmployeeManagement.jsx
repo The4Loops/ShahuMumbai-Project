@@ -18,7 +18,7 @@ function EmployeeManagement() {
     name: "",
     email: "",
     password: "",
-    role: "Users",
+    role: "Editor",
     status: "active",
   });
 
@@ -50,6 +50,7 @@ function EmployeeManagement() {
           search: search || undefined,
           role: roleFilter !== "All" ? roleFilter : undefined,
           status: statusFilter !== "All" ? statusFilter.toLowerCase() : undefined,
+          excludeRole: "Users",
         },
       });
       const transformedUsers = response.data.users.map(user => ({
@@ -220,7 +221,6 @@ function EmployeeManagement() {
               <option>Admin</option>
               <option>Manager</option>
               <option>Editor</option>
-              <option>Users</option>
             </select>
             <select
               className="border rounded-lg px-3 py-2"
