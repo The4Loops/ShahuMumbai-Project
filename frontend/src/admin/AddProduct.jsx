@@ -4,7 +4,11 @@ import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import Select from 'react-select';
 
-const AddProduct = () => {
+const PRODUCT_GET_URL = (id) => `/api/products/${id}`;
+const PRODUCT_CREATE_URL = `/api/products`;
+const PRODUCT_UPDATE_URL = (id) => `/api/products/${id}`;
+
+const AddProduct = ({ editId = null, onSaved }) => {
   const {
     register,
     handleSubmit,
@@ -15,7 +19,17 @@ const AddProduct = () => {
     trigger,
   } = useForm({
     defaultValues: {
-      categoryid: '', 
+      name: '',
+      description: '',
+      shortdescription: '',
+      categoryid: '',
+      branddesigner: '',
+      price: '',
+      discountprice: '',
+      stock: 0,
+      isactive: true,
+      isfeatured: false,
+      collection_id: null,   // ✅ new field
     }
   });
 
@@ -25,71 +39,132 @@ const AddProduct = () => {
   const [previews, setPreviews] = useState([]); // object URLs to clean up
   const [categories, setCategories] = useState([]);
   const [loadingCats, setLoadingCats] = useState(true);
+  const [collections, setCollections] = useState([]);
+  const [loadingCollections, setLoadingCollections] = useState(true);
 
-  // Fetch categories on mount
+  // Existing images from DB (edit mode)
+  const [existingImages, setExistingImages] = useState([]); // [{url, is_hero}]
+
+  // Load categories
   useEffect(() => {
-    const fetchCategories = async () => {
+    (async () => {
       try {
         setLoadingCats(true);
-        const response = await api.get('/api/category');
-        setCategories(response.data || []);
+        const { data } = await api.get('/api/category');
+        setCategories(data || []);
       } catch (err) {
         toast.error(err?.response?.data?.message || 'Failed to fetch categories');
       } finally {
         setLoadingCats(false);
       }
-    };
-    fetchCategories();
+    })();
   }, []);
 
-  // Generate & cleanup image previews
+  // Load collections
   useEffect(() => {
-    // revoke old
+    (async () => {
+      try {
+        setLoadingCollections(true);
+        const { data } = await api.get('/api/collections/options');
+        setCollections(Array.isArray(data) ? data : data?.items || []);
+      } catch (err) {
+        toast.error(err?.response?.data?.message || 'Failed to fetch collections');
+      } finally {
+        setLoadingCollections(false);
+      }
+    })();
+  }, []);
+
+  // If editing: fetch product and prefill
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      try {
+        const { data } = await api.get(PRODUCT_GET_URL(editId));
+        // shape expectations — adjust keys if your API differs
+        const p = data || {};
+        reset({
+          name: p.name ?? '',
+          description: p.description ?? '',
+          shortdescription: p.shortdescription ?? '',
+          categoryid: p.categoryid ?? '',
+          branddesigner: p.branddesigner ?? '',
+          price: p.price ?? '',
+          discountprice: p.discountprice ?? '',
+          stock: p.stock ?? 0,
+          isactive: !!p.isactive,
+          isfeatured: !!p.isfeatured,
+          collection_id: p.collection_id ?? null,
+        });
+
+        // existing images
+        const imgs = (p.images || []).map((img) => ({
+          url: img.url || img.image_url || '',
+          is_hero: !!img.is_hero,
+        }));
+        setExistingImages(imgs);
+
+        // hero index from existing
+        const heroIdx = imgs.findIndex((i) => i.is_hero);
+        setHeroImageIndex(heroIdx >= 0 ? heroIdx : null);
+      } catch (err) {
+        toast.error(err?.response?.data?.message || 'Failed to load product');
+      }
+    })();
+  }, [editId, reset]);
+
+  // Generate & cleanup previews for newly selected files
+  useEffect(() => {
     previews.forEach((url) => URL.revokeObjectURL(url));
-    // create new
     const urls = selectedImages.map((file) => URL.createObjectURL(file));
     setPreviews(urls);
-    return () => {
-      urls.forEach((url) => URL.revokeObjectURL(url));
-    };
+    return () => { urls.forEach((url) => URL.revokeObjectURL(url)); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedImages]);
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files || []);
     setSelectedImages(files);
-    setHeroImageIndex(null); // Reset hero image selection
+    // If user picks new images, reset hero selection to one of the new ones (index space changes)
+    setHeroImageIndex(null);
   };
 
   const price = watch('price');
   const discountprice = watch('discountprice');
-  const categoryid = watch('categoryid'); 
+  const categoryid = watch('categoryid'); // for react-select binding
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
     toast.dismiss();
 
     try {
-      // Validate hero image selection
-      if (selectedImages.length === 0) throw new Error('At least one image is required');
-      if (heroImageIndex === null) throw new Error('Please select a hero image');
+      // In CREATE mode, images are required
+      if (!editId) {
+        if (selectedImages.length === 0) throw new Error('At least one image is required');
+        if (heroImageIndex === null) throw new Error('Please select a hero image');
+      }
 
-      // Validate categoryid
-      if (!data.categoryid) throw new Error('Category is required');
+      // Optional upload of new images (only if user picked any)
+      let newImagePayload = null;
+      if (selectedImages.length > 0) {
+        const formData = new FormData();
+        selectedImages.forEach((file) => formData.append('files', file));
 
-      // Upload images (multipart)
-      const formData = new FormData();
-      selectedImages.forEach((file) => formData.append('files', file));
+        const uploadResponse = await api.post('/api/upload/multiple', formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+        });
 
-      const uploadResponse = await api.post('/api/upload/multiple', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
+        const imageUrls = uploadResponse?.data?.imageUrls || [];
+        if (!imageUrls.length) throw new Error('Image upload failed');
 
-      const imageUrls = uploadResponse?.data?.imageUrls || [];
-      if (!imageUrls.length) throw new Error('Image upload failed');
+        newImagePayload = imageUrls.map((url, index) => ({
+          url,
+          is_hero: index === Number(heroImageIndex),
+        }));
+      }
 
-      // Prepare product payload
-      const productData = {
+      // Build payload
+      const payload = {
         name: data.name,
         description: data.description,
         shortdescription: data.shortdescription,
@@ -100,25 +175,40 @@ const AddProduct = () => {
         stock: Number(data.stock),
         isactive: !!data.isactive,
         isfeatured: !!data.isfeatured,
-        uploadeddate: new Date().toISOString(),
-        images: imageUrls.map((url, index) => ({
-          url,
-          is_hero: index === Number(heroImageIndex),
-        })),
+        collection_id: data.collection_id || null,  // ✅ include collection
       };
 
-      const response = await api.post('/api/products', productData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-
-      if (response.status === 201) {
-        toast.success('Product created successfully!');
-        reset();
-        setSelectedImages([]);
-        setHeroImageIndex(null);
+      // For create: we must include images + uploadeddate
+      if (!editId) {
+        payload.uploadeddate = new Date().toISOString();
+        payload.images = newImagePayload; // guaranteed non-null in create branch
+        const res = await api.post(PRODUCT_CREATE_URL, payload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (res.status === 201) {
+          toast.success('Product created successfully!');
+          reset();
+          setSelectedImages([]);
+          setExistingImages([]);
+          setHeroImageIndex(null);
+          onSaved?.();
+        }
+      } else {
+        // For update: only include images if new ones were selected,
+        // otherwise backend should keep existing images unchanged
+        if (newImagePayload) {
+          payload.images = newImagePayload;
+        }
+        const res = await api.put(PRODUCT_UPDATE_URL(editId), payload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (res.status >= 200 && res.status < 300) {
+          toast.success('Product updated successfully!');
+          onSaved?.();
+        }
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Failed to create product');
+      toast.error(err?.response?.data?.message || err.message || 'Failed to save product');
     } finally {
       setIsSubmitting(false);
     }
@@ -127,35 +217,25 @@ const AddProduct = () => {
   // Themed react-select styles
   const customSelectStyles = useMemo(
     () => ({
-      control: (provided, state) => ({
-        ...provided,
+      control: (p, s) => ({
+        ...p,
         minHeight: 44,
         borderRadius: 6,
         backgroundColor: '#FFFFFF',
         border: errors.categoryid ? '1px solid #EF4444' : '1px solid #E6DCD2',
-        boxShadow: state.isFocused ? '0 0 0 2px #D4A5A5' : 'none',
+        boxShadow: s.isFocused ? '0 0 0 2px #D4A5A5' : 'none',
         '&:hover': { borderColor: '#D4A5A5' },
       }),
-      menu: (provided) => ({
-        ...provided,
-        border: '1px solid #D4A5A5',
-        borderRadius: 6,
-        backgroundColor: '#FFFFFF',
-        zIndex: 50,
-      }),
-      option: (provided, state) => ({
-        ...provided,
-        backgroundColor: state.isSelected ? '#D4A5A5' : state.isFocused ? '#F3E8E8' : '#FFFFFF',
-        color: state.isSelected ? '#FFFFFF' : '#111827',
+      menu: (p) => ({ ...p, border: '1px solid #D4A5A5', borderRadius: 6, backgroundColor: '#FFFFFF', zIndex: 50 }),
+      option: (p, s) => ({
+        ...p,
+        backgroundColor: s.isSelected ? '#D4A5A5' : s.isFocused ? '#F3E8E8' : '#FFFFFF',
+        color: s.isSelected ? '#FFFFFF' : '#111827',
         padding: '0.5rem 0.75rem',
       }),
-      singleValue: (provided) => ({ ...provided, color: '#111827' }),
-      placeholder: (provided) => ({ ...provided, color: '#9CA3AF' }),
-      dropdownIndicator: (provided) => ({
-        ...provided,
-        color: '#D4A5A5',
-        '&:hover': { color: '#C39898' },
-      }),
+      singleValue: (p) => ({ ...p, color: '#111827' }),
+      placeholder: (p) => ({ ...p, color: '#9CA3AF' }),
+      dropdownIndicator: (p) => ({ ...p, color: '#D4A5A5', '&:hover': { color: '#C39898' } }),
     }),
     [errors.categoryid]
   );
@@ -164,9 +244,16 @@ const AddProduct = () => {
     'rounded-md px-4 py-3 w-full border border-[#E6DCD2] text-[#6B4226] placeholder-[#6B4226]/50 ' +
     'focus:outline-none focus:ring-2 focus:ring-[#D4A5A5] focus:border-[#D4A5A5]';
 
+  const categoryOptions = (categories || []).map((c) => ({
+    value: c.categoryid,
+    label: c.name,
+  }));
+
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 bg-white rounded-lg border border-[#E6DCD2]">
-      <h2 className="text-xl font-semibold text-[#6B4226] mb-4">Add Product</h2>
+      <h2 className="text-xl font-semibold text-[#6B4226] mb-4">
+        {editId ? 'Edit Product' : 'Add Product'}
+      </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* Product Name */}
@@ -227,7 +314,8 @@ const AddProduct = () => {
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">Category *</label>
           <Select
-            options={(categories || []).map((c) => ({ value: c.categoryid, label: c.name }))}
+            options={categoryOptions}
+            value={categoryOptions.find((o) => o.value === categoryid) || null}
             onChange={(opt) => {
               setValue('categoryid', opt ? opt.value : '');
               trigger('categoryid');
@@ -239,6 +327,20 @@ const AddProduct = () => {
             classNamePrefix="react-select"
           />
           {errors.categoryid && <p className="text-red-600 text-xs mt-1">{errors.categoryid.message}</p>}
+        </div>
+
+        {/* Collection (simple select) */}
+        <div>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">Collection</label>
+          <select
+            className={inputBase}
+            {...register('collection_id')}
+          >
+            <option value="">— None —</option>
+            {collections.map((c) => (
+              <option key={c.id} value={c.id}>{c.title}</option>
+            ))}
+          </select>
         </div>
 
         {/* Price */}
@@ -302,9 +404,9 @@ const AddProduct = () => {
           <label htmlFor="isfeatured" className="text-sm text-[#6B4226]">Featured</label>
         </div>
 
-        {/* Images */}
+        {/* Images (required only when creating) */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Images *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">Images {editId ? '(optional)' : '*'}</label>
           <input
             type="file"
             accept="image/*"
@@ -313,45 +415,75 @@ const AddProduct = () => {
                         file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-white 
                         file:font-semibold file:bg-[#D4A5A5] file:hover:bg-[#C39898] file:transition`}
             {...register('images', {
-              required: 'At least one image is required',
-              validate: {
-                fileType: (files) =>
-                  Array.from(files || []).every((f) => f.type.startsWith('image/')) ||
-                  'Please select image files only',
-                minCount: (files) => (files?.length || 0) >= 1 || 'At least one image is required',
-              },
+              validate: editId
+                ? {  // Edit mode: optional
+                    fileType: (files) =>
+                      Array.from(files || []).every((f) => f.type?.startsWith('image/')) ||
+                      'Please select image files only',
+                  }
+                : {  // Create mode: required
+                    required: 'At least one image is required',
+                    fileType: (files) =>
+                      Array.from(files || []).every((f) => f.type?.startsWith('image/')) ||
+                      'Please select image files only',
+                    minCount: (files) => (files?.length || 0) >= 1 || 'At least one image is required',
+                  },
             })}
             onChange={handleImageChange}
           />
           {errors.images && <p className="text-red-600 text-xs mt-1">{errors.images.message}</p>}
         </div>
 
-        {/* Hero Image Picker */}
-        {selectedImages.length > 0 && (
+        {/* Existing images (edit) + Previews (new) + Hero picker */}
+        {(existingImages.length > 0 || previews.length > 0) && (
           <div className="md:col-span-2">
             <p className="text-sm font-semibold mb-2 text-[#6B4226]">Select Hero Image:</p>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
-              {previews.map((src, index) => (
+              {/* Existing images (only in edit mode) */}
+              {existingImages.map((img, idx) => (
                 <button
                   type="button"
-                  key={index}
+                  key={`old-${idx}`}
                   className={`relative group rounded-md overflow-hidden border ${
-                    heroImageIndex === index ? 'border-[#D4A5A5] ring-2 ring-[#D4A5A5]' : 'border-[#E6DCD2]'
+                    heroImageIndex === idx ? 'border-[#D4A5A5] ring-2 ring-[#D4A5A5]' : 'border-[#E6DCD2]'
                   }`}
-                  onClick={() => setHeroImageIndex(index)}
-                  aria-pressed={heroImageIndex === index}
+                  onClick={() => setHeroImageIndex(idx)}
                 >
-                  <img src={src} alt={`Preview ${index + 1}`} className="w-full h-24 object-cover" />
+                  <img src={img.url} alt={`Existing ${idx + 1}`} className="w-full h-24 object-cover" />
                   <span
                     className={`absolute bottom-1 left-1 right-1 text-[11px] px-1.5 py-0.5 rounded 
-                      ${heroImageIndex === index ? 'bg-[#D4A5A5] text-white' : 'bg-white/80 text-[#6B4226]'}`}
+                      ${heroImageIndex === idx ? 'bg-[#D4A5A5] text-white' : 'bg-white/80 text-[#6B4226]'}`}
                   >
-                    {heroImageIndex === index ? 'Hero Image' : 'Tap to set as Hero'}
+                    {heroImageIndex === idx ? 'Hero Image' : 'Tap to set as Hero'}
                   </span>
                 </button>
               ))}
+
+              {/* New previews (if user selected new files). These start AFTER existing indexes */}
+              {previews.map((src, index) => {
+                const absoluteIndex = existingImages.length + index;
+                return (
+                  <button
+                    type="button"
+                    key={`new-${index}`}
+                    className={`relative group rounded-md overflow-hidden border ${
+                      heroImageIndex === absoluteIndex ? 'border-[#D4A5A5] ring-2 ring-[#D4A5A5]' : 'border-[#E6DCD2]'
+                    }`}
+                    onClick={() => setHeroImageIndex(absoluteIndex)}
+                    aria-pressed={heroImageIndex === absoluteIndex}
+                  >
+                    <img src={src} alt={`Preview ${index + 1}`} className="w-full h-24 object-cover" />
+                    <span
+                      className={`absolute bottom-1 left-1 right-1 text-[11px] px-1.5 py-0.5 rounded 
+                        ${heroImageIndex === absoluteIndex ? 'bg-[#D4A5A5] text-white' : 'bg-white/80 text-[#6B4226]'}`}
+                    >
+                      {heroImageIndex === absoluteIndex ? 'Hero Image' : 'Tap to set as Hero'}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
-            {heroImageIndex === null && (
+            {!editId && heroImageIndex === null && (
               <p className="text-red-600 text-xs mt-2">Please select a hero image</p>
             )}
           </div>
@@ -361,10 +493,10 @@ const AddProduct = () => {
         <div className="md:col-span-2">
           <button
             type="submit"
-            disabled={isSubmitting || heroImageIndex === null}
+            disabled={isSubmitting || (!editId && heroImageIndex === null)}
             className="w-full bg-[#D4A5A5] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow disabled:opacity-50"
           >
-            {isSubmitting ? 'Adding Product...' : 'Add Product'}
+            {isSubmitting ? (editId ? 'Updating…' : 'Adding Product…') : (editId ? 'Update Product' : 'Add Product')}
           </button>
         </div>
       </form>

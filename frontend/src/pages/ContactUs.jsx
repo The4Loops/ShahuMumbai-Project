@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { jwtDecode } from "jwt-decode";
 import {
   FaFacebookF,
   FaInstagram,
@@ -9,6 +10,8 @@ import {
   FaPaperPlane,
 } from "react-icons/fa";
 import Layout from "../layout/Layout";
+import api from "../supabase/axios"; // Assuming this is your axios instance
+import { toast } from "react-toastify";
 
 // Animation Variants
 const fadeInUp = {
@@ -17,26 +20,54 @@ const fadeInUp = {
 };
 
 function ContactPage() {
+  const token = localStorage.getItem("token");
+  let decoded = {};
+  if (token) {
+    try {
+      decoded = jwtDecode(token);
+    } catch (e) {
+      console.error("Invalid token", e);
+      localStorage.removeItem("token");
+    }
+  }
+
   const [form, setForm] = useState({
-    name: "",
-    email: "",
+    name: decoded.fullname || "",
+    email: decoded.email || "",
     subject: "",
     message: "",
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.name || !form.email || !form.message) {
-      alert("Please fill in all required fields.");
+      toast.error("Please fill in all required fields.");
       return;
     }
-    console.log("Form submitted:", form);
-    // 🔗 connect API/email service here
-    setForm({ name: "", email: "", subject: "", message: "" });
+
+    setIsSubmitting(true);
+    try {
+      const response = await api.post("/api/contacts", {
+        name: form.name,
+        email: form.email,
+        subject: form.subject,
+        message: form.message,
+        status: "pending", // Default status
+      });
+      toast.dismiss();
+      toast.success("Message sent successfully!");
+      setForm({ name: decoded.fullname || "", email: decoded.email || "", subject: "", message: "" });
+    } catch (error) {
+      toast.dismiss();
+      toast.error(error.response?.data?.error || "Failed to send message.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const socialLinks = [
@@ -103,21 +134,23 @@ function ContactPage() {
             <h2 className="text-xl font-serif mb-4">Send us a Message</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
               <input
-                className="w-full p-2 border border-gray-200 rounded"
+                className="w-full p-2 border border-gray-200 rounded bg-gray-100"
                 placeholder="Your Name *"
                 name="name"
                 value={form.name}
                 onChange={handleChange}
                 required
+                readOnly={!!token} // Read-only if token exists
               />
               <input
                 type="email"
-                className="w-full p-2 border border-gray-200 rounded"
+                className="w-full p-2 border border-gray-200 rounded bg-gray-100"
                 placeholder="Email Address *"
                 name="email"
                 value={form.email}
                 onChange={handleChange}
                 required
+                readOnly={!!token} // Read-only if token exists
               />
               <input
                 className="w-full p-2 border border-gray-200 rounded"
@@ -137,9 +170,10 @@ function ContactPage() {
               ></textarea>
               <button
                 type="submit"
-                className="flex items-center justify-center gap-2 bg-[#b88c85] text-white px-4 py-2 rounded hover:bg-pink-700 transition"
+                className="flex items-center justify-center gap-2 bg-[#b88c85] text-white px-4 py-2 rounded hover:bg-pink-700 transition disabled:opacity-50"
+                disabled={isSubmitting}
               >
-                Send Message <FaPaperPlane size={16} />
+                {isSubmitting ? "Sending..." : "Send Message"} <FaPaperPlane size={16} />
               </button>
             </form>
           </motion.div>

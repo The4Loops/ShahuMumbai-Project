@@ -22,6 +22,9 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes'); 
 const checkoutRoutes = require('./routes/checkoutRoutes');
 const ordersRoutes = require('./routes/ordersRoutes');
+const contactUsRoutes=require('./routes/contactUsRoutes');
+const teamMembersRoutes=require('./routes/teamMembersRoutes');
+const collectionsRoutes = require('./routes/collectionsRoutes');
 
 const app = express();
 
@@ -65,6 +68,10 @@ app.use('/api', analyticsRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', checkoutRoutes);
 app.use('/api', ordersRoutes);
+app.use('/api',contactUsRoutes);
+app.use('/api',teamMembersRoutes);
+app.use('/api', collectionsRoutes); 
+
 
 
 // Rate Limiting

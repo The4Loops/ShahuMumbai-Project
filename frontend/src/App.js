@@ -69,7 +69,7 @@ function App() {
         <Route path="/profile" element={<Profile />} />
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/blog" element={<Blog />} />
-        <Route path="/blogsview" element={<BlogsView />} />
+        <Route path="/blogs/:id" element={<BlogsView />} />
         <Route path="/returns" element={<Returns />} />
         <Route path="waitlist" element={<WaitlistProductCard />} />
       </Routes>

@@ -1,97 +1,98 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-
-const artistTeam = [
-  {
-    initials: "IC",
-    name: "Isabella Chen",
-    role: "Lead Designer",
-    desc: "Creative visionary with 8+ years in vintage-inspired design.",
-    color: "bg-pink-500",
-  },
-  // ... your other artist members
-];
-
-const technicalTeam = [
-  {
-    initials: "JD",
-    name: "John Doe",
-    role: "Frontend Engineer",
-    desc: "Expert in React and modern frontend tech.",
-    color: "bg-blue-500",
-  },
-  // ... your other technical members
-];
+import api from "../supabase/axios";
+import { toast } from "react-toastify";
 
 export default function TeamManagement() {
   const [teamType, setTeamType] = useState("artist");
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [editingIndex, setEditingIndex] = useState(null);
-
-  const [artistTeamState, setArtistTeamState] = useState(artistTeam);
-  const [technicalTeamState, setTechnicalTeamState] = useState(technicalTeam);
+  const [editingId, setEditingId] = useState(null);
+  const [teamData, setTeamData] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const [newMember, setNewMember] = useState({
     name: "",
     role: "",
     color: "bg-pink-500",
-    team: teamType,
-    desc: "",
+    team_type: teamType,
+    description: "",
   });
 
-  const teamData = teamType === "artist" ? artistTeamState : technicalTeamState;
+  // Fetch team members
+  useEffect(() => {
+    const fetchTeam = async () => {
+      setLoading(true);
+      setTeamData([]); // Clear teamData to prevent stale data
+      try {
+        const { data } = await api.get("/api/team-members", {
+          params: { team_type: teamType },
+        });
+        setTeamData(data.members || []);
+      } catch (err) {
+        toast.error("Failed to load team members");
+        setTeamData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTeam();
+  }, [teamType]);
+
+  // Update newMember.team_type when teamType changes
+  useEffect(() => {
+    setNewMember((prev) => ({ ...prev, team_type: teamType }));
+  }, [teamType]);
+
   const filteredTeam = teamData.filter((member) =>
     member.name.toLowerCase().includes(search.toLowerCase())
   );
 
-  const handleAddOrUpdateMember = () => {
+  const handleAddOrUpdateMember = async () => {
     if (!newMember.name || !newMember.role) {
-      return alert("Please fill all required fields");
+      toast.error("Please fill all required fields");
+      return;
     }
 
-    const memberToSave = {
-      ...newMember,
-      initials: newMember.name
-        .split(" ")
-        .map((n) => n[0])
-        .join("")
-        .toUpperCase(),
-    };
+    try {
+      let response;
+      if (isEditing && editingId) {
+        response = await api.put(`/api/team-members/${editingId}`, newMember);
+      } else {
+        response = await api.post("/api/team-members", newMember);
+      }
+      toast.success(isEditing ? "Member updated" : "Member added");
 
-    if (isEditing && editingIndex !== null) {
-      // Remove from original team
-      if (teamType === "artist") {
-        setArtistTeamState((prev) =>
-          prev.filter((_, i) => i !== editingIndex)
-        );
-      } else {
-        setTechnicalTeamState((prev) =>
-          prev.filter((_, i) => i !== editingIndex)
-        );
-      }
+      // Refresh team data
+      const { data } = await api.get("/api/team-members", {
+        params: { team_type: teamType },
+      });
+      setTeamData(data.members || []);
 
-      // Add to new/selected team
-      if (newMember.team === "artist") {
-        setArtistTeamState((prev) => [...prev, memberToSave]);
-      } else {
-        setTechnicalTeamState((prev) => [...prev, memberToSave]);
-      }
-    } else {
-      // Add new member
-      if (newMember.team === "artist") {
-        setArtistTeamState((prev) => [...prev, memberToSave]);
-      } else {
-        setTechnicalTeamState((prev) => [...prev, memberToSave]);
-      }
+      // Reset modal
+      setNewMember({ name: "", role: "", color: "bg-pink-500", team_type: teamType, description: "" });
+      setShowModal(false);
+      setIsEditing(false);
+      setEditingId(null);
+    } catch (err) {
+      toast.error("Failed to save member");
     }
+  };
 
-    // Reset modal
-    setNewMember({ name: "", role: "", color: "bg-pink-500", team: teamType, desc: "" });
-    setShowModal(false);
-    setIsEditing(false);
-    setEditingIndex(null);
+  const handleDelete = async (id) => {
+    if (!window.confirm("Delete this member?")) return;
+    try {
+      await api.delete(`/api/team-members/${id}`);
+      toast.success("Member deleted");
+      // Refresh team data
+      const { data } = await api.get("/api/team-members", {
+        params: { team_type: teamType },
+      });
+      setTeamData(data.members || []);
+    } catch (err) {
+      toast.error("Failed to delete member");
+    }
   };
 
   return (
@@ -137,13 +138,10 @@ export default function TeamManagement() {
         />
         <div className="flex items-center gap-4">
           <span className="text-gray-600">{teamData.length} members</span>
-          <span className="text-gray-600">
-            Total: {artistTeamState.length + technicalTeamState.length}
-          </span>
           <button
             className="bg-black text-white px-4 py-2 rounded-lg"
             onClick={() => {
-              setNewMember({ name: "", role: "", color: "bg-pink-500", team: teamType, desc: "" });
+              setNewMember({ name: "", role: "", color: "bg-pink-500", team_type: teamType, description: "" });
               setIsEditing(false);
               setShowModal(true);
             }}
@@ -153,65 +151,71 @@ export default function TeamManagement() {
         </div>
       </div>
 
-     {/* Team Cards */}
-<motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
-  <AnimatePresence mode="popLayout">
-    {filteredTeam.map((member, idx) => (
-      <motion.div
-        key={member.name + idx}
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -20 }}
-        transition={{ duration: 0.3, delay: idx * 0.05 }}
-        whileHover={{
-          scale: 1.03,
-          boxShadow: "0px 10px 25px rgba(0,0,0,0.15)",
-          borderColor: "#000000",
-        }}
-        className="relative border border-gray-200 rounded-lg p-5 transition-all duration-300 group"
-      >
-        <div
-          className={`w-12 h-12 flex items-center justify-center text-white rounded-full ${member.color} text-lg font-semibold`}
-        >
-          {member.initials}
-        </div>
-        <h3 className="mt-4 text-lg font-semibold">{member.name}</h3>
-        <p className="text-sm text-gray-500">{member.role}</p>
-        <p className="text-gray-600 mt-3 text-sm">{member.desc}</p>
-        <span className="inline-block mt-4 px-3 py-1 text-xs bg-pink-100 text-pink-600 rounded-full">
-          {teamType === "artist" ? "artist" : "tech"}
-        </span>
+      {/* Team Cards */}
+      <motion.div layout className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
+        <AnimatePresence mode="popLayout">
+          {loading ? (
+            <p>Loading...</p>
+          ) : filteredTeam.length === 0 ? (
+            <p className="col-span-full text-center text-gray-600">No {teamType} team members found</p>
+          ) : (
+            filteredTeam.map((member) => (
+              <motion.div
+                key={member.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                whileHover={{
+                  scale: 1.03,
+                  boxShadow: "0px 10px 25px rgba(0,0,0,0.15)",
+                  borderColor: "#000000",
+                }}
+                className="relative border border-gray-200 rounded-lg p-5 transition-all duration-300 group"
+              >
+                <div
+                  className={`w-12 h-12 flex items-center justify-center text-white rounded-full ${member.color} text-lg font-semibold`}
+                >
+                  {member.initials}
+                </div>
+                <h3 className="mt-4 text-lg font-semibold">{member.name}</h3>
+                <p className="text-sm text-gray-500">{member.role}</p>
+                <p className="text-gray-600 mt-3 text-sm">{member.desc}</p>
+                <span className="inline-block mt-4 px-3 py-1 text-xs bg-pink-100 text-pink-600 rounded-full">
+                  {member.team_type}
+                </span>
 
-        {/* Edit/Delete Icons */}
-        <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-          <button
-            onClick={() => {
-              setNewMember({ ...member, team: teamType });
-              setIsEditing(true);
-              setEditingIndex(idx);
-              setShowModal(true);
-            }}
-            className="bg-gray-100 p-1 rounded hover:bg-gray-200"
-          >
-            ✏️
-          </button>
-          <button
-            onClick={() => {
-              if (teamType === "artist") {
-                setArtistTeamState((prev) => prev.filter((_, i) => i !== idx));
-              } else {
-                setTechnicalTeamState((prev) => prev.filter((_, i) => i !== idx));
-              }
-            }}
-            className="bg-gray-100 p-1 rounded hover:bg-gray-200"
-          >
-            🗑
-          </button>
-        </div>
+                {/* Edit/Delete Icons */}
+                <div className="absolute top-2 right-2 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <button
+                    onClick={() => {
+                      setNewMember({
+                        name: member.name,
+                        role: member.role,
+                        color: member.color,
+                        team_type: member.team_type,
+                        description: member.desc || "",
+                      });
+                      setIsEditing(true);
+                      setEditingId(member.id);
+                      setShowModal(true);
+                    }}
+                    className="bg-gray-100 p-1 rounded hover:bg-gray-200"
+                  >
+                    ✏️
+                  </button>
+                  <button
+                    onClick={() => handleDelete(member.id)}
+                    className="bg-gray-100 p-1 rounded hover:bg-gray-200"
+                  >
+                    🗑
+                  </button>
+                </div>
+              </motion.div>
+            ))
+          )}
+        </AnimatePresence>
       </motion.div>
-    ))}
-  </AnimatePresence>
-</motion.div>
 
       {/* Modal */}
       <AnimatePresence>
@@ -274,8 +278,8 @@ export default function TeamManagement() {
                 />
                 <select
                   className="border border-gray-300 rounded-lg px-4 py-2 w-full"
-                  value={newMember.team}
-                  onChange={(e) => setNewMember({ ...newMember, team: e.target.value })}
+                  value={newMember.team_type}
+                  onChange={(e) => setNewMember({ ...newMember, team_type: e.target.value })}
                 >
                   <option value="artist">Artist Team</option>
                   <option value="technical">Technical Team</option>
@@ -304,13 +308,13 @@ export default function TeamManagement() {
                 </div>
 
                 <textarea
-                  placeholder="Short Bio *"
+                  placeholder="Short Bio"
                   className="border border-gray-300 rounded-lg px-4 py-2 w-full"
-                  value={newMember.desc}
+                  value={newMember.description}
                   maxLength={300}
-                  onChange={(e) => setNewMember({ ...newMember, desc: e.target.value })}
+                  onChange={(e) => setNewMember({ ...newMember, description: e.target.value })}
                 />
-                <p className="text-gray-400 text-sm text-right">{newMember.desc.length}/300 characters</p>
+                <p className="text-gray-400 text-sm text-right">{newMember.description.length}/300 characters</p>
 
                 <button
                   className="bg-black text-white px-4 py-2 rounded-lg w-full"

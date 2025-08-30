@@ -86,6 +86,7 @@ export default function Navbar() {
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [cartItemCount, setCartItemCount] = useState(0);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const refs = useRef({});
   const navigate = useNavigate();
@@ -178,6 +179,13 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
+   const handleSearchSubmit = (e) => {
+    if (e.key === "Enter" && searchQuery.trim()) {
+      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      setSearchQuery(""); // Clear the search input
+    }
+  };
+
   return (
     <nav className="fixed top-0 w-full z-50 bg-transparent backdrop-blur-lg shadow-md font-serif">
       {/* Top Bar */}
@@ -208,6 +216,9 @@ export default function Navbar() {
             type="text"
             placeholder="Search"
             className="w-[300px] px-2 py-1.5 bg-transparent backdrop-blur-sm font-bold rounded-full border border-gray-300"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={handleSearchSubmit}
           />
         </div>
         <ul className="flex items-center gap-8 flex-[1]">

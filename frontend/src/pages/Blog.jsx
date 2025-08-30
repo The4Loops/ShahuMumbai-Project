@@ -134,21 +134,13 @@ const Blog = () => {
   };
 
   const getShareUrls = (blog) => {
-    const url = `${window.location.origin}/blog/${blog.slug}`;
-    return {
-      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(
-        url
-      )}&text=${encodeURIComponent(blog.title)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-        url
-      )}`,
-      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(
-        url
-      )}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(
-        blog.excerpt
-      )}`,
-    };
+  const url = `${window.location.origin}/blogs/${blog.id}`; // use id route
+  return {
+    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(blog.title)}`,
+    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+    linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(blog.excerpt)}`,
   };
+};
 
   return (
     <Layout>
@@ -266,11 +258,13 @@ const Blog = () => {
                   </div>
                   <p className="text-gray-700 mb-4">{blog.excerpt}</p>
                   <Link
-                    to={`/blogsview`}
-                    className="text-[#6d4c41] hover:underline"
-                  >
-                    Read More
+                      to={`/blogs/${blog.id}`}
+                      state={{ blog }} // optional: gives BlogView immediate data while it fetches
+                      className="text-[#6d4c41] hover:underline"
+                      >
+                      Read More
                   </Link>
+
 
                   {/* Blog footer */}
                   <div className="flex items-center gap-6 mt-4 text-gray-500 text-sm">

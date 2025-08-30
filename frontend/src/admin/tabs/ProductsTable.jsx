@@ -1,21 +1,27 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Eye, Edit, Trash2, X, Search } from "lucide-react";
 import useSearch from "./useSearch";
+import api from "../../supabase/axios";
+import { useNavigate } from "react-router-dom";
+import { useAdminActions } from "../AdminActionsContext";
 
 function ProductsTab() {
-  const [products, setProducts] = useState([
-    { id: 1, name: "Smartphone X200", category: "Electronics", price: "$699", stock: 42 },
-    { id: 2, name: "Gaming Laptop Pro", category: "Computers", price: "$1,299", stock: 15 },
-    { id: 3, name: "Wireless Earbuds", category: "Audio", price: "$129", stock: 87 },
-    { id: 4, name: "4K Ultra HD TV", category: "Home Entertainment", price: "$999", stock: 0 },
-  ]);
+  const [products, setProducts] = useState([]);  
+  const [loadingProducts, setLoadingProducts] = useState(true);
+  const [productsError, setProductsError] = useState(null);
+  const { openProductEditor } = useAdminActions();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalProduct, setModalProduct] = useState(null); // Add/Edit modal
   const [isEditing, setIsEditing] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState(null); // Delete confirmation
+  const [collections, setCollections] = useState([]);
+  const [loadingCollections, setLoadingCollections] = useState(true);
+  const [collectionsError, setCollectionsError] = useState(null);
+
+  const navigate = useNavigate();
 
   const filteredProducts = useSearch(products, searchQuery, ["name", "category", "price"]);
 
@@ -25,31 +31,105 @@ function ProductsTab() {
     return { label: "Out of Stock", color: "bg-red-100 text-red-700" };
   };
 
-  const handleOpenEdit = (product) => {
-    setModalProduct({ ...product });
-    setIsEditing(true);
-  };
+const isUuid = (s) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(s);
 
-  const handleSave = () => {
-    if (!modalProduct.name) return alert("Product name is required!");
+const handleOpenEdit = (product) => {
+  if (!isUuid(product.id)) {
+    alert('This item is a demo row. Load real products first.');
+    return;
+  }
+  openProductEditor(product.id); // stays within AdminPanel tabs
+};
+
+  const handleSave = async () => {
+  if (!modalProduct.name) return alert("Product name is required!");
+
+  try {
     if (isEditing) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === modalProduct.id ? modalProduct : p))
-      );
-    } else {
-      const newProduct = {
+      await api.put(`/api/products/${modalProduct.id}`, {
         ...modalProduct,
-        id: products.length ? Math.max(...products.map((p) => p.id)) + 1 : 1,
-      };
-      setProducts((prev) => [newProduct, ...prev]);
+        collection_id: modalProduct.collection_id ?? null,
+      });
+      setProducts(prev => prev.map(p => p.id === modalProduct.id ? modalProduct : p));
+    } else {
+      const { data } = await api.post(`/api/products`, {
+        ...modalProduct,
+        collection_id: modalProduct.collection_id ?? null,
+      });
+      setProducts(prev => [data, ...prev]);
     }
     setModalProduct(null);
-  };
+  } catch (e) {
+    console.error("Save failed:", e);
+    alert("Failed to save product.");
+  }
+};
+
+useEffect(() => {
+  (async () => {
+    try {
+      const { data } = await api.get('/api/admin/products'); // <-- remove this effect
+      setProducts(
+        (Array.isArray(data) ? data : data?.items || []).map(p => ({
+          id: p.id,
+          name: p.name,
+          category: p.category_name || p.category || '',
+          price: typeof p.price === 'number' ? `₹${p.price}` : p.price,
+          stock: p.stock ?? 0,
+        }))
+      );
+    } catch (e) {
+      console.error('load products failed', e);
+    }
+  })();
+}, []);
+
 
   const confirmDelete = () => {
     setProducts((prev) => prev.filter((p) => p.id !== deleteProduct.id));
     setDeleteProduct(null);
   };
+
+
+  useEffect(() => {
+  let alive = true;
+  (async () => {
+    try {
+      setLoadingProducts(true);
+      setProductsError(null);
+
+      // Most backends here expose GET /api/products
+      const { data } = await api.get('/api/products'); // <-- not /api/admin/products
+      const list = Array.isArray(data) ? data : (data?.items || []);
+
+      if (!alive) return;
+
+      // normalize to your table fields
+      setProducts(
+        list.map(p => ({
+          id: p.id,                                   // UUID
+          name: p.name,
+          category: p.category_name || p.category || '',
+          price: typeof p.price === 'number' ? `₹${p.price}` : (p.price ?? ''),
+          stock: p.stock ?? 0,
+        }))
+      );
+    } catch (e) {
+      if (!alive) return;
+      console.error('load products failed', {
+        url: (api.defaults?.baseURL || '') + '/api/products',
+        status: e.response?.status,
+        payload: e.response?.data,
+        message: e.message,
+      });
+      setProductsError(e.response?.data?.message || 'Failed to load products');
+    } finally {
+      if (alive) setLoadingProducts(false);
+    }
+  })();
+  return () => { alive = false; };
+}, []);
 
   return (
     <div className="p-4">
@@ -67,6 +147,14 @@ function ProductsTab() {
         </div>
       </div>
 
+      {/* Load/Error status (place HERE) */}
+    {loadingProducts && (
+      <div className="mb-3 text-sm text-gray-500">Loading products…</div>
+    )}
+    {productsError && (
+      <div className="mb-3 text-sm text-red-600">{productsError}</div>
+    )}
+    
       {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
         <table className="min-w-full border-collapse bg-white rounded-xl shadow-sm border border-gray-200">
@@ -117,7 +205,7 @@ function ProductsTab() {
                         <button onClick={() => setSelectedProduct(product)} className="p-2 rounded hover:bg-gray-100 transition" title="View">
                           <Eye size={18} className="text-blue-600" />
                         </button>
-                        <button onClick={() => handleOpenEdit(product)} className="p-2 rounded hover:bg-gray-100 transition" title="Edit">
+                        <button onClick={() => openProductEditor(product.id)} className="p-2 rounded hover:bg-gray-100 transition" title="Edit">
                           <Edit size={18} className="text-green-600" />
                         </button>
                         <button onClick={() => setDeleteProduct(product)} className="p-2 rounded hover:bg-gray-100 transition" title="Delete">
@@ -157,7 +245,7 @@ function ProductsTab() {
                   <button onClick={() => setSelectedProduct(product)} className="p-2 rounded hover:bg-gray-100 transition">
                     <Eye size={18} className="text-blue-600" />
                   </button>
-                  <button onClick={() => handleOpenEdit(product)} className="p-2 rounded hover:bg-gray-100 transition">
+                  <button onClick={() => openProductEditor(product.id)} className="p-2 rounded hover:bg-gray-100 transition">
                     <Edit size={18} className="text-green-600" />
                   </button>
                   <button onClick={() => setDeleteProduct(product)} className="p-2 rounded hover:bg-gray-100 transition">
@@ -204,54 +292,75 @@ function ProductsTab() {
       </AnimatePresence>
 
       {/* Add/Edit Product Modal */}
-      <AnimatePresence>
-        {modalProduct && (
-          <motion.div
-            className="fixed inset-0 flex items-end md:items-center justify-center bg-black bg-opacity-50 z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-t-xl md:rounded-xl shadow-xl p-6 w-full md:w-96 relative"
-              initial={{ y: 50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 50, opacity: 0 }}
+      {/* Add/Edit Product Modal */}
+<AnimatePresence>
+  {modalProduct && (
+    <motion.div /* ...same props... */>
+      <motion.div /* ...same props... */>
+        {/* ...header... */}
+        <div className="space-y-4">
+          {["name", "category", "price", "stock"].map((field) => (
+            <div key={field} className="flex flex-col">
+              <label className="text-gray-600 font-medium capitalize mb-1">{field}</label>
+              <input
+                type={field === "stock" ? "number" : "text"}
+                value={modalProduct[field] ?? ""}
+                onChange={(e) =>
+                  setModalProduct({
+                    ...modalProduct,
+                    [field]: field === "stock" ? parseInt(e.target.value || "0", 10) : e.target.value,
+                  })
+                }
+                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+          ))}
+
+          {/* Inserted Collection dropdown */}
+          <div className="flex flex-col">
+            <label className="text-gray-600 font-medium mb-1">Collection</label>
+            <select
+              value={modalProduct.collection_id || ""}
+              onChange={(e) =>
+                setModalProduct({
+                  ...modalProduct,
+                  collection_id: e.target.value || null,
+                })
+              }
+              disabled={loadingCollections}
+              className="border border-gray-300 rounded-md px-3 py-2"
             >
-              <button onClick={() => setModalProduct(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-              <h2 className="text-xl font-semibold mb-4">Edit Product</h2>
-              <div className="space-y-4">
-                {["name", "category", "price", "stock"].map((field) => (
-                  <div key={field} className="flex flex-col">
-                    <label className="text-gray-600 font-medium capitalize mb-1">{field}</label>
-                    <input
-                      type={field === "stock" ? "number" : "text"}
-                      value={modalProduct[field]}
-                      onChange={(e) =>
-                        setModalProduct({
-                          ...modalProduct,
-                          [field]: field === "stock" ? parseInt(e.target.value) : e.target.value,
-                        })
-                      }
-                      className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                  </div>
-                ))}
-                <div className="flex justify-end gap-2 mt-4">
-                  <button onClick={() => setModalProduct(null)} className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition">
-                    Cancel
-                  </button>
-                  <button onClick={handleSave} className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">
-                    Save Changes
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+              <option value="">— None —</option>
+              {collections.map(c => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            {collectionsError && <span className="text-xs text-red-600 mt-1">{collectionsError}</span>}
+
+
+
+            {loadingCollections && (
+              <span className="text-xs text-gray-500 mt-1">Loading collections…</span>
+            )}
+            {collectionsError && (
+              <span className="text-xs text-red-600 mt-1">{collectionsError}</span>
+            )}
+          </div>
+
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => setModalProduct(null)} className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition">
+              Cancel
+            </button>
+            <button onClick={handleSave} className="px-4 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700 transition font-semibold">
+              Save Changes
+            </button>
+          </div>
+        </div>
+      </motion.div>
+    </motion.div>
+  )}
+</AnimatePresence>
+
 
       {/* Delete Confirmation Modal */}
       <AnimatePresence>
