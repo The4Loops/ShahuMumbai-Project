@@ -1,3 +1,4 @@
+// src/pages/ProductDetails.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -9,9 +10,9 @@ import { IoMdShareAlt } from "react-icons/io";
 import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import RelatedCard from "../components/RelatedCard";
 import api from "../supabase/axios";
-import { jwtDecode } from "jwt-decode";
+import {jwtDecode} from "jwt-decode";
 import { toast } from "react-toastify";
-import { Ecom } from "../analytics"; // ✅ added
+import { Ecom } from "../analytics"; // keep your analytics wrapper
 
 // Carousel Arrows
 const NextArrow = ({ onClick }) => (
@@ -53,14 +54,9 @@ const QuantitySelect = ({ max = 10, value, onChange }) => (
 
 const StarRating = ({ value = 0, size = 18 }) => {
   const full = Math.floor(value);
-  const stars = Array.from({ length: 5 }, (_, i) =>
-    i < full ? "full" : "empty"
-  );
+  const stars = Array.from({ length: 5 }, (_, i) => (i < full ? "full" : "empty"));
   return (
-    <span
-      className="inline-flex items-center gap-0.5"
-      aria-label={`Rating: ${value} out of 5`}
-    >
+    <span className="inline-flex items-center gap-0.5" aria-label={`Rating: ${value} out of 5`}>
       {stars.map((t, i) =>
         t === "full" ? (
           <AiFillStar key={i} size={size} className="text-[#D4A5A5]" />
@@ -81,9 +77,13 @@ const ProductDetails = () => {
   const [qty, setQty] = useState(1);
   const sliderRef = useRef();
   const token = localStorage.getItem("token");
-  var decoded = "";
+  let decoded = "";
   if (token) {
-    decoded = jwtDecode(token);
+    try {
+      decoded = jwtDecode(token);
+    } catch (e) {
+      decoded = "";
+    }
   }
   const userid = decoded?.id;
   const fullName = decoded?.fullname || "Anonymous";
@@ -102,12 +102,18 @@ const ProductDetails = () => {
   const [submitting, setSubmitting] = useState(false);
   const [cartSubmitting, setCartSubmitting] = useState(false);
 
+  // Color selection
+  const [selectedColor, setSelectedColor] = useState(null);
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
         const productResponse = await api.get(`/api/products/${id}`);
         setProduct(productResponse.data);
+
+        // set default selected color if colors exist
+        setSelectedColor(productResponse.data?.colors?.[0] || null);
 
         const relatedResponse = await api.get(
           `/api/products?category=${productResponse.data.categories?.name}&limit=8`
@@ -118,16 +124,16 @@ const ProductDetails = () => {
 
         document.title = `${productResponse.data.name} - YourBrand`;
 
-        // ✅ GA4: view_item after product is fetched
+        // GA4: view_item after product is fetched
         try {
           const p = productResponse.data;
           Ecom.viewItem({
             id: p.id,
             title: p.name,
             category: p?.categories?.name,
-            price:
-              Number(p.price) - (Number(p.discountprice || 0) || 0),
+            price: Number(p.price) - (Number(p.discountprice || 0) || 0),
             quantity: 1,
+            color: p?.colors?.[0]?.name || p.color || null,
           });
         } catch {}
       } catch (err) {
@@ -141,14 +147,11 @@ const ProductDetails = () => {
       try {
         setReviewLoading(true);
         setReviewError(null);
-        // Adjust to your API shape; expecting an array of {id, name, rating, comment, created_at}
         const res = await api.get(`/api/reviews/${id}`);
         const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
         setReviews(list);
         const count = list.length;
-        const avg = count
-          ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count
-          : 0;
+        const avg = count ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count : 0;
         setReviewCount(count);
         setAvgRating(Number(avg.toFixed(1)));
       } catch (e) {
@@ -160,7 +163,23 @@ const ProductDetails = () => {
 
     fetchProduct();
     fetchReviews();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // When product changes, ensure selectedColor is initialized (keeps user selection only if product is same)
+  useEffect(() => {
+    if (!product) return;
+    setSelectedColor((prev) => prev || product.colors?.[0] || null);
+  }, [product]);
+
+  // If selectedColor has its own image(s), jump slider to show them
+  useEffect(() => {
+    if (!sliderRef.current) return;
+    // go to first slide when color changes
+    try {
+      sliderRef.current.slickGoTo(0);
+    } catch {}
+  }, [selectedColor]);
 
   const submitReview = async (e) => {
     e.preventDefault();
@@ -176,8 +195,7 @@ const ProductDetails = () => {
       toast.dismiss();
       toast.success("Review submitted successfully!");
       setReviews([...reviews, response.data]);
-      const newAvg =
-        (avgRating * reviewCount + Number(reviewRating)) / (reviewCount + 1);
+      const newAvg = (avgRating * reviewCount + Number(reviewRating)) / (reviewCount + 1);
       setAvgRating(Number(newAvg.toFixed(1)));
       setReviewText("");
       setReviewRating(5);
@@ -187,7 +205,7 @@ const ProductDetails = () => {
         toast.error(e.response?.data?.message || "Failed to submit review.");
       } else {
         toast.dismiss();
-        toast.error("Failed to submit review." + e);
+        toast.error("Failed to submit review.");
       }
     } finally {
       setSubmitting(false);
@@ -195,26 +213,33 @@ const ProductDetails = () => {
   };
 
   const handleAddToCart = async () => {
+    // If the product offers multiple colors, require selection
+    if (product?.colors?.length && !selectedColor) {
+      toast.error("Please select a color.");
+      return;
+    }
     if (Number(product.stock) === 0 || cartSubmitting) return;
     try {
       setCartSubmitting(true);
-      const response = await api.post("/api/cart", {
+      const payload = {
         user_id: userid,
         product_id: product.id,
         quantity: qty,
-      });
+        color: selectedColor?.name || product.color || null,
+      };
+      const response = await api.post("/api/cart", payload);
       toast.dismiss();
-      toast.success(`${product.name} added to cart!`);
+      toast.success(`${product.name}${payload.color ? ` (${payload.color})` : ""} added to cart!`);
 
-      // ✅ GA4: add_to_cart after successful API
+      // GA4: add_to_cart
       try {
         Ecom.addToCart({
           id: product.id,
           title: product.name,
           category: product?.categories?.name,
-          price:
-            Number(product.price) - (Number(product.discountprice || 0) || 0),
+          price: Number(product.price) - (Number(product.discountprice || 0) || 0),
           quantity: qty,
+          color: payload.color,
         });
       } catch {}
     } catch (e) {
@@ -248,34 +273,35 @@ const ProductDetails = () => {
     prevArrow: <PrevArrow />,
   };
 
-  // Images (hero first)
-  const images = product.product_images
+  // Build base product images (hero first)
+  const baseImages = product.product_images
     ? [
-        ...product.product_images
-          .filter((img) => img.is_hero)
-          .map((img) => img.image_url),
-        ...product.product_images
-          .filter((img) => !img.is_hero)
-          .map((img) => img.image_url),
+        ...product.product_images.filter((img) => img.is_hero).map((img) => img.image_url),
+        ...product.product_images.filter((img) => !img.is_hero).map((img) => img.image_url),
       ]
     : [];
 
-  // Pricing & discount: sale price is discountprice when present
-  const hasDiscount =
-    product.discountprice &&
-    Number(product.discountprice) < Number(product.price);
-  const salePrice = hasDiscount
-    ? Number(product.price) - Number(product.discountprice)
-    : Number(product.price);
+  // If colors give image_urls (array) or image_url (single), prefer those when a color is selected
+  const colorImages =
+    selectedColor?.image_urls && selectedColor.image_urls.length
+      ? selectedColor.image_urls
+      : selectedColor?.image_url
+      ? [selectedColor.image_url]
+      : null;
+
+  const images = colorImages
+    ? [...colorImages, ...baseImages.filter((i) => !colorImages.includes(i))]
+    : baseImages;
+
+  const hero = images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+
+  // Pricing & discount
+  const hasDiscount = product.discountprice && Number(product.discountprice) < Number(product.price);
+  const salePrice = hasDiscount ? Number(product.price) - Number(product.discountprice) : Number(product.price);
   const mrp = Number(product.price);
-  const discountPercentage = hasDiscount
-    ? Math.round(((mrp - salePrice) / mrp) * 100)
-    : 0;
+  const discountPercentage = hasDiscount ? Math.round(((mrp - salePrice) / mrp) * 100) : 0;
 
   const handleThumbClick = (idx) => sliderRef.current?.slickGoTo(idx);
-
-  const hero =
-    images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
 
   return (
     <Layout>
@@ -295,10 +321,7 @@ const ProductDetails = () => {
               </Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
-            <li
-              className="text-[#3E2C23] truncate max-w-[60%]"
-              title={product.name}
-            >
+            <li className="text-[#3E2C23] truncate max-w-[60%]" title={product.name}>
               {product.name}
             </li>
           </ol>
@@ -309,22 +332,27 @@ const ProductDetails = () => {
           {/* Left: Thumbnails */}
           <div className="lg:col-span-2 order-2 lg:order-1">
             <div className="flex lg:flex-col gap-3 lg:sticky lg:top-24">
-              {images.map((img, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleThumbClick(idx)}
-                  className="border-2 border-transparent hover:border-[#D4A5A5] rounded-md overflow-hidden w-20 h-20 bg-white"
-                >
-                  <img
-                    src={img}
-                    alt={`${product.name} thumbnail ${idx + 1}`}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
-                    }}
-                  />
-                </button>
-              ))}
+              {images.length ? (
+                images.map((img, idx) => (
+                  <button
+                    key={idx}
+                    onClick={() => handleThumbClick(idx)}
+                    className="border-2 border-transparent hover:border-[#D4A5A5] rounded-md overflow-hidden w-20 h-20 bg-white"
+                    aria-label={`Thumbnail ${idx + 1}`}
+                  >
+                    <img
+                      src={img}
+                      alt={`${product.name} thumbnail ${idx + 1}`}
+                      className="w-full h-full object-cover"
+                      onError={(e) => {
+                        e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+                      }}
+                    />
+                  </button>
+                ))
+              ) : (
+                <div className="w-20 h-20 bg-white rounded-md border border-[#D4A5A5]" />
+              )}
             </div>
           </div>
 
@@ -346,11 +374,7 @@ const ProductDetails = () => {
                     </div>
                   ))
                 ) : (
-                  <img
-                    src={hero}
-                    alt={`${product.name}`}
-                    className="h-[560px] w-full object-cover rounded-md"
-                  />
+                  <img src={hero} alt={`${product.name}`} className="h-[560px] w-full object-cover rounded-md" />
                 )}
               </Slider>
 
@@ -381,65 +405,62 @@ const ProductDetails = () => {
           <aside className="lg:col-span-4 order-3">
             <div className="lg:sticky lg:top-24 flex flex-col gap-4">
               <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-5">
-                <h1 className="text-2xl font-bold text-[#6B4226] mb-1">
-                  {product.name}
-                </h1>
+                <h1 className="text-2xl font-bold text-[#6B4226] mb-1">{product.name}</h1>
                 <div className="flex items-center gap-2 mt-1">
                   <StarRating value={avgRating} />
-                  <span className="text-xs text-[#3E2C23]">
-                    {avgRating}/5 • {reviewCount} review
-                    {reviewCount === 1 ? "" : "s"}
-                  </span>
+                  <span className="text-xs text-[#3E2C23]">{avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}</span>
                 </div>
-                <p className="text-sm italic text-[#A3B18A] mt-1">
-                  Color: {product.color}
-                </p>
-                <p className="text-sm italic text-[#A3B18A]">
-                  Category: {product.categories?.name || "N/A"}
-                </p>
+
+                {/* Color selector */}
+                <div className="mt-3">
+                  <p className="text-sm italic text-[#A3B18A] mb-1">Color:</p>
+
+                  {product.colors && product.colors.length > 0 ? (
+                    <div className="flex items-center gap-3">
+                      {product.colors.map((c) => (
+                        <button
+                          key={c.name}
+                          type="button"
+                          onClick={() => setSelectedColor(c)}
+                          title={c.name}
+                          aria-pressed={selectedColor?.name === c.name}
+                          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center focus:outline-none ${
+                            selectedColor?.name === c.name ? "border-[#6B4226] ring-2 ring-[#6B4226]/25" : "border-transparent"
+                          }`}
+                          style={{ backgroundColor: c.code || "#ffffff" }}
+                        >
+                          <span className="sr-only">{c.name}</span>
+                        </button>
+                      ))}
+                      <span className="text-sm text-[#3E2C23]">{selectedColor?.name || "Choose"}</span>
+                    </div>
+                  ) : (
+                    <p className="text-sm italic text-[#A3B18A]">{product.color || "—"}</p>
+                  )}
+                </div>
+
+                <p className="text-sm italic text-[#A3B18A] mt-1">Category: {product.categories?.name || "N/A"}</p>
 
                 <div className="mt-4">
                   {hasDiscount ? (
                     <div className="flex items-baseline gap-3">
-                      <p className="text-3xl font-extrabold text-[#6B4226]">
-                        ₹{salePrice.toFixed(2)}
-                      </p>
-                      <p className="text-base text-gray-500 line-through">
-                        ₹{mrp.toFixed(2)}
-                      </p>
-                      <p className="text-base text-[#A3B18A] font-semibold">
-                        {discountPercentage}% OFF
-                      </p>
+                      <p className="text-3xl font-extrabold text-[#6B4226]">₹{salePrice.toFixed(2)}</p>
+                      <p className="text-base text-gray-500 line-through">₹{mrp.toFixed(2)}</p>
+                      <p className="text-base text-[#A3B18A] font-semibold">{discountPercentage}% OFF</p>
                     </div>
                   ) : (
-                    <p className="text-3xl font-extrabold text-[#6B4226]">
-                      ₹{mrp.toFixed(2)}
-                    </p>
+                    <p className="text-3xl font-extrabold text-[#6B4226]">₹{mrp.toFixed(2)}</p>
                   )}
                 </div>
 
                 <div className="mt-5 flex items-center gap-3">
-                  <QuantitySelect
-                    max={Math.min(10, Number(product.stock) || 10)}
-                    value={qty}
-                    onChange={setQty}
-                  />
-                  {Number(product.stock) > 0 ? (
-                    <p className="text-sm text-[#A3B18A]">
-                      In Stock: {product.stock}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-red-500">Out of Stock</p>
-                  )}
+                  <QuantitySelect max={Math.min(10, Number(product.stock) || 10)} value={qty} onChange={setQty} />
+                  {Number(product.stock) > 0 ? <p className="text-sm text-[#A3B18A]">In Stock: {product.stock}</p> : <p className="text-sm text-red-500">Out of Stock</p>}
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
-                    className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0 || cartSubmitting
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
-                    }`}
+                    className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${Number(product.stock) === 0 || cartSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
                     aria-label="Add this product to your shopping cart"
                     disabled={Number(product.stock) === 0 || cartSubmitting}
                     onClick={handleAddToCart}
@@ -447,14 +468,10 @@ const ProductDetails = () => {
                     {cartSubmitting ? "Adding..." : "Add to Cart"}
                   </button>
                   <button
-                    className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
-                    }`}
+                    className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${Number(product.stock) === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
                     aria-label="Buy now"
                     disabled={Number(product.stock) === 0}
-                    onClick={() => console.log("Buy now", { id, qty })}
+                    onClick={() => console.log("Buy now", { id, qty, color: selectedColor?.name })}
                   >
                     Buy Now
                   </button>
@@ -463,9 +480,7 @@ const ProductDetails = () => {
 
               {/* About this item */}
               <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-4">
-                <h3 className="text-[#6B4226] font-semibold mb-2">
-                  About this item
-                </h3>
+                <h3 className="text-[#6B4226] font-semibold mb-2">About this item</h3>
                 <ul className="list-disc list-inside text-sm text-[#3E2C23] space-y-1">
                   {product.shortdescription ? (
                     product.shortdescription
@@ -487,39 +502,28 @@ const ProductDetails = () => {
         <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h2 className="text-xl font-bold text-[#6B4226] mb-3">
-                Product Description
-              </h2>
-              <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                {product.description || "No additional description provided."}
-              </p>
+              <h2 className="text-xl font-bold text-[#6B4226] mb-3">Product Description</h2>
+              <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">{product.description || "No additional description provided."}</p>
               <div className="mt-4 text-md text-[#6B4226]">
-                Designer:{" "}
-                <span className="font-semibold">{product.branddesigner}</span>
+                Designer: <span className="font-semibold">{product.branddesigner}</span>
               </div>
             </div>
           </div>
           <div className="lg:col-span-4">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h3 className="text-lg font-bold text-[#6B4226] mb-2">
-                Specifications
-              </h3>
+              <h3 className="text-lg font-bold text-[#6B4226] mb-2">Specifications</h3>
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Color</dt>
-                  <dd className="font-medium">{product.color || "—"}</dd>
+                  <dd className="font-medium">{selectedColor?.name || product.color || "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Category</dt>
-                  <dd className="font-medium">
-                    {product.categories?.name || "—"}
-                  </dd>
+                  <dd className="font-medium">{product.categories?.name || "—"}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>Stock</dt>
-                  <dd className="font-medium">
-                    {Number(product.stock) > 0 ? product.stock : "Out of stock"}
-                  </dd>
+                  <dd className="font-medium">{Number(product.stock) > 0 ? product.stock : "Out of stock"}</dd>
                 </div>
               </dl>
             </div>
@@ -531,15 +535,10 @@ const ProductDetails = () => {
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-[#6B4226]">
-                  Customer Reviews
-                </h2>
+                <h2 className="text-xl font-bold text-[#6B4226]">Customer Reviews</h2>
                 <div className="flex items-center gap-2">
                   <StarRating value={avgRating} />
-                  <span className="text-sm text-[#3E2C23]">
-                    {avgRating}/5 • {reviewCount} review
-                    {reviewCount === 1 ? "" : "s"}
-                  </span>
+                  <span className="text-sm text-[#3E2C23]">{avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}</span>
                 </div>
               </div>
 
@@ -548,32 +547,19 @@ const ProductDetails = () => {
               ) : reviewError ? (
                 <p className="text-red-500">{reviewError}</p>
               ) : reviews.length === 0 ? (
-                <p className="text-[#3E2C23]">
-                  No reviews yet. Be the first to review!
-                </p>
+                <p className="text-[#3E2C23]">No reviews yet. Be the first to review!</p>
               ) : (
                 <ul className="space-y-4">
                   {reviews.map((r) => (
-                    <li
-                      key={r.id}
-                      className="border border-[#F1E7E5] rounded-lg p-4"
-                    >
+                    <li key={r.id} className="border border-[#F1E7E5] rounded-lg p-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <StarRating value={Number(r.rating) || 0} />
-                          <span className="text-sm text-[#6B4226] font-semibold">
-                            {r.users.full_name || "Anonymous"}
-                          </span>
+                          <span className="text-sm text-[#6B4226] font-semibold">{r.users?.full_name || "Anonymous"}</span>
                         </div>
-                        <time className="text-xs text-[#3E2C23] opacity-70">
-                          {r.created_at
-                            ? new Date(r.created_at).toLocaleDateString("en-IN")
-                            : ""}
-                        </time>
+                        <time className="text-xs text-[#3E2C23] opacity-70">{r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}</time>
                       </div>
-                      <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                        {r.comment}
-                      </p>
+                      <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">{r.comment}</p>
                     </li>
                   ))}
                 </ul>
@@ -582,68 +568,25 @@ const ProductDetails = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <form
-              onSubmit={submitReview}
-              className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6"
-            >
-              <h3 className="text-lg font-bold text-[#6B4226] mb-3">
-                Write a review
-              </h3>
+            <form onSubmit={submitReview} className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
+              <h3 className="text-lg font-bold text-[#6B4226] mb-3">Write a review</h3>
 
-              <label className="block text-sm text-[#3E2C23] mb-1">
-                Your name (optional)
-              </label>
-              <input
-                type="text"
-                value={reviewName}
-                onChange={(e) => setReviewName(e.target.value)}
-                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
-                placeholder="e.g., Arjun"
-                readOnly
-              />
+              <label className="block text-sm text-[#3E2C23] mb-1">Your name (optional)</label>
+              <input type="text" value={reviewName} onChange={(e) => setReviewName(e.target.value)} className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]" placeholder="e.g., Arjun" readOnly />
 
-              <label className="block text-sm text-[#3E2C23] mb-1">
-                Rating
-              </label>
-              <select
-                value={reviewRating}
-                onChange={(e) => setReviewRating(Number(e.target.value))}
-                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white"
-              >
+              <label className="block text-sm text-[#3E2C23] mb-1">Rating</label>
+              <select value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white">
                 {[5, 4, 3, 2, 1].map((n) => (
                   <option key={n} value={n}>
-                    {n} -{" "}
-                    {n === 5
-                      ? "Excellent"
-                      : n === 4
-                      ? "Good"
-                      : n === 3
-                      ? "Average"
-                      : n === 2
-                      ? "Poor"
-                      : "Terrible"}
+                    {n} - {n === 5 ? "Excellent" : n === 4 ? "Good" : n === 3 ? "Average" : n === 2 ? "Poor" : "Terrible"}
                   </option>
                 ))}
               </select>
 
-              <label className="block text-sm text-[#3E2C23] mb-1">
-                Review
-              </label>
-              <textarea
-                value={reviewText}
-                onChange={(e) => setReviewText(e.target.value)}
-                className="w-full min-h-[120px] border border-[#D4A5A5] rounded-md px-3 py-2 mb-4 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
-                placeholder="Share what you liked or what could be improved…"
-                required
-              />
+              <label className="block text-sm text-[#3E2C23] mb-1">Review</label>
+              <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} className="w-full min-h-[120px] border border-[#D4A5A5] rounded-md px-3 py-2 mb-4 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]" placeholder="Share what you liked or what could be improved…" required />
 
-              <button
-                type="submit"
-                disabled={submitting}
-                className={`w-full bg-[#6B4226] text-white px-6 py-3 rounded-md font-semibold shadow hover:opacity-90 transition ${
-                  submitting ? "opacity-60 cursor-not-allowed" : ""
-                }`}
-              >
+              <button type="submit" disabled={submitting} className={`w-full bg-[#6B4226] text-white px-6 py-3 rounded-md font-semibold shadow hover:opacity-90 transition ${submitting ? "opacity-60 cursor-not-allowed" : ""}`}>
                 {submitting ? "Submitting…" : "Submit Review"}
               </button>
             </form>
@@ -652,21 +595,12 @@ const ProductDetails = () => {
 
         {/* Related Products */}
         <div className="mt-16 px-2 max-w-[1440px] mx-auto font-serif">
-          <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">
-            You May Also Like
-          </h2>
+          <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">You May Also Like</h2>
           <div className="flex flex-wrap justify-center gap-8">
             {relatedProducts.map((related) => {
-              const relatedHasDiscount =
-                related.discountprice &&
-                Number(related.discountprice) < Number(related.price);
-              const relatedSalePrice = relatedHasDiscount
-                ? Number(related.price)
-                : Number(related.discountprice);
-              const relatedImage =
-                related.product_images?.find((img) => img.is_hero)?.image_url ||
-                related.product_images?.[0]?.image_url ||
-                "/assets/images/placeholder.png";
+              const relatedHasDiscount = related.discountprice && Number(related.discountprice) < Number(related.price);
+              const relatedSalePrice = relatedHasDiscount ? Number(related.price) - Number(related.discountprice) : Number(related.price);
+              const relatedImage = related.product_images?.find((img) => img.is_hero)?.image_url || related.product_images?.[0]?.image_url || "/assets/images/placeholder.png";
               return (
                 <div key={related.id} className="w-[260px]">
                   <RelatedCard

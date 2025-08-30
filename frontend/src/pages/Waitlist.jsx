@@ -1,98 +1,150 @@
-// src/components/WaitlistLayout.jsx
-import React, { useState } from "react";
+// src/components/Waitlist.jsx
+import React, { useState, useEffect } from "react";
+import confetti from "canvas-confetti";
 import Layout from "../layout/Layout";
 
 const dummyWaitlist = [
-  { id: 1, email: "alex@example.com", product: "PlayStation 5" },
-  { id: 2, email: "sara@example.com", product: "Xbox Series X" },
-  { id: 3, email: "john@example.com", product: "Nintendo Switch" },
-  { id: 4, email: "mia@example.com", product: "Nvidia RTX 4090" },
-  { id: 5, email: "david@example.com", product: "PlayStation 5" },
-  { id: 6, email: "lisa@example.com", product: "Xbox Series X" },
+  { id: 1, name: "Alice Johnson", email: "alice@example.com" },
+  { id: 2, name: "Bob Smith", email: "bob@example.com" },
+  { id: 3, name: "Carol Davis", email: "carol@example.com" },
 ];
 
-const WaitlistLayout = () => {
-  const [search, setSearch] = useState("");
-  const [filterProduct, setFilterProduct] = useState("All");
+const colors = [
+  "bg-pink-100",
+  "bg-indigo-100",
+  "bg-green-100",
+  "bg-yellow-100",
+  "bg-purple-100",
+  "bg-blue-100",
+];
 
-  // Get unique product names for the filter dropdown
-  const products = ["All", ...new Set(dummyWaitlist.map((w) => w.product))];
+const emojis = ["🎉", "🚀", "🌟", "💎", "🔥", "✨"];
 
-  // Filtered waitlist based on search and product filter
-  const filteredWaitlist = dummyWaitlist.filter((entry) => {
-    const matchesSearch = entry.email
-      .toLowerCase()
-      .includes(search.toLowerCase());
-    const matchesProduct =
-      filterProduct === "All" || entry.product === filterProduct;
-    return matchesSearch && matchesProduct;
-  });
+const Waitlist = () => {
+  const [waitlist, setWaitlist] = useState(dummyWaitlist);
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [message, setMessage] = useState("");
+  const [nextId, setNextId] = useState(4);
+  const [count, setCount] = useState(dummyWaitlist.length);
+  const [displayCount, setDisplayCount] = useState(dummyWaitlist.length);
+
+  const handleJoinWaitlist = (e) => {
+    e.preventDefault();
+    if (!name || !email) {
+      setMessage("Please enter your name and email!");
+      return;
+    }
+
+    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
+
+    const newEntry = {
+      id: nextId,
+      name,
+      email,
+      emoji,
+      added: true, // flag for animation
+    };
+
+    setWaitlist([newEntry, ...waitlist]);
+    setNextId(nextId + 1);
+    setName("");
+    setEmail("");
+    setMessage("You've joined the waitlist!");
+
+    // Trigger confetti
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
+
+    // Update counter
+    setCount((prev) => prev + 1);
+
+    setTimeout(() => setMessage(""), 3000);
+
+    // Remove animation flag after animation duration
+    setTimeout(() => {
+      setWaitlist((prev) =>
+        prev.map((user) => ({ ...user, added: false }))
+      );
+    }, 500);
+  };
+
+  // Animate counter
+  useEffect(() => {
+    if (displayCount === count) return;
+    const interval = setInterval(() => {
+      setDisplayCount((prev) => {
+        if (prev < count) return prev + 1;
+        clearInterval(interval);
+        return prev;
+      });
+    }, 50);
+    return () => clearInterval(interval);
+  }, [count, displayCount]);
 
   return (
     <Layout>
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-100 p-6">
-      <h1 className="text-2xl font-bold text-center mb-6 text-gray-900">
-        Product Waitlist
+    <div className="max-w-3xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-2 text-center">
+        Join Our Pre-Launch Waitlist
       </h1>
-
-      {/* Search & Filter Bar */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-4 justify-center items-center">
-        <input
-          type="text"
-          placeholder="Search by email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white w-full sm:w-64"
-        />
-        <select
-          value={filterProduct}
-          onChange={(e) => setFilterProduct(e.target.value)}
-          className="p-2 rounded-lg border border-gray-300 dark:border-gray-600 dark:bg-gray-100 dark:text-black w-full sm:w-48"
-        >
-          {products.map((product) => (
-            <option key={product} value={product}>
-              {product}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Total Count */}
-      <p className="text-center mb-6 text-gray-700  font-medium">
-        Total waitlist entries: {filteredWaitlist.length}
+      <p className="text-center text-gray-600 mb-6">
+        Total people on waitlist:{" "}
+        <span className="font-bold text-indigo-600">{displayCount}</span>
       </p>
 
-      {/* Waitlist Cards */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {filteredWaitlist.length > 0 ? (
-          filteredWaitlist.map((entry, index) => (
-            <div
-              key={entry.id}
-              className="p-5 rounded-2xl shadow-md bg-white dark:bg-gray-800 flex flex-col gap-3 hover:shadow-lg transition"
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  #{index + 1}
-                </span>
-                <span className="text-xs px-2 py-1 rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-700 dark:text-indigo-100">
-                  {entry.product}
-                </span>
-              </div>
+      <form
+        onSubmit={handleJoinWaitlist}
+        className="flex flex-col sm:flex-row gap-4 mb-6"
+      >
+        <input
+          type="text"
+          placeholder="Your Name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <input
+          type="email"
+          placeholder="Your Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+        />
+        <button
+          type="submit"
+          className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition"
+        >
+          Join
+        </button>
+      </form>
 
-              <p className="text-gray-900 dark:text-white font-semibold">
-                {entry.email}
-              </p>
+      {message && <p className="text-green-600 mb-4">{message}</p>}
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        {waitlist.map((user, index) => (
+          <div
+            key={user.id}
+            className={`
+              ${colors[index % colors.length]} 
+              p-4 border border-gray-200 rounded-lg shadow-md flex items-center gap-3
+              ${user.added ? "animate-fade-slide" : "transition-transform duration-300"}
+            `}
+          >
+            <span className="text-2xl">{user.emoji}</span>
+            <div>
+              <p className="font-semibold text-gray-800">{user.name}</p>
+              <p className="text-gray-600 text-sm">{user.email}</p>
             </div>
-          ))
-        ) : (
-          <p className="col-span-full text-center text-gray-500 dark:text-gray-400">
-            No waitlist entries found.
-          </p>
-        )}
+          </div>
+        ))}
       </div>
     </div>
     </Layout>
   );
 };
 
-export default WaitlistLayout;
+export default Waitlist;
