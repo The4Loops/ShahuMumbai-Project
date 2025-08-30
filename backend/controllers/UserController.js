@@ -17,6 +17,19 @@ const verifyAdmin = (req) => {
   }
 };
 
+// Verify User
+const verifyUser = (req) => {
+  const token = req.headers.authorization?.split(" ")[1];
+  if (!token) return { error: "Unauthorized: Token missing" };
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    return { decoded };
+  } catch (err) {
+    return { error: "Invalid Token" };
+  }
+};
+
 // ADMIN API: Create User
 exports.adminCreateUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
@@ -206,6 +219,152 @@ exports.deleteUser = async (req, res) => {
     }
 
     res.status(200).json({ message: "User deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// API: Update User Profile
+exports.updateUserProfile = async (req, res) => {
+  const { error: authError, decoded } = verifyUser(req);
+  if (authError) return res.status(401).json({ error: authError });
+  console.log(decoded.id);
+  try {
+    const {
+      full_name,
+      email,
+      password,
+      phone,
+      about,
+      country,
+      newsletter_subscription,
+      email_notifications,
+      public_profile,
+      twitter_url,
+      facebook_url,
+      instagram_url,
+      linkedin_url,
+      profile_image,
+    } = req.body;
+
+    // Validate email is provided
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    const updates = {
+      full_name: full_name || null,
+      email,
+      phone: phone || null,
+      about: about || null,
+      country: country || null,
+      newsletter_subscription: newsletter_subscription ?? false,
+      email_notifications: email_notifications ?? false,
+      public_profile: public_profile ?? false,
+      twitter_url: twitter_url || null,
+      facebook_url: facebook_url || null,
+      instagram_url: instagram_url || null,
+      linkedin_url: linkedin_url || null,
+      profile_image: profile_image || null,
+      updated_at: new Date().toISOString(),
+    };
+
+    // Hash password if provided
+    if (password) {
+      updates.password = await bcrypt.hash(password, 10);
+    }
+
+    // Update user in Supabase, ensuring the user can only update their own profile
+    const { data, error } = await supabase
+      .from("users")
+      .update(updates)
+      .eq("id", decoded.id) // Ensure user can only update their own profile
+      .select("id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login")
+      .single();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    // Transform response to match frontend expectations
+    const transformedData = {
+      id: data.id,
+      full_name: data.full_name,
+      email: data.email,
+      phone: data.phone,
+      about: data.about,
+      country: data.country,
+      preferences: {
+        newsletter: data.newsletter_subscription,
+        emailNotifications: data.email_notifications,
+        publicProfile: data.public_profile,
+      },
+      socialLinks: {
+        twitter: data.twitter_url,
+        facebook: data.facebook_url,
+        instagram: data.instagram_url,
+        linkedin: data.linkedin_url,
+      },
+      image: data.profile_image,
+      role: data.roles.label,
+      active: data.active === "Y",
+      joined: data.joined ? new Date(data.joined).toLocaleDateString() : "N/A",
+      last_login: data.last_login ? new Date(data.last_login).toLocaleDateString() : "Never",
+    };
+
+    res.status(200).json({ message: "Profile updated successfully", user: transformedData });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// API: Get User Profile
+exports.getUserProfile = async (req, res) => {
+  const { error: authError, decoded } = verifyUser(req);
+  if (authError) return res.status(401).json({ error: authError });
+
+  try {
+    const { data, error } = await supabase
+      .from("users")
+      .select("id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login")
+      .eq("id", decoded.id)
+      .single();
+
+    if (error) {
+      return res.status(400).json({ error: error.message });
+    }
+
+    if (!data) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Transform response to match frontend expectations
+    const transformedData = {
+      id: data.id,
+      full_name: data.full_name,
+      email: data.email,
+      phone: data.phone,
+      about: data.about,
+      country: data.country,
+      preferences: {
+        newsletter: data.newsletter_subscription || false,
+        emailNotifications: data.email_notifications || false,
+        publicProfile: data.public_profile || false,
+      },
+      socialLinks: {
+        twitter: data.twitter_url || "",
+        facebook: data.facebook_url || "",
+        instagram: data.instagram_url || "",
+        linkedin: data.linkedin_url || "",
+      },
+      image: data.profile_image || null,
+      role: data.roles.label,
+      active: data.active === "Y",
+      joined: data.joined ? new Date(data.joined).toLocaleDateString() : "N/A",
+      last_login: data.last_login ? new Date(data.last_login).toLocaleDateString() : "Never",
+    };
+
+    res.status(200).json({ user: transformedData });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

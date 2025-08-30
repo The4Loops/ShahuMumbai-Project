@@ -2,11 +2,11 @@ import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { MdEmail, MdPhone } from "react-icons/md";
 import { FaTwitter, FaFacebook, FaInstagram, FaLinkedin } from "react-icons/fa";
-import { jwtDecode } from "jwt-decode";
 import { useNavigate, Link } from "react-router-dom";
+import api from "../supabase/axios";
 import Layout from "../layout/Layout";
 
-// ✅ Moved outside to avoid useEffect dependency warning
+// Moved outside to avoid useEffect dependency warning
 const emptyProfile = {
   name: "",
   email: "",
@@ -49,61 +49,130 @@ function Profile() {
   const [profile, setProfile] = useState(emptyProfile);
   const [saved, setSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [error, setError] = useState(null);
   const navigate = useNavigate();
 
+  // Fetch profile data on mount
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const storedProfile = localStorage.getItem("profile");
-
-    if (storedProfile) {
-      const parsed = JSON.parse(storedProfile);
-      setProfile({
-        ...emptyProfile,
-        ...parsed,
-        preferences: {
-          ...emptyProfile.preferences,
-          ...(parsed.preferences || {}),
-        },
-        socialLinks: {
-          ...emptyProfile.socialLinks,
-          ...(parsed.socialLinks || {}),
-        },
-      });
-    } else if (token) {
-      try {
-        const decoded = jwtDecode(token);
-        setProfile((prev) => ({
-          ...prev,
-          name: decoded.fullname || "",
-          email: decoded.email || "",
-          phone: decoded.phone || "",
-          role: decoded.role || "",
-        }));
-      } catch (e) {
-        console.error("Invalid token");
+    const fetchProfile = async () => {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        navigate("/");
+        return;
       }
-    }
-  }, []);
+
+      try {
+        const response = await api.get("/api/users/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const { user } = response.data;
+        setProfile({
+          name: user.full_name || "",
+          email: user.email || "",
+          phone: user.phone || "",
+          about: user.about || "",
+          country: user.country || "",
+          role: user.role || "",
+          preferences: {
+            newsletter: user.preferences.newsletter || false,
+            emailNotifications: user.preferences.emailNotifications || false,
+            publicProfile: user.preferences.publicProfile || false,
+          },
+          socialLinks: {
+            twitter: user.socialLinks.twitter || "",
+            facebook: user.socialLinks.facebook || "",
+            instagram: user.socialLinks.instagram || "",
+            linkedin: user.socialLinks.linkedin || "",
+          },
+          image: user.image || null,
+        });
+        localStorage.setItem("profile", JSON.stringify(user));
+      } catch (err) {
+        console.error("Failed to fetch profile:", err);
+        setError("Failed to load profile");
+      }
+    };
+
+    fetchProfile();
+  }, [navigate]);
 
   const handleChange = (e) => {
     setProfile({ ...profile, [e.target.name]: e.target.value });
   };
 
-  const handleImageChange = (e) => {
+  const handleImageChange = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setProfile((prev) => ({ ...prev, image: reader.result }));
-    };
-    reader.readAsDataURL(file);
+
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await api.post("/api/upload/single", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      setProfile((prev) => ({ ...prev, image: response.data.url }));
+    } catch (err) {
+      console.error("Image upload failed:", err);
+      setError("Failed to upload image");
+    }
   };
 
-  const handleToggleEdit = () => {
+  const handleToggleEdit = async () => {
     if (isEditing) {
-      setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
-      localStorage.setItem("profile", JSON.stringify(profile));
+      try {
+        const token = localStorage.getItem("token");
+        const response = await api.put(
+          "/api/users/profile",
+          {
+            full_name: profile.name,
+            email: profile.email,
+            phone: profile.phone,
+            about: profile.about,
+            country: profile.country,
+            newsletter_subscription: profile.preferences.newsletter,
+            email_notifications: profile.preferences.emailNotifications,
+            public_profile: profile.preferences.publicProfile,
+            twitter_url: profile.socialLinks.twitter,
+            facebook_url: profile.socialLinks.facebook,
+            instagram_url: profile.socialLinks.instagram,
+            linkedin_url: profile.socialLinks.linkedin,
+            profile_image: profile.image,
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        const { user } = response.data;
+        setProfile({
+          name: user.full_name || "",
+          email: user.email || "",
+          phone: user.phone || "",
+          about: user.about || "",
+          country: user.country || "",
+          role: user.role || "",
+          preferences: {
+            newsletter: user.preferences.newsletter || false,
+            emailNotifications: user.preferences.emailNotifications || false,
+            publicProfile: user.preferences.publicProfile || false,
+          },
+          socialLinks: {
+            twitter: user.socialLinks.twitter || "",
+            facebook: user.socialLinks.facebook || "",
+            instagram: user.socialLinks.instagram || "",
+            linkedin: user.socialLinks.linkedin || "",
+          },
+          image: user.image || null,
+        });
+        localStorage.setItem("profile", JSON.stringify(user));
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      } catch (err) {
+        console.error("Profile update failed:", err);
+        setError("Failed to update profile");
+      }
     }
     setIsEditing(!isEditing);
   };
@@ -185,6 +254,7 @@ function Profile() {
               {isEditing ? "Save Changes" : "Edit Profile"}
             </button>
           </div>
+          {error && <p className="text-red-600 mb-2">{error}</p>}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               name="name"
