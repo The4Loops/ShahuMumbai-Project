@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom"; // Added import
 import api from "../supabase/axios";
 import ProductCard from "../components/ProductCard";
 import Layout from "../layout/Layout";
@@ -20,18 +21,22 @@ const useDebounced = (value, delay = 300) => {
 const Products = () => {
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search, 400);
-
   const [selectedCategories, setSelectedCategories] = useState(new Set());
   const [sort, setSort] = useState("relevance");
-
   const [page, setPage] = useState(1);
 
+  const [searchParams, setSearchParams] = useSearchParams(); // Added for query params
   const menuBtnRef = useRef(null);
   const menuRef = useRef(null);
+
+  // Initialize search state from URL query parameter
+  useEffect(() => {
+    const query = searchParams.get("search") || "";
+    setSearch(query);
+  }, [searchParams]);
 
   const fetchProducts = async () => {
     try {
@@ -117,6 +122,7 @@ const Products = () => {
     setSelectedCategories(new Set());
     setSearch("");
     setSort("relevance");
+    setSearchParams({}); // Clear search query from URL
   };
 
   useEffect(() => {
@@ -144,7 +150,9 @@ const Products = () => {
   }, [menuOpen]);
 
   const activeCount =
-    (search.trim() ? 1 : 0) + (selectedCategories.size > 0 ? 1 : 0) + (sort !== "relevance" ? 1 : 0);
+    (search.trim() ? 1 : 0) +
+    (selectedCategories.size > 0 ? 1 : 0) +
+    (sort !== "relevance" ? 1 : 0);
 
   return (
     <Layout>
@@ -226,9 +234,16 @@ const Products = () => {
                         <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 opacity-70" />
                         <input
                           value={search}
-                          onChange={(e) => setSearch(e.target.value)}
+                          onChange={(e) => {
+                            setSearch(e.target.value);
+                            setSearchParams(
+                              e.target.value.trim()
+                                ? { search: e.target.value.trim() }
+                                : {}
+                            );
+                          }}
                           placeholder="Search products..."
-                          className="w-full pl-9 pr-3 py-2 border border-black/60 rounded bg-[#EDE1DF] text-sm focus:outline-none"
+                          className="w-full px-9 py-2 border border-black/60 rounded bg-[#EDE1DF] text-sm focus:outline-none"
                         />
                       </div>
                     </div>
