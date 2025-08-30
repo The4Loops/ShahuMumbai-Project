@@ -370,3 +370,23 @@ exports.getTopLatestProducts=async(req,res)=>{
       .json({ message: "Server error", error: error.message });
   }
 }
+
+exports.setProductCollection = async (req, res) => {
+  try {
+    const { id } = req.params;               
+    const { collectionid } = req.body;       
+
+    const { data, error } = await supabase
+      .from('products')
+      .update({ collectionid: collectionid || null, updated_at: new Date() })
+      .eq('id', id)
+      .select('id, collectionid')
+      .single();
+
+    if (error) throw error;
+    res.json(data);
+  } catch (e) {
+    console.error('setProductCollection', e);
+    res.status(500).json({ error: e.message });
+  }
+};

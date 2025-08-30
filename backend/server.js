@@ -22,10 +22,9 @@ const analyticsRoutes = require('./routes/analyticsRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes'); 
 const checkoutRoutes = require('./routes/checkoutRoutes');
 const ordersRoutes = require('./routes/ordersRoutes');
+const collectionsRoutes = require('./routes/collectionsRoutes');
 
 const app = express();
-
-app.set('trust proxy', 1);
 
 // Middleware
 app.use(helmet());
@@ -67,6 +66,8 @@ app.use('/api', analyticsRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', checkoutRoutes);
 app.use('/api', ordersRoutes);
+app.use('/api', collectionsRoutes); 
+
 
 
 // Rate Limiting

@@ -16,6 +16,9 @@ import MenuManagement from "./MenuManagement";
 import RoleManagement from "./RoleManagement";
 import SubscribersTable from "./SubscribersTable";
 import News from "./News";
+import AddCollections from "./AddCollections";
+import { FiGrid } from "react-icons/fi";
+import { AdminActionsContext } from "./AdminActionsContext";
 
 import {
   FaBars,
@@ -72,6 +75,7 @@ const MENU_REGISTRY = [
   { id: "Table", label: "Data Table Management", icon: AiOutlineTable, category: "Utilities", component: Tables },
   { id: "Subscribers Table", label: "Subscribers Table Management", icon: AiOutlineTable, category: "Utilities", component: SubscribersTable },
   { id: "News", label: "News Management", icon: AiOutlineTable, category: "Utilities", component: News },
+  { id: "Add Collections", label: "Add Collections", icon: FiGrid, category: "Catalog", component: AddCollections },
 
 ];
 
@@ -104,6 +108,8 @@ const AdminPanel = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true); // collapsible menu
   const [drawerOpen, setDrawerOpen] = useState(false); // mobile
   const [paletteOpen, setPaletteOpen] = useState(false);
+  const [editProductId, setEditProductId] = useState(null);
+  const [editCollectionId, setEditCollectionId] = useState(null);
 
   const isFavorite = (id) => favorites.includes(id);
   const toggleFavorite = (id) => {
@@ -113,6 +119,17 @@ const AdminPanel = () => {
       return next;
     });
   };
+
+  const openProductEditor = (id) => {
+    setEditProductId(id ?? null);
+    setActiveId("Add Product");
+  };
+  const openCollectionEditor = (id) => {
+   setEditCollectionId(id ?? null);
+   setActiveId("Add Collections");
+   };
+
+
 
   useEffect(() => {
     const onK = (e) => {
@@ -145,6 +162,7 @@ const AdminPanel = () => {
 
   return (
     <Layout>
+      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor }}>
       <div className="min-h-screen bg-[#f7f5f2]">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[#EAD8D8]">
@@ -242,34 +260,43 @@ const AdminPanel = () => {
             )}
 
             {/* Content */}
-            <main className="flex-1">
-              {!activeItem ? (
-                <Dashboard
-                  onOpen={(id) => setActiveId(id)}
-                  favorites={favorites}
-                  toggleFavorite={toggleFavorite}
-                />
-              ) : (
-                <section className="bg-white border border-[#EAD8D8] rounded-2xl shadow-sm p-4 sm:p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-xl font-semibold text-[#6B4226]">
-                      {activeItem.label}
-                    </h3>
-                    <button
-                      onClick={() => toggleFavorite(activeItem.id)}
-                      className="flex items-center gap-2 text-[#6B4226]"
-                      title={favorites.includes(activeItem.id) ? "Unpin" : "Pin"}
-                    >
-                      {favorites.includes(activeItem.id) ? <FaStar /> : <FaRegStar />}
-                      <span className="text-sm">
-                        {favorites.includes(activeItem.id) ? "Pinned" : "Pin"}
-                      </span>
-                    </button>
-                  </div>
-                  <ActiveComponent />
-                </section>
-              )}
-            </main>
+              <main className="flex-1">
+                {!activeItem ? (
+                  <Dashboard
+                    onOpen={(id) => setActiveId(id)}
+                    favorites={favorites}
+                    toggleFavorite={toggleFavorite}
+                  />
+                ) : (
+                  <section className="bg-white border border-[#EAD8D8] rounded-2xl shadow-sm p-4 sm:p-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-[#6B4226]">
+                        {activeItem.label}
+                      </h3>
+                      <button
+                        onClick={() => toggleFavorite(activeItem.id)}
+                        className="flex items-center gap-2 text-[#6B4226]"
+                        title={favorites.includes(activeItem.id) ? "Unpin" : "Pin"}
+                      >
+                        {favorites.includes(activeItem.id) ? <FaStar /> : <FaRegStar />}
+                        <span className="text-sm">
+                          {favorites.includes(activeItem.id) ? "Pinned" : "Pin"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* ✅ Render exactly ONE component */}
+                    {activeItem.id === "Add Product" ? (
+                      <AddProduct editId={editProductId} onSaved={() => setEditProductId(null)} />
+                    ) : activeItem.id === "Add Collections" ? (
+                      <AddCollections editId={editCollectionId} onSaved={() => setEditCollectionId(null)} />
+                    ) : (
+                      <activeItem.component />
+                    )}
+                  </section>
+                )}
+              </main>
+
           </div>
         </div>
       </div>
@@ -285,6 +312,7 @@ const AdminPanel = () => {
           }}
         />
       )}
+      </AdminActionsContext.Provider>
     </Layout>
   );
 };
