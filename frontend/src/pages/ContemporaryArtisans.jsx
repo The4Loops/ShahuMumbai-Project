@@ -2,49 +2,8 @@ import { useState, useEffect, memo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
-
-// --- Data ---
-const artisans = [
-  {
-    name: "Anaya Kapoor",
-    specialty: "Handwoven Textile Expert",
-    bio: "Anaya revives ancient Indian weaving techniques to create timeless, sustainable fabrics.",
-    color: "#fbe4d8",
-  },
-  {
-    name: "Rajiv Mehra",
-    specialty: "Vintage Footwear Restorer",
-    bio: "With a deep respect for craftsmanship, Rajiv breathes new life into classic leather pieces.",
-    color: "#d8e2dc",
-  },
-  {
-    name: "Ira Das",
-    specialty: "Jewelry Archivist",
-    bio: "Ira curates and restores intricate heirloom jewelry with care, storytelling, and precision.",
-    color: "#e2d4f0",
-  },
-];
-
-const technicalTeam = [
-  {
-    name: "Aarav Sharma",
-    specialty: "Lead Software Engineer",
-    bio: "Aarav builds scalable systems and ensures seamless integration of cutting-edge tech.",
-    color: "#d0e8ff",
-  },
-  {
-    name: "Priya Nair",
-    specialty: "UI/UX Designer",
-    bio: "Priya crafts intuitive digital experiences blending creativity and functionality.",
-    color: "#ffe8d6",
-  },
-  {
-    name: "Karan Malhotra",
-    specialty: "DevOps Specialist",
-    bio: "Karan optimizes infrastructure and automates workflows for high efficiency.",
-    color: "#e3f2e1",
-  },
-];
+import api from "../supabase/axios"; // Assuming this is your axios instance
+import { toast } from "react-toastify";
 
 // --- Components ---
 const TeamToggle = ({ view, setView }) => (
@@ -105,8 +64,10 @@ const TeamMemberCard = memo(({ member, view, delay }) => (
 function TeamPage() {
   const location = useLocation();
   const navigate = useNavigate();
-
   const [view, setView] = useState("artisans");
+  const [teamData, setTeamData] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   // Load from query string or localStorage
   useEffect(() => {
@@ -126,12 +87,37 @@ function TeamPage() {
     navigate({ search: params.toString() }, { replace: true });
   };
 
-  const teamData = view === "artisans" ? artisans : technicalTeam;
+  // Fetch team members from API
+  useEffect(() => {
+    const fetchTeam = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const { data } = await api.get("/api/team-members", {
+          params: { team_type: view === "artisans" ? "artist" : "technical" },
+        });
+        setTeamData(
+          (data.members || []).map((member) => ({
+            name: member.name,
+            specialty: member.role, // Map role to specialty
+            bio: member.description || "", // Map description to bio
+            color: member.color,
+          }))
+        );
+      } catch (err) {
+        setError("Failed to load team members.");
+        toast.error("Failed to load team members.");
+        setTeamData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchTeam();
+  }, [view]);
 
   return (
     <Layout>
       <div className="bg-[#F1E7E5] px-4 sm:px-10 py-16 min-h-screen text-[#2e2e2e]">
-        
         {/* Toggle */}
         <TeamToggle view={view} setView={handleViewChange} />
 
@@ -152,17 +138,28 @@ function TeamPage() {
           </p>
         </motion.div>
 
-        {/* Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
-          {teamData.map((member, idx) => (
-            <TeamMemberCard
-              key={member.name}
-              member={member}
-              view={view}
-              delay={idx * 0.15}
-            />
-          ))}
-        </div>
+        {/* Error or Loading */}
+        {error && (
+          <div className="text-center text-red-600 mb-8">{error}</div>
+        )}
+        {loading ? (
+          <div className="text-center text-gray-600">Loading...</div>
+        ) : teamData.length === 0 ? (
+          <div className="text-center text-gray-600">
+            No {view === "artisans" ? "artisans" : "technical team members"} found.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
+            {teamData.map((member, idx) => (
+              <TeamMemberCard
+                key={member.name}
+                member={member}
+                view={view}
+                delay={idx * 0.15}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </Layout>
   );

@@ -1,7 +1,7 @@
-// src/admin/Communications.jsx
 import React, { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
+import api from '../supabase/axios';
 import { FaSearch, FaInbox, FaEnvelope, FaUser, FaClock, FaCheckCircle, FaTimes } from 'react-icons/fa';
+import { toast } from 'react-toastify'; // Added for error/success messages
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
 const PAGE_SIZE = 12;
@@ -9,13 +9,13 @@ const PAGE_SIZE = 12;
 const fmt = (iso) => (iso ? new Date(iso).toLocaleString() : '');
 
 const StatusBadge = ({ status }) => {
-  const s = (status || 'new').toLowerCase();
+  const s = (status || 'pending').toLowerCase();
   const map = {
-    new: 'bg-blue-100 text-blue-700',
+    pending: 'bg-blue-100 text-blue-700',
     read: 'bg-gray-100 text-gray-700',
     resolved: 'bg-green-100 text-green-700',
   };
-  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || map.new}`}>{s}</span>;
+  return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${map[s] || map.pending}`}>{s}</span>;
 };
 
 export default function Communications() {
@@ -34,43 +34,21 @@ export default function Communications() {
       setLoading(true);
       setError('');
       try {
-        const { data } = await axios.get(`${BASE_URL}/api/customer-messages`);
+        const { data } = await api.get(`/api/contacts`, {
+          params: {
+            q: query.trim() || undefined,
+            limit: PAGE_SIZE,
+            offset: (page - 1) * PAGE_SIZE,
+          },
+        });
         if (!cancelled) {
-          setItems(Array.isArray(data) ? data : []);
+          setItems(Array.isArray(data.contacts) ? data.contacts : []);
         }
       } catch (e) {
-        // Demo fallback
         if (!cancelled) {
           setError('Could not reach API. Showing sample messages.');
-          setItems([
-            {
-              id: 1,
-              name: 'Aisha Khan',
-              email: 'aisha@example.com',
-              message:
-                "Hi team,\nI received Order #2471 but the size is a bit small. Could I exchange for M?\nThanks!",
-              createdAt: new Date().toISOString(),
-              status: 'new',
-            },
-            {
-              id: 2,
-              name: 'Karan Patel',
-              email: 'karan.p@example.com',
-              message:
-                'Hello, I think my card was charged twice for the same purchase yesterday. Please check.',
-              createdAt: new Date(Date.now() - 6 * 3600e3).toISOString(),
-              status: 'read',
-            },
-            {
-              id: 3,
-              name: 'Meera Shah',
-              email: 'meera.s@example.com',
-              message:
-                'My delivery shows “attempted” but I was home. Can you reschedule or share the courier contact?',
-              createdAt: new Date(Date.now() - 2 * 86400e3).toISOString(),
-              status: 'resolved',
-            },
-          ]);
+          toast.error('Failed to load messages.');
+          setItems([]);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -80,9 +58,9 @@ export default function Communications() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [query, page]);
 
-  // Filter + sort
+  // Filter + sort (client-side fallback)
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     const base = q
@@ -90,10 +68,11 @@ export default function Communications() {
           (m) =>
             m.name?.toLowerCase().includes(q) ||
             m.email?.toLowerCase().includes(q) ||
-            m.message?.toLowerCase().includes(q)
+            m.message?.toLowerCase().includes(q) ||
+            m.subject?.toLowerCase().includes(q)
         )
       : items;
-    return base.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    return base.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
   }, [items, query]);
 
   // Pagination
@@ -106,19 +85,25 @@ export default function Communications() {
   const markRead = async (id) => {
     setActionLoading(true);
     try {
-      await axios.post(`${BASE_URL}/api/customer-messages/${id}/read`);
-    } catch {}
-    setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: 'read' } : m)));
+      const { data } = await api.put(`/api/contacts/${id}`, { status: 'read' });
+      setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: data.status } : m)));
+      toast.success('Message marked as read.');
+    } catch (e) {
+      toast.error('Failed to mark message as read.');
+    }
     setActionLoading(false);
   };
 
   const setStatus = async (id, status) => {
     setActionLoading(true);
     try {
-      await axios.patch(`${BASE_URL}/api/customer-messages/${id}/status`, { status });
-    } catch {}
-    setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status } : m)));
-    setSelected((sel) => (sel && sel.id === id ? { ...sel, status } : sel));
+      const { data } = await api.put(`/api/contacts/${id}`, { status });
+      setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: data.status } : m)));
+      setSelected((sel) => (sel && sel.id === id ? { ...sel, status: data.status } : sel));
+      toast.success(`Message marked as ${status}.`);
+    } catch (e) {
+      toast.error(`Failed to mark message as ${status}.`);
+    }
     setActionLoading(false);
   };
 
@@ -130,7 +115,7 @@ export default function Communications() {
           <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
           <input
             className="pl-9 pr-3 py-2 rounded-lg border border-[#D4A5A5] focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
-            placeholder="Search name, email, message…"
+            placeholder="Search name, email, subject, message…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -162,13 +147,14 @@ export default function Communications() {
                       <span className="text-xs text-gray-500 truncate">&lt;{m.email}&gt;</span>
                       <StatusBadge status={m.status} />
                     </div>
+                    <p className="text-sm text-gray-700 truncate mt-1">{m.subject || 'No Subject'}</p>
                     <p className="text-sm text-gray-700 line-clamp-2 mt-1 whitespace-pre-line">{m.message}</p>
                     <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <FaClock /> {fmt(m.createdAt)}
+                      <FaClock /> {fmt(m.created_at)}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
-                    {m.status === 'new' && (
+                    {m.status === 'pending' && (
                       <button
                         onClick={() => markRead(m.id)}
                         disabled={actionLoading}
@@ -187,7 +173,7 @@ export default function Communications() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => setStatus(m.id, 'new')}
+                        onClick={() => setStatus(m.id, 'pending')}
                         disabled={actionLoading}
                         className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                       >
@@ -198,7 +184,7 @@ export default function Communications() {
                       onClick={() => {
                         setSelected(m);
                         // auto-mark read when opened
-                        if (m.status === 'new') markRead(m.id);
+                        if (m.status === 'pending') markRead(m.id);
                       }}
                       className="px-3 py-1.5 text-sm rounded bg-black text-white hover:bg-gray-800"
                     >
@@ -235,7 +221,7 @@ export default function Communications() {
         )}
       </div>
 
-      {/* Modal that mirrors your CustomerServicePopup style */}
+      {/* Modal */}
       {selected && (
         <AdminMessageModal
           item={selected}
@@ -247,7 +233,7 @@ export default function Communications() {
   );
 }
 
-// --- Modal component styled like your CustomerServicePopup ---
+// --- Modal component ---
 function AdminMessageModal({ item, onClose, onResolve }) {
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -263,13 +249,13 @@ function AdminMessageModal({ item, onClose, onResolve }) {
           </button>
         </div>
 
-        {/* Content (mirrors your popup style) */}
+        {/* Content */}
         <div className="p-6">
           <p className="text-lg text-gray-600 mb-8 text-center">
-            This is exactly what the customer submitted via the Customer Service page.
+            This is exactly what the customer submitted via the Contact page.
           </p>
 
-          {/* Info cards (similar to Phone/Email/Address section, but with Name/Email/Time) */}
+          {/* Info cards */}
           <div className="grid gap-8 md:grid-cols-3 mb-12">
             <div className="bg-gray-50 rounded-xl shadow p-6 text-center">
               <FaUser className="mx-auto text-3xl text-gray-700 mb-3" />
@@ -284,16 +270,28 @@ function AdminMessageModal({ item, onClose, onResolve }) {
             <div className="bg-gray-50 rounded-xl shadow p-6 text-center">
               <FaClock className="mx-auto text-3xl text-gray-700 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Submitted</h3>
-              <p className="text-gray-700">{fmt(item.createdAt)}</p>
+              <p className="text-gray-700">{fmt(item.created_at)}</p>
             </div>
           </div>
 
-          {/* Message block (mirrors the form’s message area) */}
+          {/* Message block */}
           <div className="bg-gray-50 rounded-xl shadow p-6 space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Subject</label>
+              <div className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-3 bg-white">
+                {item.subject || 'No Subject'}
+              </div>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Message</label>
               <div className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-3 bg-white whitespace-pre-wrap">
                 {item.message}
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700">Status</label>
+              <div className="mt-1">
+                <StatusBadge status={item.status} />
               </div>
             </div>
 
@@ -312,10 +310,6 @@ function AdminMessageModal({ item, onClose, onResolve }) {
               </button>
             </div>
           </div>
-
-          {/* (Optional) Quick reply idea:
-              You can add a reply textarea here to email the customer or push a response to their account inbox.
-              Kept out for now since you asked for parity with the submitted form. */}
         </div>
       </div>
     </div>
