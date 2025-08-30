@@ -5,6 +5,7 @@ import { FaTwitter, FaFacebook, FaInstagram, FaLinkedin } from "react-icons/fa";
 import { useNavigate, Link } from "react-router-dom";
 import api from "../supabase/axios";
 import Layout from "../layout/Layout";
+import { toast } from "react-toastify";
 
 // Moved outside to avoid useEffect dependency warning
 const emptyProfile = {
@@ -86,7 +87,6 @@ function Profile() {
           },
           image: user.image || null,
         });
-        localStorage.setItem("profile", JSON.stringify(user));
       } catch (err) {
         console.error("Failed to fetch profile:", err);
         setError("Failed to load profile");
@@ -123,9 +123,8 @@ function Profile() {
   const handleToggleEdit = async () => {
     if (isEditing) {
       try {
-        const token = localStorage.getItem("token");
         const response = await api.put(
-          "/api/users/profile",
+          "/api/edit-profile",
           {
             full_name: profile.name,
             email: profile.email,
@@ -140,9 +139,6 @@ function Profile() {
             instagram_url: profile.socialLinks.instagram,
             linkedin_url: profile.socialLinks.linkedin,
             profile_image: profile.image,
-          },
-          {
-            headers: { Authorization: `Bearer ${token}` },
           }
         );
         const { user } = response.data;
@@ -166,12 +162,12 @@ function Profile() {
           },
           image: user.image || null,
         });
-        localStorage.setItem("profile", JSON.stringify(user));
         setSaved(true);
         setTimeout(() => setSaved(false), 2000);
+        toast.dismiss();
+        toast.success("Edit profile successfully");
       } catch (err) {
         console.error("Profile update failed:", err);
-        setError("Failed to update profile");
       }
     }
     setIsEditing(!isEditing);
