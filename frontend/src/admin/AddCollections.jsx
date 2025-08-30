@@ -1,4 +1,3 @@
-// src/pages/AddCollections.jsx
 import { useEffect, useMemo, useState } from 'react';
 import api from '../supabase/axios';
 import { useForm } from 'react-hook-form';
@@ -33,7 +32,7 @@ const AddCollections = () => {
       status: 'DRAFT',
       is_active: true,
       cover_image: null,
-    }
+    },
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -46,17 +45,17 @@ const AddCollections = () => {
     if (!isEdit) setValue('slug', slugify(title || ''));
   }, [title, isEdit, setValue]);
 
-  // Preview cover
+  // Preview cover image
   const coverFile = watch('cover_image');
   useEffect(() => {
     if (!coverFile || !coverFile[0]) {
-      setPreview(null);
+      setPreview(existingCover); // Fallback to existing cover during edit
       return;
     }
     const url = URL.createObjectURL(coverFile[0]);
     setPreview(url);
     return () => URL.revokeObjectURL(url);
-  }, [coverFile]);
+  }, [coverFile, existingCover]);
 
   // Load for edit
   useEffect(() => {
@@ -70,8 +69,10 @@ const AddCollections = () => {
           description: data.description || '',
           status: data.status || 'DRAFT',
           is_active: data.is_active,
+          cover_image: null, // Reset file input
         });
         setExistingCover(data.cover_image || null);
+        setPreview(data.cover_image || null);
       } catch {
         toast.error('Failed to load collection');
       }
@@ -86,14 +87,28 @@ const AddCollections = () => {
 
       // If a new file was chosen, upload it
       if (form.cover_image && form.cover_image[0]) {
+        // Validate file
+        const file = form.cover_image[0];
+        const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+          toast.error('Please upload a valid image (JPEG, PNG, or WebP)');
+          setIsSubmitting(false);
+          return;
+        }
+        if (file.size > 5 * 1024 * 1024) {
+          toast.error('Image size must be less than 5MB');
+          setIsSubmitting(false);
+          return;
+        }
+
         const fd = new FormData();
-        fd.append('files', form.cover_image[0]);
-        const up = await api.post('/api/upload/multiple', fd, {
+        fd.append('image', file);
+        const { data } = await api.post('/api/upload/single', fd, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        const urls = up?.data?.imageUrls || [];
+        const urls = data?.url || [];
         if (!urls.length) throw new Error('Cover image upload failed');
-        cover_url = urls[0];
+        cover_url = urls;
       }
 
       const payload = {
@@ -108,6 +123,7 @@ const AddCollections = () => {
       if (isEdit) {
         await api.put(`/api/admin/collections/${id}`, payload);
         toast.success('Collection updated!');
+        navigate('/admin/collections'); // Redirect to collections list
       } else {
         await api.post('/api/admin/collections', payload);
         toast.success('Collection created!');
@@ -122,10 +138,8 @@ const AddCollections = () => {
         setExistingCover(null);
         setPreview(null);
       }
-
-      // navigate('/admin/collections'); // optional
     } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || 'Failed to save collection');
+      toast.error(err?.response?.data?.error || err.message || 'Failed to save collection');
     } finally {
       setIsSubmitting(false);
     }
@@ -185,7 +199,11 @@ const AddCollections = () => {
 
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">Cover Image</label>
-          <input type="file" accept="image/*" {...register('cover_image')} />
+          <input
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            {...register('cover_image')}
+          />
           {(preview || existingCover) && (
             <div className="mt-3">
               <img
@@ -193,6 +211,19 @@ const AddCollections = () => {
                 alt="Cover preview"
                 className="w-full max-w-sm h-40 object-cover rounded-md border"
               />
+              {isEdit && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setExistingCover(null);
+                    setPreview(null);
+                    setValue('cover_image', null);
+                  }}
+                  className="mt-2 text-sm text-red-600 hover:underline"
+                >
+                  Remove Cover Image
+                </button>
+              )}
             </div>
           )}
         </div>
