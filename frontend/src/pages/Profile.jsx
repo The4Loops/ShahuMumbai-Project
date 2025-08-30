@@ -74,7 +74,7 @@ function Profile() {
         const decoded = jwtDecode(token);
         setProfile((prev) => ({
           ...prev,
-          name: decoded.full_name || "",
+          name: decoded.fullname || "",
           email: decoded.email || "",
           phone: decoded.phone || "",
           role: decoded.role || "",
