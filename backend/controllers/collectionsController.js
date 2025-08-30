@@ -7,6 +7,7 @@ exports.listCollections = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(limitStr, 10) || 50, 1), 100);
     const offset = Math.max(parseInt(offsetStr, 10) || 0, 0);
 
+    // Build main collections query
     let queryBuilder = supabase
       .from('collections')
       .select('id, title, slug, description, cover_image, status, is_active, created_at, updated_at', { count: 'exact' })
@@ -25,13 +26,37 @@ exports.listCollections = async (req, res) => {
 
     queryBuilder = queryBuilder.range(offset, offset + limit - 1);
 
-    const { data, error, count } = await queryBuilder;
-    if (error) throw error;
+    // Execute collections query
+    const { data: collections, error: collectionsError, count } = await queryBuilder;
+    if (collectionsError) throw collectionsError;
 
-    return res.json({ collections: data || [], total: count ?? data.length });
+    // Fetch products for the collection IDs
+    const collectionIds = collections.map(c => c.id);
+    let productCounts = {};
+    if (collectionIds.length > 0) {
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('collectionid')
+        .in('collectionid', collectionIds);
+      if (productsError) throw productsError;
+
+      // Count products per collectionid in code
+      productCounts = products.reduce((acc, { collectionid }) => ({
+        ...acc,
+        [collectionid]: (acc[collectionid] || 0) + 1
+      }), {});
+    }
+
+    // Combine collections with product counts
+    const formattedData = (collections || []).map(collection => ({
+      ...collection,
+      product_count: productCounts[collection.id] || 0
+    }));
+
+    return res.json({ collections: formattedData, total: count ?? formattedData.length });
   } catch (e) {
     console.error('collections.listCollections error', e);
-    return res.status(500).json({ error: 'Internal server error' });
+    return res.status(500).json({ error: 'Internal server error', details: e.message });
   }
 };
 
