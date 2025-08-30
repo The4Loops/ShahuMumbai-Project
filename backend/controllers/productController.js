@@ -330,3 +330,43 @@ exports.deleteProduct = async (req, res) => {
       .json({ message: "Server error", error: error.message });
   }
 };
+
+// get top products
+exports.getTopLatestProducts=async(req,res)=>{
+  try {
+    let query = supabase
+      .from("products")
+      .select(
+        `
+        *,
+        product_images!product_id (
+          id,
+          image_url,
+          is_hero
+        ),
+        categories!categoryid (
+          categoryid,
+          name
+        )
+      `
+      )
+      .eq("isactive", true)
+      .order("created_at", { ascending: false }) // Sort by created_at in descending order
+      .limit(4); // Limit to top 4 products
+
+    const { data, error } = await query;
+
+    if (error) {
+      return res
+        .status(400)
+        .json({ message: "Error fetching top latest products", error });
+    }
+
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error(error);
+    return res
+      .status(500)
+      .json({ message: "Server error", error: error.message });
+  }
+}
