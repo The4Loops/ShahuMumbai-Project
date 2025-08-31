@@ -1,9 +1,11 @@
 import React, { useRef, useEffect, useState } from "react";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import {useNavigate} from 'react-router-dom';
 import video from "../assets/ComingSoon.mp4";
 import api from "../supabase/axios";
 
 function Hero() {
+  const navigate=useNavigate();
   const contentRef = useRef(null);
   const inView = useInView(contentRef, { once: true, margin: "-100px" });
 
@@ -108,10 +110,10 @@ function Hero() {
             {description}
           </p>
           <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center md:justify-start">
-            <button className="bg-white text-gray-800 px-4 sm:px-5 py-2 rounded-lg hover:bg-gray-200 transition text-sm sm:text-base">
+            <button onClick={()=>navigate("/products")} className="bg-white text-gray-800 px-4 sm:px-5 py-2 rounded-lg hover:bg-gray-200 transition text-sm sm:text-base">
               Shop Collection
             </button>
-            <button className="border border-white text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-white hover:text-black transition text-sm sm:text-base">
+            <button onClick={()=>navigate("/about")} className="border border-white text-white px-4 sm:px-5 py-2 rounded-lg hover:bg-white hover:text-black transition text-sm sm:text-base">
               Learn Our Story
             </button>
           </div>
