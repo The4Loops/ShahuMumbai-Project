@@ -30,6 +30,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
       isactive: true,
       isfeatured: false,
       collection_id: null,
+      color:"#000000"
     },
   });
 
@@ -96,6 +97,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
           isactive: !!p.isactive,
           isfeatured: !!p.isfeatured,
           collection_id: p.collectionid ?? null,
+          color:p.color ?? ""
         });
 
         const imgs = (p.product_images || []).map((img) => ({
@@ -176,6 +178,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         isactive: !!data.isactive,
         isfeatured: !!data.isfeatured,
         collection_id: data.collection_id || null,
+        color:data.color || null
       };
 
       if (!editId) {
@@ -492,6 +495,17 @@ const AddProduct = ({ editId = null, onSaved }) => {
           {errors.stock && (
             <p className="text-red-600 text-xs mt-1">{errors.stock.message}</p>
           )}
+        </div>
+
+         <div className="w-full">
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Color
+          </label>
+          <input
+            type="color"
+            className="w-full h-[42px] border border-[#E6DCD2] rounded-md cursor-pointer"
+            {...register("color")}
+          />
         </div>
 
         {/* Toggles */}

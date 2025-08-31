@@ -29,6 +29,8 @@ exports.createProduct = async (req, res) => {
       isfeatured,
       uploadeddate,
       images,
+      collection_id,
+      color,
     } = req.body;
 
     // Validate required fields
@@ -43,11 +45,9 @@ exports.createProduct = async (req, res) => {
       !images ||
       images.length === 0
     ) {
-      return res
-        .status(400)
-        .json({
-          message: "All required fields and at least one image are required",
-        });
+      return res.status(400).json({
+        message: "All required fields and at least one image are required",
+      });
     }
     if (!images.some((img) => img.is_hero)) {
       return res
@@ -71,6 +71,8 @@ exports.createProduct = async (req, res) => {
           isactive: isactive === true || isactive === "true",
           isfeatured: isfeatured === true || isfeatured === "true",
           uploadeddate: new Date(uploadeddate),
+          collectionid: collection_id,
+          color: color,
         },
       ])
       .select()
@@ -225,25 +227,35 @@ exports.updateProduct = async (req, res) => {
       isfeatured,
       uploadeddate,
       images,
+      collection_id,
+      color,
     } = req.body;
+
+    const updateFields = {
+      name,
+      description,
+      shortdescription,
+      categoryid,
+      branddesigner,
+      price: parseFloat(price),
+      discountprice: discountprice ? parseFloat(discountprice) : null,
+      stock: parseInt(stock),
+      isactive: isactive === true || isactive === "true",
+      isfeatured: isfeatured === true || isfeatured === "true",
+      collectionid: collection_id,
+      color,
+      updated_at: new Date(),
+    };
+
+    // Only set uploadeddate if provided
+    if (uploadeddate) {
+      updateFields.uploadeddate = new Date(uploadeddate);
+    }
 
     // Update product
     const { data: product, error: productError } = await supabase
       .from("products")
-      .update({
-        name,
-        description,
-        shortdescription,
-        categoryid,
-        branddesigner,
-        price: parseFloat(price),
-        discountprice: discountprice ? parseFloat(discountprice) : null,
-        stock: parseInt(stock),
-        isactive: isactive === true || isactive === "true",
-        isfeatured: isfeatured === true || isfeatured === "true",
-        uploadeddate: new Date(uploadeddate),
-        updated_at: new Date(),
-      })
+      .update(updateFields)
       .eq("id", id)
       .select()
       .single();
@@ -262,12 +274,10 @@ exports.updateProduct = async (req, res) => {
         .eq("product_id", id);
 
       if (deleteImageError) {
-        return res
-          .status(400)
-          .json({
-            message: "Error deleting existing images",
-            error: deleteImageError,
-          });
+        return res.status(400).json({
+          message: "Error deleting existing images",
+          error: deleteImageError,
+        });
       }
 
       // Insert new image URLs
@@ -332,7 +342,7 @@ exports.deleteProduct = async (req, res) => {
 };
 
 // get top products
-exports.getTopLatestProducts=async(req,res)=>{
+exports.getTopLatestProducts = async (req, res) => {
   try {
     let query = supabase
       .from("products")
@@ -369,25 +379,25 @@ exports.getTopLatestProducts=async(req,res)=>{
       .status(500)
       .json({ message: "Server error", error: error.message });
   }
-}
+};
 
 // set product collection
 exports.setProductCollection = async (req, res) => {
   try {
-    const { id } = req.params;               
-    const { collectionid } = req.body;       
+    const { id } = req.params;
+    const { collectionid } = req.body;
 
     const { data, error } = await supabase
-      .from('products')
+      .from("products")
       .update({ collectionid: collectionid || null, updated_at: new Date() })
-      .eq('id', id)
-      .select('id, collectionid')
+      .eq("id", id)
+      .select("id, collectionid")
       .single();
 
     if (error) throw error;
     res.json(data);
   } catch (e) {
-    console.error('setProductCollection', e);
+    console.error("setProductCollection", e);
     res.status(500).json({ error: e.message });
   }
 };
