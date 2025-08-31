@@ -413,9 +413,9 @@ const ProductDetails = () => {
 
                 {/* Color selector */}
                 <div className="mt-3">
-                  <p className="text-sm italic text-[#A3B18A] mb-1">Color:</p>
+                  <p className="text-sm italic text-[#A3B18A] mb-1">Color: {product.color}</p>
 
-                  {product.colors && product.colors.length > 0 ? (
+                  {/* {product.colors && product.colors.length > 0 ? (
                     <div className="flex items-center gap-3">
                       {product.colors.map((c) => (
                         <button
@@ -436,7 +436,7 @@ const ProductDetails = () => {
                     </div>
                   ) : (
                     <p className="text-sm italic text-[#A3B18A]">{product.color || "—"}</p>
-                  )}
+                  )} */}
                 </div>
 
                 <p className="text-sm italic text-[#A3B18A] mt-1">Category: {product.categories?.name || "N/A"}</p>
