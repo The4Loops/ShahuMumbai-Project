@@ -1,4 +1,3 @@
-// src/pages/ProductDetails.jsx
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import Layout from "../layout/Layout";
@@ -10,9 +9,44 @@ import { IoMdShareAlt } from "react-icons/io";
 import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import RelatedCard from "../components/RelatedCard";
 import api from "../supabase/axios";
-import {jwtDecode} from "jwt-decode";
+import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
-import { Ecom } from "../analytics"; // keep your analytics wrapper
+import { Ecom } from "../analytics";
+
+// ---------- helpers ----------
+const asBool = (v) => v === true || v === "true" || v === 1 || v === "1";
+const get = (obj, keys, fallback = undefined) =>
+  keys.reduce((acc, k) => (acc && acc[k] != null ? acc[k] : undefined), obj) ?? fallback;
+
+const IMAGE_BASE =
+  process.env.REACT_APP_IMAGE_BASE ||
+  process.env.REACT_APP_API_BASE_URL ||
+  ""; // prefix for relative urls if your uploader returns "/uploads/.."
+
+const normalizeImageUrl = (u) => {
+  if (!u || typeof u !== "string") return "";
+  if (/^(data:|blob:|https?:\/\/)/i.test(u)) return u;
+  if (u.startsWith("/")) return `${IMAGE_BASE}${u}`;
+  return `${IMAGE_BASE}/${u}`;
+};
+
+const pickImageUrl = (img) =>
+  normalizeImageUrl(
+    img?.image_url ||
+      img?.url ||
+      img?.publicUrl ||
+      img?.public_url ||
+      img?.Location ||
+      img?.location ||
+      img?.path ||
+      ""
+  );
+
+const categoryName = (p) =>
+  p?.categories?.name ||
+  get(p, ["category", "name"]) ||
+  get(p, ["categories", 0, "name"]) ||
+  "N/A";
 
 // Carousel Arrows
 const NextArrow = ({ onClick }) => (
@@ -81,59 +115,45 @@ const ProductDetails = () => {
   if (token) {
     try {
       decoded = jwtDecode(token);
-    } catch (e) {
+    } catch {
       decoded = "";
     }
   }
   const userid = decoded?.id;
   const fullName = decoded?.fullname || "Anonymous";
 
-  // Reviews state
+  // Reviews
   const [reviews, setReviews] = useState([]);
   const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState(null);
 
-  // New review form
-  const [reviewName, setReviewName] = useState(fullName);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewText, setReviewText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [cartSubmitting, setCartSubmitting] = useState(false);
-
-  // Color selection
+  // Color (string)
   const [selectedColor, setSelectedColor] = useState(null);
 
   useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
-        const productResponse = await api.get(`/api/products/${id}`);
-        setProduct(productResponse.data);
+        const { data: p } = await api.get(`/api/products/${id}`);
+        setProduct(p);
+        setSelectedColor(Array.isArray(p?.colors) ? p.colors[0] || null : null);
 
-        // set default selected color if colors exist
-        setSelectedColor(productResponse.data?.colors?.[0] || null);
+        const cat = categoryName(p);
+        const { data: rel } = await api.get(`/api/products?category=${encodeURIComponent(cat)}&limit=8`);
+        setRelatedProducts((rel || []).filter((rp) => String(rp.id) !== String(id)));
 
-        const relatedResponse = await api.get(
-          `/api/products?category=${productResponse.data.categories?.name}&limit=8`
-        );
-        setRelatedProducts(
-          relatedResponse.data.filter((p) => String(p.id) !== String(id))
-        );
+        document.title = `${p.name} - YourBrand`;
 
-        document.title = `${productResponse.data.name} - YourBrand`;
-
-        // GA4: view_item after product is fetched
         try {
-          const p = productResponse.data;
           Ecom.viewItem({
             id: p.id,
             title: p.name,
-            category: p?.categories?.name,
+            category: cat,
             price: Number(p.price) - (Number(p.discountprice || 0) || 0),
             quantity: 1,
-            color: p?.colors?.[0]?.name || p.color || null,
+            color: Array.isArray(p?.colors) ? p.colors[0] || null : null,
           });
         } catch {}
       } catch (err) {
@@ -154,7 +174,7 @@ const ProductDetails = () => {
         const avg = count ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count : 0;
         setReviewCount(count);
         setAvgRating(Number(avg.toFixed(1)));
-      } catch (e) {
+      } catch {
         setReviewError("Failed to load reviews.");
       } finally {
         setReviewLoading(false);
@@ -163,21 +183,12 @@ const ProductDetails = () => {
 
     fetchProduct();
     fetchReviews();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // When product changes, ensure selectedColor is initialized (keeps user selection only if product is same)
+  // Reset slider on color change
   useEffect(() => {
-    if (!product) return;
-    setSelectedColor((prev) => prev || product.colors?.[0] || null);
-  }, [product]);
-
-  // If selectedColor has its own image(s), jump slider to show them
-  useEffect(() => {
-    if (!sliderRef.current) return;
-    // go to first slide when color changes
     try {
-      sliderRef.current.slickGoTo(0);
+      sliderRef.current?.slickGoTo(0);
     } catch {}
   }, [selectedColor]);
 
@@ -200,20 +211,20 @@ const ProductDetails = () => {
       setReviewText("");
       setReviewRating(5);
     } catch (e) {
-      if (e.response?.status === 400) {
-        toast.dismiss();
-        toast.error(e.response?.data?.message || "Failed to submit review.");
-      } else {
-        toast.dismiss();
-        toast.error("Failed to submit review.");
-      }
+      toast.dismiss();
+      toast.error(e.response?.data?.message || "Failed to submit review.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const [reviewName, setReviewName] = useState(fullName);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [cartSubmitting, setCartSubmitting] = useState(false);
+
   const handleAddToCart = async () => {
-    // If the product offers multiple colors, require selection
     if (product?.colors?.length && !selectedColor) {
       toast.error("Please select a color.");
       return;
@@ -225,18 +236,17 @@ const ProductDetails = () => {
         user_id: userid,
         product_id: product.id,
         quantity: qty,
-        color: selectedColor?.name || product.color || null,
+        color: selectedColor || null,
       };
-      const response = await api.post("/api/cart", payload);
+      await api.post("/api/cart", payload);
       toast.dismiss();
       toast.success(`${product.name}${payload.color ? ` (${payload.color})` : ""} added to cart!`);
 
-      // GA4: add_to_cart
       try {
         Ecom.addToCart({
           id: product.id,
           title: product.name,
-          category: product?.categories?.name,
+          category: categoryName(product),
           price: Number(product.price) - (Number(product.discountprice || 0) || 0),
           quantity: qty,
           color: payload.color,
@@ -250,17 +260,9 @@ const ProductDetails = () => {
     }
   };
 
-  if (loading) {
-    return <p className="p-6 text-center text-[#6B4226]">Loading...</p>;
-  }
-
-  if (error || !product) {
-    return (
-      <p className="p-6 text-center text-red-500">
-        {error || "Product not found"}
-      </p>
-    );
-  }
+  if (loading) return <p className="p-6 text-center text-[#6B4226]">Loading...</p>;
+  if (error || !product)
+    return <p className="p-6 text-center text-red-500">{error || "Product not found"}</p>;
 
   const sliderSettings = {
     dots: false,
@@ -273,31 +275,20 @@ const ProductDetails = () => {
     prevArrow: <PrevArrow />,
   };
 
-  // Build base product images (hero first)
-  const baseImages = product.product_images
-    ? [
-        ...product.product_images.filter((img) => img.is_hero).map((img) => img.image_url),
-        ...product.product_images.filter((img) => !img.is_hero).map((img) => img.image_url),
-      ]
-    : [];
+  // Robust image ordering (hero first), tolerant of is_hero being string/number
+  const imgs = Array.isArray(product.product_images) ? product.product_images : [];
+  const baseImages = [
+    ...imgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
+    ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
+  ].filter(Boolean);
 
-  // If colors give image_urls (array) or image_url (single), prefer those when a color is selected
-  const colorImages =
-    selectedColor?.image_urls && selectedColor.image_urls.length
-      ? selectedColor.image_urls
-      : selectedColor?.image_url
-      ? [selectedColor.image_url]
-      : null;
-
-  const images = colorImages
-    ? [...colorImages, ...baseImages.filter((i) => !colorImages.includes(i))]
-    : baseImages;
-
+  const images = baseImages;
   const hero = images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
 
-  // Pricing & discount
   const hasDiscount = product.discountprice && Number(product.discountprice) < Number(product.price);
-  const salePrice = hasDiscount ? Number(product.price) - Number(product.discountprice) : Number(product.price);
+  const salePrice = hasDiscount
+    ? Number(product.price) - Number(product.discountprice)
+    : Number(product.price);
   const mrp = Number(product.price);
   const discountPercentage = hasDiscount ? Math.round(((mrp - salePrice) / mrp) * 100) : 0;
 
@@ -310,15 +301,11 @@ const ProductDetails = () => {
         <nav className="max-w-6xl mx-auto text-sm mb-4 text-[#6B4226]">
           <ol className="flex flex-wrap gap-1">
             <li>
-              <Link to="/" className="hover:underline">
-                Home
-              </Link>
+              <Link to="/" className="hover:underline">Home</Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
             <li>
-              <Link to="/products" className="hover:underline">
-                Our Products
-              </Link>
+              <Link to="/products" className="hover:underline">Our Products</Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
             <li className="text-[#3E2C23] truncate max-w-[60%]" title={product.name}>
@@ -327,9 +314,9 @@ const ProductDetails = () => {
           </ol>
         </nav>
 
-        {/* Main 3-column layout */}
+        {/* Main layout */}
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left: Thumbnails */}
+          {/* Left: Thumbs */}
           <div className="lg:col-span-2 order-2 lg:order-1">
             <div className="flex lg:flex-col gap-3 lg:sticky lg:top-24">
               {images.length ? (
@@ -383,10 +370,7 @@ const ProductDetails = () => {
                 type="button"
                 onClick={() => {
                   if (navigator.share) {
-                    navigator.share({
-                      title: product.name,
-                      url: window.location.href,
-                    });
+                    navigator.share({ title: product.name, url: window.location.href });
                   } else {
                     navigator.clipboard.writeText(window.location.href);
                     alert("Link copied to clipboard");
@@ -401,45 +385,55 @@ const ProductDetails = () => {
             </div>
           </div>
 
-          {/* Right: Buy Box (sticky) */}
+          {/* Right: Buy Box */}
           <aside className="lg:col-span-4 order-3">
             <div className="lg:sticky lg:top-24 flex flex-col gap-4">
               <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-5">
                 <h1 className="text-2xl font-bold text-[#6B4226] mb-1">{product.name}</h1>
                 <div className="flex items-center gap-2 mt-1">
                   <StarRating value={avgRating} />
-                  <span className="text-xs text-[#3E2C23]">{avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}</span>
+                  <span className="text-xs text-[#3E2C23]">
+                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                  </span>
                 </div>
 
                 {/* Color selector */}
                 <div className="mt-3">
-                  <p className="text-sm italic text-[#A3B18A] mb-1">Color: {product.color}</p>
+                  <p className="text-sm italic text-[#A3B18A] mb-1">
+                    Color: {selectedColor || "—"}
+                  </p>
 
-                  {/* {product.colors && product.colors.length > 0 ? (
+                  {product.colors?.length ? (
                     <div className="flex items-center gap-3">
-                      {product.colors.map((c) => (
-                        <button
-                          key={c.name}
-                          type="button"
-                          onClick={() => setSelectedColor(c)}
-                          title={c.name}
-                          aria-pressed={selectedColor?.name === c.name}
-                          className={`w-8 h-8 rounded-full border-2 flex items-center justify-center focus:outline-none ${
-                            selectedColor?.name === c.name ? "border-[#6B4226] ring-2 ring-[#6B4226]/25" : "border-transparent"
-                          }`}
-                          style={{ backgroundColor: c.code || "#ffffff" }}
-                        >
-                          <span className="sr-only">{c.name}</span>
-                        </button>
-                      ))}
-                      <span className="text-sm text-[#3E2C23]">{selectedColor?.name || "Choose"}</span>
+                      {product.colors.map((c) => {
+                        const isSelected = selectedColor === c;
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setSelectedColor(c)}
+                            title={c}
+                            aria-pressed={isSelected}
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center focus:outline-none ${
+                              isSelected
+                                ? "border-[#6B4226] ring-2 ring-[#6B4226]/25"
+                                : "border-transparent"
+                            }`}
+                            style={{ backgroundColor: c }}
+                          >
+                            <span className="sr-only">{c}</span>
+                          </button>
+                        );
+                      })}
                     </div>
                   ) : (
-                    <p className="text-sm italic text-[#A3B18A]">{product.color || "—"}</p>
-                  )} */}
+                    <p className="text-sm italic text-[#A3B18A]">—</p>
+                  )}
                 </div>
 
-                <p className="text-sm italic text-[#A3B18A] mt-1">Category: {product.categories?.name || "N/A"}</p>
+                <p className="text-sm italic text-[#A3B18A] mt-1">
+                  Category: {categoryName(product)}
+                </p>
 
                 <div className="mt-4">
                   {hasDiscount ? (
@@ -454,13 +448,23 @@ const ProductDetails = () => {
                 </div>
 
                 <div className="mt-5 flex items-center gap-3">
-                  <QuantitySelect max={Math.min(10, Number(product.stock) || 10)} value={qty} onChange={setQty} />
-                  {Number(product.stock) > 0 ? <p className="text-sm text-[#A3B18A]">In Stock: {product.stock}</p> : <p className="text-sm text-red-500">Out of Stock</p>}
+                  <QuantitySelect
+                    max={Math.min(10, Number(product.stock) || 10)}
+                    value={qty}
+                    onChange={setQty}
+                  />
+                  {Number(product.stock) > 0 ? (
+                    <p className="text-sm text-[#A3B18A]">In Stock: {product.stock}</p>
+                  ) : (
+                    <p className="text-sm text-red-500">Out of Stock</p>
+                  )}
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
-                    className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${Number(product.stock) === 0 || cartSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${
+                      Number(product.stock) === 0 || cartSubmitting ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                     aria-label="Add this product to your shopping cart"
                     disabled={Number(product.stock) === 0 || cartSubmitting}
                     onClick={handleAddToCart}
@@ -468,10 +472,12 @@ const ProductDetails = () => {
                     {cartSubmitting ? "Adding..." : "Add to Cart"}
                   </button>
                   <button
-                    className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${Number(product.stock) === 0 ? "opacity-50 cursor-not-allowed" : ""}`}
+                    className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
+                      Number(product.stock) === 0 ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
                     aria-label="Buy now"
                     disabled={Number(product.stock) === 0}
-                    onClick={() => console.log("Buy now", { id, qty, color: selectedColor?.name })}
+                    onClick={() => console.log("Buy now", { id, qty, color: selectedColor })}
                   >
                     Buy Now
                   </button>
@@ -498,12 +504,14 @@ const ProductDetails = () => {
           </aside>
         </div>
 
-        {/* Full description & details */}
+        {/* Description & Specs */}
         <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
               <h2 className="text-xl font-bold text-[#6B4226] mb-3">Product Description</h2>
-              <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">{product.description || "No additional description provided."}</p>
+              <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
+                {product.description || "No additional description provided."}
+              </p>
               <div className="mt-4 text-md text-[#6B4226]">
                 Designer: <span className="font-semibold">{product.branddesigner}</span>
               </div>
@@ -515,15 +523,17 @@ const ProductDetails = () => {
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Color</dt>
-                  <dd className="font-medium">{selectedColor?.name || product.color || "—"}</dd>
+                  <dd className="font-medium">{selectedColor || "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Category</dt>
-                  <dd className="font-medium">{product.categories?.name || "—"}</dd>
+                  <dd className="font-medium">{categoryName(product)}</dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>Stock</dt>
-                  <dd className="font-medium">{Number(product.stock) > 0 ? product.stock : "Out of stock"}</dd>
+                  <dd className="font-medium">
+                    {Number(product.stock) > 0 ? product.stock : "Out of stock"}
+                  </dd>
                 </div>
               </dl>
             </div>
@@ -538,7 +548,9 @@ const ProductDetails = () => {
                 <h2 className="text-xl font-bold text-[#6B4226]">Customer Reviews</h2>
                 <div className="flex items-center gap-2">
                   <StarRating value={avgRating} />
-                  <span className="text-sm text-[#3E2C23]">{avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}</span>
+                  <span className="text-sm text-[#3E2C23]">
+                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                  </span>
                 </div>
               </div>
 
@@ -555,11 +567,17 @@ const ProductDetails = () => {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           <StarRating value={Number(r.rating) || 0} />
-                          <span className="text-sm text-[#6B4226] font-semibold">{r.users?.full_name || "Anonymous"}</span>
+                          <span className="text-sm text-[#6B4226] font-semibold">
+                            {r.users?.full_name || "Anonymous"}
+                          </span>
                         </div>
-                        <time className="text-xs text-[#3E2C23] opacity-70">{r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}</time>
+                        <time className="text-xs text-[#3E2C23] opacity-70">
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : ""}
+                        </time>
                       </div>
-                      <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">{r.comment}</p>
+                      <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
+                        {r.comment}
+                      </p>
                     </li>
                   ))}
                 </ul>
@@ -568,14 +586,28 @@ const ProductDetails = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <form onSubmit={submitReview} className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
+            <form
+              onSubmit={submitReview}
+              className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6"
+            >
               <h3 className="text-lg font-bold text-[#6B4226] mb-3">Write a review</h3>
 
               <label className="block text-sm text-[#3E2C23] mb-1">Your name (optional)</label>
-              <input type="text" value={reviewName} onChange={(e) => setReviewName(e.target.value)} className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]" placeholder="e.g., Arjun" readOnly />
+              <input
+                type="text"
+                value={reviewName}
+                onChange={(e) => setReviewName(e.target.value)}
+                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
+                placeholder="e.g., Arjun"
+                readOnly
+              />
 
               <label className="block text-sm text-[#3E2C23] mb-1">Rating</label>
-              <select value={reviewRating} onChange={(e) => setReviewRating(Number(e.target.value))} className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white">
+              <select
+                value={reviewRating}
+                onChange={(e) => setReviewRating(Number(e.target.value))}
+                className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white"
+              >
                 {[5, 4, 3, 2, 1].map((n) => (
                   <option key={n} value={n}>
                     {n} - {n === 5 ? "Excellent" : n === 4 ? "Good" : n === 3 ? "Average" : n === 2 ? "Poor" : "Terrible"}
@@ -584,9 +616,21 @@ const ProductDetails = () => {
               </select>
 
               <label className="block text-sm text-[#3E2C23] mb-1">Review</label>
-              <textarea value={reviewText} onChange={(e) => setReviewText(e.target.value)} className="w-full min-h-[120px] border border-[#D4A5A5] rounded-md px-3 py-2 mb-4 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]" placeholder="Share what you liked or what could be improved…" required />
+              <textarea
+                value={reviewText}
+                onChange={(e) => setReviewText(e.target.value)}
+                className="w-full min-h-[120px] border border-[#D4A5A5] rounded-md px-3 py-2 mb-4 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
+                placeholder="Share what you liked or what could be improved…"
+                required
+              />
 
-              <button type="submit" disabled={submitting} className={`w-full bg-[#6B4226] text-white px-6 py-3 rounded-md font-semibold shadow hover:opacity-90 transition ${submitting ? "opacity-60 cursor-not-allowed" : ""}`}>
+              <button
+                type="submit"
+                disabled={submitting}
+                className={`w-full bg-[#6B4226] text-white px-6 py-3 rounded-md font-semibold shadow hover:opacity-90 transition ${
+                  submitting ? "opacity-60 cursor-not-allowed" : ""
+                }`}
+              >
                 {submitting ? "Submitting…" : "Submit Review"}
               </button>
             </form>
@@ -598,9 +642,19 @@ const ProductDetails = () => {
           <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">You May Also Like</h2>
           <div className="flex flex-wrap justify-center gap-8">
             {relatedProducts.map((related) => {
-              const relatedHasDiscount = related.discountprice && Number(related.discountprice) < Number(related.price);
-              const relatedSalePrice = relatedHasDiscount ? Number(related.price) - Number(related.discountprice) : Number(related.price);
-              const relatedImage = related.product_images?.find((img) => img.is_hero)?.image_url || related.product_images?.[0]?.image_url || "/assets/images/placeholder.png";
+              const rImgs = Array.isArray(related.product_images) ? related.product_images : [];
+              const relatedOrdered = [
+                ...rImgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
+                ...rImgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
+              ].filter(Boolean);
+              const relatedImage =
+                relatedOrdered[0] || "/assets/images/placeholder.png";
+              const relatedHasDiscount =
+                related.discountprice && Number(related.discountprice) < Number(related.price);
+              const relatedSalePrice = relatedHasDiscount
+                ? Number(related.price) - Number(related.discountprice)
+                : Number(related.price);
+
               return (
                 <div key={related.id} className="w-[260px]">
                   <RelatedCard
@@ -609,7 +663,7 @@ const ProductDetails = () => {
                       name: related.name,
                       price: relatedSalePrice,
                       image: relatedImage,
-                      category: related.categories?.name || "N/A",
+                      category: categoryName(related),
                     }}
                   />
                 </div>

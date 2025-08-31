@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "react-router-dom"; // Added import
+import { useSearchParams } from "react-router-dom";
 import api from "../supabase/axios";
 import ProductCard from "../components/ProductCard";
 import Layout from "../layout/Layout";
@@ -8,6 +8,38 @@ import { FiFilter, FiChevronDown, FiX, FiSearch } from "react-icons/fi";
 
 const ITEMS_PER_PAGE = 30;
 const FALLBACK_CATEGORIES = ["Men", "Women", "Accessories"];
+
+// ------- helpers -------
+const asBool = (v) => v === true || v === "true" || v === 1 || v === "1";
+const categoryName = (p) =>
+  p?.categories?.name ||
+  (p?.category && p.category.name) ||
+  (Array.isArray(p?.categories) ? p.categories[0]?.name : null) ||
+  "Uncategorized";
+
+const IMAGE_BASE =
+  process.env.REACT_APP_IMAGE_BASE ||
+  process.env.REACT_APP_API_BASE_URL ||
+  "";
+
+const normalizeImageUrl = (u) => {
+  if (!u || typeof u !== "string") return "";
+  if (/^(data:|blob:|https?:\/\/)/i.test(u)) return u;
+  if (u.startsWith("/")) return `${IMAGE_BASE}${u}`;
+  return `${IMAGE_BASE}/${u}`;
+};
+
+const pickImageUrl = (img) =>
+  normalizeImageUrl(
+    img?.image_url ||
+      img?.url ||
+      img?.publicUrl ||
+      img?.public_url ||
+      img?.Location ||
+      img?.location ||
+      img?.path ||
+      ""
+  );
 
 const useDebounced = (value, delay = 300) => {
   const [v, setV] = useState(value);
@@ -28,11 +60,11 @@ const Products = () => {
   const [sort, setSort] = useState("relevance");
   const [page, setPage] = useState(1);
 
-  const [searchParams, setSearchParams] = useSearchParams(); // Added for query params
+  const [searchParams, setSearchParams] = useSearchParams();
   const menuBtnRef = useRef(null);
   const menuRef = useRef(null);
 
-  // Initialize search state from URL query parameter
+  // Initialize search from URL query
   useEffect(() => {
     const query = searchParams.get("search") || "";
     setSearch(query);
@@ -40,30 +72,33 @@ const Products = () => {
 
   const fetchProducts = async () => {
     try {
+      setLoading(true);
       const response = await api.get(`/api/products`);
       const products = response.data || [];
 
-      const mappedData = products.map((product) => ({
-        id: product.id,
-        name: product.name,
-        description: product.description || "No description available",
-        price: Number(product.price || 0),
-        category:
-          product.categories?.name ||
-          product.category?.name ||
-          "Uncategorized",
-        image:
-          product.product_images?.find((img) => img.is_hero)?.image_url ||
-          product.product_images?.[0]?.image_url ||
-          require("../assets/images/product_images/DummyHandbag1.jpeg"),
-      }));
+      const mapped = products.map((p) => {
+        const imgs = Array.isArray(p.product_images) ? p.product_images : [];
+        const ordered = [
+          ...imgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
+          ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
+        ].filter(Boolean);
 
-      setAllProducts(mappedData);
-      setLoading(false);
+        return {
+          id: p.id,
+          name: p.name,
+          description: p.description || "No description available",
+          price: Number(p.price || 0),
+          category: categoryName(p),
+          image: ordered[0] || "/assets/images/placeholder.png",
+        };
+      });
+
+      setAllProducts(mapped);
     } catch (err) {
       toast.dismiss();
       toast.error(err?.response?.data?.error || "An error occurred.");
       setAllProducts([]);
+    } finally {
       setLoading(false);
     }
   };
@@ -122,7 +157,7 @@ const Products = () => {
     setSelectedCategories(new Set());
     setSearch("");
     setSort("relevance");
-    setSearchParams({}); // Clear search query from URL
+    setSearchParams({});
   };
 
   useEffect(() => {
@@ -316,7 +351,7 @@ const Products = () => {
                     </div>
                   </div>
 
-                  {/* Solid footer panel with matching background */}
+                  {/* footer */}
                   <div className="flex items-center justify-between gap-2 p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
                     <button
                       onClick={clearFilters}

@@ -2,19 +2,31 @@ const nodemailer = require("nodemailer");
 const supabase = require("../config/supabaseClient");
 const jwt = require("jsonwebtoken");
 
-// Create Product
+/* ---------------------------- color helpers ---------------------------- */
+const asArrayOfStrings = (val) => {
+  if (!val) return [];
+  if (Array.isArray(val)) return val.map(String).map((s) => s.trim()).filter(Boolean);
+  if (typeof val === "string") return [val.trim()].filter(Boolean);
+  return [];
+};
+const isValidColor = (s) =>
+  /^#([0-9A-F]{3}|[0-9A-F]{6})$/i.test(s) || /^[a-z][a-z0-9\s-]*$/i.test(s);
+const sanitizeColors = (arr) => {
+  const seen = new Set();
+  return asArrayOfStrings(arr)
+    .map((c) => c.toLowerCase())
+    .filter((c) => isValidColor(c))
+    .filter((c) => (seen.has(c) ? false : (seen.add(c), true)));
+};
+
+/* ------------------------------ Create -------------------------------- */
 exports.createProduct = async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized: Token missing" });
-    }
+    if (!token) return res.status(401).json({ message: "Unauthorized: Token missing" });
 
-    // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "Admin") {
-      return res.status(403).json({ message: "Forbidden: Admins only" });
-    }
+    if (decoded.role !== "Admin") return res.status(403).json({ message: "Forbidden: Admins only" });
 
     const {
       name,
@@ -30,10 +42,9 @@ exports.createProduct = async (req, res) => {
       uploadeddate,
       images,
       collection_id,
-      color,
+      colors, // array only
     } = req.body;
 
-    // Validate required fields
     if (
       !name ||
       !description ||
@@ -50,12 +61,11 @@ exports.createProduct = async (req, res) => {
       });
     }
     if (!images.some((img) => img.is_hero)) {
-      return res
-        .status(400)
-        .json({ message: "At least one image must be set as hero image" });
+      return res.status(400).json({ message: "At least one image must be set as hero image" });
     }
 
-    // Insert product
+    const cleanColors = sanitizeColors(colors);
+
     const { data: product, error: productError } = await supabase
       .from("products")
       .insert([
@@ -71,48 +81,36 @@ exports.createProduct = async (req, res) => {
           isactive: isactive === true || isactive === "true",
           isfeatured: isfeatured === true || isfeatured === "true",
           uploadeddate: new Date(uploadeddate),
-          collectionid: collection_id,
-          color: color,
+          collectionid: collection_id || null,
+          colors: cleanColors,
         },
       ])
       .select()
       .single();
 
     if (productError) {
-      return res
-        .status(400)
-        .json({ message: "Error inserting product", error: productError });
+      return res.status(400).json({ message: "Error inserting product", error: productError });
     }
 
-    // Insert image URLs
     const imageRecords = images.map((img) => ({
       product_id: product.id,
       image_url: img.url,
       is_hero: img.is_hero,
     }));
 
-    const { error: imageError } = await supabase
-      .from("product_images")
-      .insert(imageRecords);
-
+    const { error: imageError } = await supabase.from("product_images").insert(imageRecords);
     if (imageError) {
-      return res
-        .status(400)
-        .json({ message: "Error inserting images", error: imageError });
+      return res.status(400).json({ message: "Error inserting images", error: imageError });
     }
 
-    return res
-      .status(201)
-      .json({ message: "Product created successfully", product });
+    return res.status(201).json({ message: "Product created successfully", product });
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Get All Products
+/* ------------------------------- Read All ------------------------------ */
 exports.getAllProducts = async (req, res) => {
   try {
     let query = supabase
@@ -135,34 +133,34 @@ exports.getAllProducts = async (req, res) => {
 
     const { category, limit } = req.query;
 
-    // Filter by category if provided
     if (category) {
+      // NOTE: ilike on joined table alias isn't supported by supabase directly;
+      // this works because of the explicit join syntax in RPC; otherwise filter on categoryid in your caller.
       query = query.ilike("categories.name", category);
     }
-
-    // Apply limit if provided
     if (limit) {
       query = query.limit(parseInt(limit));
     }
 
     const { data, error } = await query;
-
     if (error) {
-      return res
-        .status(400)
-        .json({ message: "Error fetching products", error });
+      return res.status(400).json({ message: "Error fetching products", error });
     }
 
-    return res.status(200).json(data);
+    // normalize colors to always be an array
+    const normalized = (data || []).map((p) => ({
+      ...p,
+      colors: Array.isArray(p.colors) ? p.colors : [],
+    }));
+
+    return res.status(200).json(normalized);
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Get Product by ID
+/* ------------------------------- Read One ------------------------------ */
 exports.getProductById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -190,28 +188,22 @@ exports.getProductById = async (req, res) => {
       return res.status(404).json({ message: "Product not found", error });
     }
 
-    return res.status(200).json(data);
+    const normalized = { ...data, colors: Array.isArray(data.colors) ? data.colors : [] };
+    return res.status(200).json(normalized);
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Update Product
+/* ------------------------------ Update --------------------------------- */
 exports.updateProduct = async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
-    if (!token) {
-      return res.status(401).json({ message: "Unauthorized: Token missing" });
-    }
+    if (!token) return res.status(401).json({ message: "Unauthorized: Token missing" });
 
-    // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "Admin") {
-      return res.status(403).json({ message: "Forbidden: Admins only" });
-    }
+    if (decoded.role !== "Admin") return res.status(403).json({ message: "Forbidden: Admins only" });
 
     const { id } = req.params;
     const {
@@ -228,7 +220,7 @@ exports.updateProduct = async (req, res) => {
       uploadeddate,
       images,
       collection_id,
-      color,
+      colors, // optional array
     } = req.body;
 
     const updateFields = {
@@ -242,17 +234,18 @@ exports.updateProduct = async (req, res) => {
       stock: parseInt(stock),
       isactive: isactive === true || isactive === "true",
       isfeatured: isfeatured === true || isfeatured === "true",
-      collectionid: collection_id,
-      color,
+      collectionid: collection_id || null,
       updated_at: new Date(),
     };
 
-    // Only set uploadeddate if provided
     if (uploadeddate) {
       updateFields.uploadeddate = new Date(uploadeddate);
     }
 
-    // Update product
+    if (typeof colors !== "undefined") {
+      updateFields.colors = sanitizeColors(colors);
+    }
+
     const { data: product, error: productError } = await supabase
       .from("products")
       .update(updateFields)
@@ -261,55 +254,39 @@ exports.updateProduct = async (req, res) => {
       .single();
 
     if (productError || !product) {
-      return res
-        .status(404)
-        .json({ message: "Product not found", error: productError });
+      return res.status(404).json({ message: "Product not found", error: productError });
     }
 
-    // Delete existing images
     if (images && images.length > 0) {
       const { error: deleteImageError } = await supabase
         .from("product_images")
         .delete()
         .eq("product_id", id);
-
       if (deleteImageError) {
-        return res.status(400).json({
-          message: "Error deleting existing images",
-          error: deleteImageError,
-        });
+        return res
+          .status(400)
+          .json({ message: "Error deleting existing images", error: deleteImageError });
       }
 
-      // Insert new image URLs
       const imageRecords = images.map((img) => ({
         product_id: id,
         image_url: img.url,
         is_hero: img.is_hero,
       }));
-
-      const { error: imageError } = await supabase
-        .from("product_images")
-        .insert(imageRecords);
-
+      const { error: imageError } = await supabase.from("product_images").insert(imageRecords);
       if (imageError) {
-        return res
-          .status(400)
-          .json({ message: "Error inserting images", error: imageError });
+        return res.status(400).json({ message: "Error inserting images", error: imageError });
       }
     }
 
-    return res
-      .status(200)
-      .json({ message: "Product updated successfully", product });
+    return res.status(200).json({ message: "Product updated successfully", product });
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// Delete Product
+/* ------------------------------ Delete --------------------------------- */
 exports.deleteProduct = async (req, res) => {
   try {
     const token = req.headers.authorization?.split(" ")[1];
@@ -317,7 +294,6 @@ exports.deleteProduct = async (req, res) => {
       return res.status(401).json({ message: "Unauthorized: Token missing" });
     }
 
-    // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role !== "Admin") {
       return res.status(403).json({ message: "Forbidden: Admins only" });
@@ -325,7 +301,6 @@ exports.deleteProduct = async (req, res) => {
 
     const { id } = req.params;
 
-    // Delete product (images will be deleted automatically due to ON DELETE CASCADE)
     const { error } = await supabase.from("products").delete().eq("id", id);
 
     if (error) {
@@ -335,16 +310,14 @@ exports.deleteProduct = async (req, res) => {
     return res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// get top products
+/* ------------------------- Top Latest (Home) --------------------------- */
 exports.getTopLatestProducts = async (req, res) => {
   try {
-    let query = supabase
+    const { data, error } = await supabase
       .from("products")
       .select(
         `
@@ -361,10 +334,8 @@ exports.getTopLatestProducts = async (req, res) => {
       `
       )
       .eq("isactive", true)
-      .order("created_at", { ascending: false }) // Sort by created_at in descending order
-      .limit(4); // Limit to top 4 products
-
-    const { data, error } = await query;
+      .order("created_at", { ascending: false })
+      .limit(4);
 
     if (error) {
       return res
@@ -372,16 +343,19 @@ exports.getTopLatestProducts = async (req, res) => {
         .json({ message: "Error fetching top latest products", error });
     }
 
-    return res.status(200).json(data);
+    const normalized = (data || []).map((p) => ({
+      ...p,
+      colors: Array.isArray(p.colors) ? p.colors : [],
+    }));
+
+    return res.status(200).json(normalized);
   } catch (error) {
     console.error(error);
-    return res
-      .status(500)
-      .json({ message: "Server error", error: error.message });
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };
 
-// set product collection
+/* --------------------------- Set Collection --------------------------- */
 exports.setProductCollection = async (req, res) => {
   try {
     const { id } = req.params;
