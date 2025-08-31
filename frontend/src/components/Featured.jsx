@@ -58,7 +58,8 @@ function Featured() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.2, duration: 0.6 }}
               whileHover={{ y: -8, scale: 1.02 }}
-              className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition"
+              className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer "
+              onClick={()=>navigate(`/products/${product.id}`)}
             >
               {/* Tag */}
               {product.is_new && (
