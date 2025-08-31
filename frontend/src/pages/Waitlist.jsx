@@ -1,148 +1,218 @@
 // src/components/Waitlist.jsx
 import React, { useState, useEffect } from "react";
-import confetti from "canvas-confetti";
 import Layout from "../layout/Layout";
 
-const dummyWaitlist = [
-  { id: 1, name: "Alice Johnson", email: "alice@example.com" },
-  { id: 2, name: "Bob Smith", email: "bob@example.com" },
-  { id: 3, name: "Carol Davis", email: "carol@example.com" },
-];
-
+// Tailwind background colors for placeholders
 const colors = [
-  "bg-pink-100",
-  "bg-indigo-100",
-  "bg-green-100",
-  "bg-yellow-100",
-  "bg-purple-100",
-  "bg-blue-100",
+  "bg-blue-400",
+  "bg-purple-400",
+  "bg-green-400",
+  "bg-pink-400",
+  "bg-yellow-400",
+  "bg-red-400",
+  "bg-indigo-400",
+  "bg-teal-400",
 ];
 
-const emojis = ["🎉", "🚀", "🌟", "💎", "🔥", "✨"];
+const getRandomColor = () =>
+  colors[Math.floor(Math.random() * colors.length)];
+
+const fakeTimes = ["Just now", "2m ago", "5m ago", "10m ago", "30m ago"];
+const getRandomTime = () =>
+  fakeTimes[Math.floor(Math.random() * fakeTimes.length)];
+
+const statuses = ["Available", "Out of Stock", "Upcoming"];
+const getRandomStatus = () =>
+  statuses[Math.floor(Math.random() * statuses.length)];
+
+const getStatusBadgeStyle = (status) => {
+  switch (status) {
+    case "Available":
+      return "bg-green-100 text-green-700 border-green-300";
+    case "Out of Stock":
+      return "bg-red-100 text-red-700 border-red-300";
+    case "Upcoming":
+      return "bg-yellow-100 text-yellow-700 border-yellow-300";
+    default:
+      return "bg-gray-100 text-gray-700 border-gray-300";
+  }
+};
 
 const Waitlist = () => {
-  const [waitlist, setWaitlist] = useState(dummyWaitlist);
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [message, setMessage] = useState("");
-  const [nextId, setNextId] = useState(4);
-  const [count, setCount] = useState(dummyWaitlist.length);
-  const [displayCount, setDisplayCount] = useState(dummyWaitlist.length);
+  const [products, setProducts] = useState([
+    {
+      id: 1,
+      name: "SuperCool Gadget",
+      status: "Out of Stock",
+      color: getRandomColor(),
+      updated: getRandomTime(),
+    },
+    {
+      id: 2,
+      name: "Smart Headphones",
+      status: "Upcoming",
+      color: getRandomColor(),
+      updated: getRandomTime(),
+    },
+    {
+      id: 3,
+      name: "Future Laptop",
+      status: "Available",
+      color: getRandomColor(),
+      updated: getRandomTime(),
+      availableSince: Date.now(), // track available time
+    },
+  ]);
 
-  const handleJoinWaitlist = (e) => {
-    e.preventDefault();
-    if (!name || !email) {
-      setMessage("Please enter your name and email!");
-      return;
-    }
+  const [toasts, setToasts] = useState([]);
 
-    const emoji = emojis[Math.floor(Math.random() * emojis.length)];
-
-    const newEntry = {
-      id: nextId,
-      name,
-      email,
-      emoji,
-      added: true, // flag for animation
-    };
-
-    setWaitlist([newEntry, ...waitlist]);
-    setNextId(nextId + 1);
-    setName("");
-    setEmail("");
-    setMessage("You've joined the waitlist!");
-
-    // Trigger confetti
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-
-    // Update counter
-    setCount((prev) => prev + 1);
-
-    setTimeout(() => setMessage(""), 3000);
-
-    // Remove animation flag after animation duration
-    setTimeout(() => {
-      setWaitlist((prev) =>
-        prev.map((user) => ({ ...user, added: false }))
-      );
-    }, 500);
-  };
-
-  // Animate counter
+  // Auto-refresh product status & last updated every 5 minutes
   useEffect(() => {
-    if (displayCount === count) return;
     const interval = setInterval(() => {
-      setDisplayCount((prev) => {
-        if (prev < count) return prev + 1;
-        clearInterval(interval);
-        return prev;
-      });
-    }, 50);
+      setProducts((prev) =>
+        prev
+          .map((product) => {
+            const newStatus = getRandomStatus();
+            const newUpdated = getRandomTime();
+            let updatedProduct = { ...product, updated: newUpdated };
+
+            // If status changes
+            if (newStatus !== product.status) {
+              const toastMsg = `${product.name} is now ${newStatus}!`;
+              const id = Date.now() + Math.random();
+
+              setToasts((old) => [...old, { id, message: toastMsg }]);
+
+              // Auto-remove toast after 1s
+              setTimeout(() => {
+                setToasts((old) => old.filter((t) => t.id !== id));
+              }, 1000);
+
+              updatedProduct.status = newStatus;
+
+              // If product just became Available → mark timestamp
+              if (newStatus === "Available") {
+                updatedProduct.availableSince = Date.now();
+              }
+            }
+
+            return updatedProduct;
+          })
+          // Remove products that have been "Available" for over 24 hours
+          .filter((p) => {
+            if (p.status === "Available" && p.availableSince) {
+              const hoursSinceAvailable =
+                (Date.now() - p.availableSince) / (1000 * 60 * 60);
+              return hoursSinceAvailable < 24;
+            }
+            return true;
+          })
+      );
+
+      // remove flash after animation
+      setTimeout(() => {
+        setProducts((prev) =>
+          prev.map((product) => ({ ...product, flash: false }))
+        );
+      }, 800);
+    }, 300000); // 5 minutes
+
     return () => clearInterval(interval);
-  }, [count, displayCount]);
+  }, []);
 
   return (
     <Layout>
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-3xl font-bold mb-2 text-center">
-        Join Our Pre-Launch Waitlist
-      </h1>
-      <p className="text-center text-gray-600 mb-6">
-        Total people on waitlist:{" "}
-        <span className="font-bold text-indigo-600">{displayCount}</span>
-      </p>
+      <div className="max-w-6xl mx-auto p-6 relative">
+        <h1 className="text-3xl font-bold mb-8 text-center">My Waitlist</h1>
 
-      <form
-        onSubmit={handleJoinWaitlist}
-        className="flex flex-col sm:flex-row gap-4 mb-6"
-      >
-        <input
-          type="text"
-          placeholder="Your Name"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <input
-          type="email"
-          placeholder="Your Email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="flex-1 p-3 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-        />
-        <button
-          type="submit"
-          className="bg-indigo-600 text-white px-6 py-3 rounded-md hover:bg-indigo-700 transition"
-        >
-          Join
-        </button>
-      </form>
-
-      {message && <p className="text-green-600 mb-4">{message}</p>}
-
-      <div className="grid sm:grid-cols-2 gap-4">
-        {waitlist.map((user, index) => (
-          <div
-            key={user.id}
-            className={`
-              ${colors[index % colors.length]} 
-              p-4 border border-gray-200 rounded-lg shadow-md flex items-center gap-3
-              ${user.added ? "animate-fade-slide" : "transition-transform duration-300"}
-            `}
-          >
-            <span className="text-2xl">{user.emoji}</span>
-            <div>
-              <p className="font-semibold text-gray-800">{user.name}</p>
-              <p className="text-gray-600 text-sm">{user.email}</p>
+        {/* Toast Notification Stack */}
+        <div className="fixed top-5 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-50">
+          {toasts.map((toast) => (
+            <div
+              key={toast.id}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeInOut"
+            >
+              {toast.message}
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
+
+        {/* Grid of product cards */}
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {products.map((product) => (
+            <div
+              key={product.id}
+              className={`bg-white rounded-2xl shadow-lg overflow-hidden border hover:shadow-xl transition relative ${
+                product.flash ? "animate-flash" : ""
+              }`}
+            >
+              {/* Status Badge */}
+              <span
+                className={`absolute top-3 right-3 text-xs font-semibold px-3 py-1 rounded-full border ${getStatusBadgeStyle(
+                  product.status
+                )}`}
+              >
+                {product.status}
+              </span>
+
+              {/* Image Placeholder */}
+              <div
+                className={`h-40 flex items-center justify-center ${product.color}`}
+              >
+                <span className="text-white text-2xl font-bold">
+                  {product.name.charAt(0)}
+                </span>
+              </div>
+
+              {/* Card Body */}
+              <div className="p-4">
+                <h2 className="text-lg font-semibold text-gray-800">
+                  {product.name}
+                </h2>
+
+                {product.status === "Available" ? (
+                  <p className="mt-2 text-sm text-gray-600">
+                    ✅ This product is available now — no waitlist needed.
+                  </p>
+                ) : (
+                  <div className="mt-3 p-3 bg-indigo-50 border rounded-md">
+                    <p className="text-sm text-gray-700">
+                      You are on the waitlist for:
+                    </p>
+                    <p className="font-bold text-indigo-700">{product.name}</p>
+                    <p className="text-xs text-gray-500">
+                      Status: {product.status}
+                    </p>
+                  </div>
+                )}
+
+                <p className="mt-3 text-xs text-gray-400">
+                  ⏱ Last updated: {product.updated}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {/* Custom Animations */}
+      <style>{`
+        @keyframes flash {
+          0% { background-color: #fef3c7; }
+          100% { background-color: transparent; }
+        }
+        .animate-flash {
+          animation: flash 0.8s ease-in-out;
+        }
+        @keyframes fadeInOut {
+          0% { opacity: 0; transform: translateY(-10px); }
+          10%, 90% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-10px); }
+        }
+        .animate-fadeInOut {
+          animation: fadeInOut 1s ease-in-out forwards;
+        }
+      `}</style>
     </Layout>
   );
 };
