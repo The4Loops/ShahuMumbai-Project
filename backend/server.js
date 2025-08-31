@@ -25,6 +25,7 @@ const ordersRoutes = require('./routes/ordersRoutes');
 const contactUsRoutes=require('./routes/contactUsRoutes');
 const teamMembersRoutes=require('./routes/teamMembersRoutes');
 const collectionsRoutes = require('./routes/collectionsRoutes');
+const subscriberRoutes=require('./routes/subscriberRoutes');
 
 const app = express();
 
@@ -73,7 +74,7 @@ app.use('/api', ordersRoutes);
 app.use('/api',contactUsRoutes);
 app.use('/api',teamMembersRoutes);
 app.use('/api', collectionsRoutes); 
-
+app.use('/api',subscriberRoutes);
 
 
 // Rate Limiting

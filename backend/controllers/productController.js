@@ -12,7 +12,7 @@ exports.createProduct = async (req, res) => {
 
     // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "Admin") {
       return res.status(403).json({ message: "Forbidden: Admins only" });
     }
 
@@ -207,7 +207,7 @@ exports.updateProduct = async (req, res) => {
 
     // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "Admin") {
       return res.status(403).json({ message: "Forbidden: Admins only" });
     }
 
@@ -309,7 +309,7 @@ exports.deleteProduct = async (req, res) => {
 
     // Verify Token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "admin") {
+    if (decoded.role !== "Admin") {
       return res.status(403).json({ message: "Forbidden: Admins only" });
     }
 
@@ -371,6 +371,7 @@ exports.getTopLatestProducts=async(req,res)=>{
   }
 }
 
+// set product collection
 exports.setProductCollection = async (req, res) => {
   try {
     const { id } = req.params;               

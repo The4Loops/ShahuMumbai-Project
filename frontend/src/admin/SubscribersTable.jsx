@@ -1,7 +1,9 @@
-// tabs/SubscribersTable.jsx
 import React, { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Trash2, Download, ChevronUp, ChevronDown } from "lucide-react";
+import api from "../supabase/axios";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function SubscribersTable() {
   const [subscribers, setSubscribers] = useState([]);
@@ -12,32 +14,36 @@ export default function SubscribersTable() {
   const [sortConfig, setSortConfig] = useState({ key: null, direction: "asc" });
   const itemsPerPage = 5;
 
-  useEffect(() => { setSubscribers([
-  { id: 1, email: "john@example.com", subscribed_at: "2025-08-18T10:00:00Z" },
-  { id: 2, email: "jane@example.com", subscribed_at: "2025-08-18T11:00:00Z" },
-  { id: 3, email: "sam@example.com", subscribed_at: "2025-08-18T12:00:00Z" },
-  { id: 4, email: "alex@example.com", subscribed_at: "2025-08-18T13:00:00Z" },
-  { id: 5, email: "lisa@example.com", subscribed_at: "2025-08-18T14:00:00Z" },
-  { id: 6, email: "mike@example.com", subscribed_at: "2025-08-18T15:00:00Z" },
-  { id: 7, email: "emma@example.com", subscribed_at: "2025-08-19T09:30:00Z" },
-  { id: 8, email: "oliver@example.com", subscribed_at: "2025-08-19T10:45:00Z" },
-  { id: 9, email: "ava@example.com", subscribed_at: "2025-08-20T08:15:00Z" },
-  { id: 10, email: "liam@example.com", subscribed_at: "2025-08-20T12:00:00Z" },
-  { id: 11, email: "sophia@example.com", subscribed_at: "2025-08-21T14:20:00Z" },
-  { id: 12, email: "noah@example.com", subscribed_at: "2025-08-21T16:40:00Z" },
-  { id: 13, email: "mia@example.com", subscribed_at: "2025-08-22T11:00:00Z" },
-  { id: 14, email: "lucas@example.com", subscribed_at: "2025-08-22T13:15:00Z" },
-  { id: 15, email: "isabella@example.com", subscribed_at: "2025-08-23T09:50:00Z" },
-  { id: 16, email: "ethan@example.com", subscribed_at: "2025-08-23T15:30:00Z" },
-  { id: 17, email: "charlotte@example.com", subscribed_at: "2025-08-24T10:10:00Z" },
-  { id: 18, email: "mason@example.com", subscribed_at: "2025-08-24T12:45:00Z" },
-  { id: 19, email: "amelia@example.com", subscribed_at: "2025-08-25T08:25:00Z" },
-  { id: 20, email: "logan@example.com", subscribed_at: "2025-08-25T14:55:00Z" }
-]);}, []);
+  // Fetch subscribers on mount
+  useEffect(() => {
+    const fetchSubscribers = async () => {
+      try {
+        const response = await api.get("/api/subscriber");
+        // Map API response to match expected subscriber structure
+        const transformedSubscribers = response.data.users.map(user => ({
+          id: user.id,
+          email: user.email,
+          subscribed_at: user.updated_at, // Use updated_at as subscribed_at
+        }));
+        setSubscribers(transformedSubscribers);
+      } catch (err) {
+        toast.error(err.response?.data?.error || "Failed to fetch subscribers");
+      }
+    };
 
-  const handleDelete = (id) => {
-    if (!window.confirm("Delete this subscriber?")) return;
-    setSubscribers(subscribers.filter((sub) => sub.id !== id));
+    fetchSubscribers();
+  }, []);
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Unsubscribe this user from the newsletter?")) return;
+
+    try {
+      await api.delete(`/api/subscriber/${id}`);
+      setSubscribers(subscribers.filter((sub) => sub.id !== id));
+      toast.success("User unsubscribed successfully");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to unsubscribe user");
+    }
   };
 
   const handleExportCSV = () => {
@@ -68,8 +74,9 @@ export default function SubscribersTable() {
 
   const requestSort = (key) => {
     let direction = "asc";
-    if (sortConfig.key === key && sortConfig.direction === "asc")
+    if (sortConfig.key === key && sortConfig.direction === "asc") {
       direction = "desc";
+    }
     setSortConfig({ key, direction });
     setCurrentPage(1);
   };
@@ -136,6 +143,7 @@ export default function SubscribersTable() {
 
   return (
     <div className="p-6">
+      <ToastContainer position="top-right" autoClose={3000} hideProgressBar />
       <div className="flex justify-between items-center mb-4">
         <h2 className="text-xl font-semibold">📧 Newsletter Subscribers</h2>
         <button

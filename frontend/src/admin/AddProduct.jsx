@@ -95,11 +95,11 @@ const AddProduct = ({ editId = null, onSaved }) => {
           stock: p.stock ?? 0,
           isactive: !!p.isactive,
           isfeatured: !!p.isfeatured,
-          collection_id: p.collection_id ?? null,
+          collection_id: p.collectionid ?? null,
         });
 
-        const imgs = (p.images || []).map((img) => ({
-          url: img.url || img.image_url || "",
+        const imgs = (p.product_images || []).map((img) => ({
+          url: img.image_url || "",
           is_hero: !!img.is_hero,
         }));
         setExistingImages(imgs);
@@ -131,7 +131,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
   const price = watch("price");
   const discountprice = watch("discountprice");
   const categoryid = watch("categoryid");
-  const collection_id = watch("collection_id"); // Added for react-select binding
+  const collection_id = watch("collection_id");
 
   const onSubmit = async (data) => {
     setIsSubmitting(true);
@@ -152,10 +152,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
 
         const uploadResponse = await api.post(
           "/api/upload/multiple",
-          formData,
-          {
-            headers: { "Content-Type": "multipart/form-data" },
-          }
+          formData
         );
 
         const imageUrls = uploadResponse?.data?.imageUrls || [];
@@ -184,9 +181,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
       if (!editId) {
         payload.uploadeddate = new Date().toISOString();
         payload.images = newImagePayload;
-        const res = await api.post(PRODUCT_CREATE_URL, payload, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await api.post(PRODUCT_CREATE_URL, payload);
         if (res.status === 201) {
           toast.success("Product created successfully!");
           reset();
@@ -198,10 +193,10 @@ const AddProduct = ({ editId = null, onSaved }) => {
       } else {
         if (newImagePayload) {
           payload.images = newImagePayload;
+        } else {
+          payload.images = existingImages; // Retain existing images if no new ones are uploaded
         }
-        const res = await api.put(PRODUCT_UPDATE_URL(editId), payload, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const res = await api.put(PRODUCT_UPDATE_URL(editId), payload);
         if (res.status >= 200 && res.status < 300) {
           toast.success("Product updated successfully!");
           onSaved?.();
