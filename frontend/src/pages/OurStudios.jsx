@@ -1,105 +1,131 @@
-import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
-import { Heart, BookOpen, Scissors } from "lucide-react"; 
+import heroimages from "../assets/OurStudios/heroimage.png";
+import city from "../assets/OurStudios/moderncity.png";
+import mother from "../assets/OurStudios/mother.png";
+import father from "../assets/OurStudios/Father.png";
+import widow from "../assets/OurStudios/widow.png";
+import mini from "../assets/OurStudios/bgmini.png";
 
 function OurStudios() {
   return (
     <Layout>
-      <div className="bg-[#F1E7E5] px-6 sm:px-12 py-20 text-[#2e2e2e] min-h-screen">
-        
+      <div className="bg-[#F1E7E5] text-[#2e2e2e]">
         {/* Hero Section */}
-        <motion.div
-          className="text-center mb-20"
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.7 }}
+        <section
+          className="relative bg-center bg-cover text-center py-20 sm:py-28 px-4 sm:px-6"
+          style={{
+            backgroundImage: `url(${heroimages})`,
+          }}
         >
-          <h1 className="text-5xl font-serif mb-6 tracking-wide">
+          <h1 className="text-4xl sm:text-6xl font-serif mb-6 tracking-wide text-[#2e2e2e]">
             Our Studio
           </h1>
-          <p className="max-w-2xl mx-auto text-lg text-[#444] leading-relaxed">
+          <p className="max-w-3xl mx-auto text-base sm:text-lg font-bold text-[#333] leading-relaxed">
             Where heritage meets modernity — a creative house rooted in India’s
             traditions and connected to the world.
           </p>
-        </motion.div>
+        </section>
 
-        {/* Studio Card */}
-        <motion.div
-          className="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col md:flex-row mb-24"
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-        >
-          {/* Image / Visual placeholder */}
-          <div className="md:w-1/2 h-64 md:h-auto bg-gradient-to-br from-[#f4c7ab] to-[#f1e7e5]" />
+        {/* About Studio */}
+        <section className="max-w-6xl mx-auto py-8 sm:py-24 px-4 sm:px-6 grid grid-cols-1 md:grid-cols-2 gap-10 sm:gap-12 items-center">
+          {/* Image */}
+          <div className="h-60 sm:h-80 md:h-full">
+            <img
+              src={city}
+              alt="Mini Studio"
+              className="w-full h-full object-cover rounded-2xl shadow-lg"
+            />
+          </div>
 
           {/* Content */}
-          <div className="p-10 flex flex-col justify-center md:w-1/2">
-            <h2 className="text-2xl font-semibold mb-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-serif mb-4 sm:mb-6">
               Global Fashion House — Mumbai
             </h2>
-            <p className="text-[#555] text-base leading-relaxed">
-              Based in Mumbai, a city that reflects both India’s rich artistic 
-              traditions and a cosmopolitan spirit. A global fashion house with 
-              Indian roots, blending local craftsmanship with international vision.
+            <p className="text-[#555] text-base sm:text-lg leading-relaxed">
+              Based in Mumbai, a city that reflects both India’s rich artistic
+              traditions and a cosmopolitan spirit. A global fashion house with
+              Indian roots, blending local craftsmanship with international
+              vision.
             </p>
           </div>
-        </motion.div>
+        </section>
 
-        {/* Crafted with Care Section */}
-        <motion.div
-          className="max-w-5xl mx-auto text-center"
-          initial={{ opacity: 0, y: 40 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8 }}
-          viewport={{ once: true }}
-        >
-          <h2 className="text-3xl font-serif mb-6">Crafted with Care</h2>
-          <p className="max-w-3xl mx-auto text-[#444] leading-relaxed text-lg mb-12">
-            Every creation at Shahu is handmade by skilled artisans. Each piece carries a human story.
-          </p>
+        {/* Crafted with Care */}
+        <section className="bg-[#F1E7E5] py-2 sm:py-24 px-4 sm:px-6">
+          <div className="max-w-6xl mx-auto text-center">
+            <h2 className="text-3xl sm:text-4xl font-serif mb-6 sm:mb-8">
+              Crafted with Care
+            </h2>
+            <p className="max-w-3xl mx-auto text-base sm:text-lg text-[#444] leading-relaxed mb-12 sm:mb-16">
+              Every creation at Shahu is handmade by skilled artisans. Each
+              piece carries a human story of resilience and tradition.
+            </p>
 
-          {/* Stories Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* Mother */}
-            <div className="bg-white rounded-xl shadow-md p-6 text-left flex flex-col items-start">
-              <div className="bg-[#f4c7ab]/40 p-3 rounded-full mb-4">
-                <BookOpen className="w-6 h-6 text-[#b85c38]" />
+            {/* Stories Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-10">
+              {/* Mother */}
+              <div
+                className="relative h-64 sm:h-72 rounded-2xl shadow-md p-6 sm:p-8 flex flex-col justify-center items-center text-center hover:shadow-xl transition bg-cover bg-center"
+                style={{ backgroundImage: `url(${mother})` }}
+              >
+                <div className="absolute inset-0 bg-black/40 rounded-2xl" />
+                <div className="relative z-10">
+                  <h3 className="font-semibold text-lg sm:text-xl mb-2 sm:mb-3 text-white">
+                    A Mother’s Dream
+                  </h3>
+                  <p className="text-white text-xs sm:text-sm leading-relaxed">
+                    Funding her children’s education with each stitch of fabric.
+                  </p>
+                </div>
               </div>
-              <h3 className="font-semibold text-lg mb-2">A Mother’s Dream</h3>
-              <p className="text-[#555] text-sm leading-relaxed">
-                Funding her children’s education with each stitch of fabric.
-              </p>
+
+              {/* Father */}
+              <div
+                className="relative h-64 sm:h-72 rounded-2xl shadow-md p-6 sm:p-8 flex flex-col justify-center items-center text-center hover:shadow-xl transition bg-cover bg-center"
+                style={{ backgroundImage: `url(${father})` }}
+              >
+                <div className="absolute inset-0 bg-black/40 rounded-2xl" />
+                <div className="relative z-10">
+                  <h3 className="font-semibold text-lg sm:text-xl mb-2 sm:mb-3 text-white">
+                    A Father’s Legacy
+                  </h3>
+                  <p className="text-white text-xs sm:text-sm leading-relaxed">
+                    Preserving cultural traditions while supporting his family.
+                  </p>
+                </div>
+              </div>
+
+              {/* Widow */}
+              <div
+                className="relative h-64 sm:h-72 rounded-2xl shadow-md p-6 sm:p-8 flex flex-col justify-center items-center text-center hover:shadow-xl transition bg-cover bg-center"
+                style={{ backgroundImage: `url(${widow})` }}
+              >
+                <div className="absolute inset-0 bg-black/40 rounded-2xl" />
+                <div className="relative z-10">
+                  <h3 className="font-semibold text-lg sm:text-xl mb-2 sm:mb-3 text-white">
+                    A Widow’s Passion
+                  </h3>
+                  <p className="text-white text-xs sm:text-sm leading-relaxed">
+                    Continuing her late husband’s vision through fashion.
+                  </p>
+                </div>
+              </div>
             </div>
 
-            {/* Father */}
-            <div className="bg-white rounded-xl shadow-md p-6 text-left flex flex-col items-start">
-              <div className="bg-[#c6e2d8]/40 p-3 rounded-full mb-4">
-                <Scissors className="w-6 h-6 text-[#287271]" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">A Father’s Legacy</h3>
-              <p className="text-[#555] text-sm leading-relaxed">
-                Preserving cultural traditions while supporting his family.
-              </p>
-            </div>
-
-            {/* Widow */}
-            <div className="bg-white rounded-xl shadow-md p-6 text-left flex flex-col items-start">
-              <div className="bg-[#fddde6]/40 p-3 rounded-full mb-4">
-                <Heart className="w-6 h-6 text-[#b23a48]" />
-              </div>
-              <h3 className="font-semibold text-lg mb-2">A Widow’s Passion</h3>
-              <p className="text-[#555] text-sm leading-relaxed">
-                Continuing her late husband’s vision through fashion.
-              </p>
-            </div>
+            {/* Bottom Mini Text */}
+            <p
+              className="relative max-w-4xl mx-auto mt-12 sm:mt-16 text-[#333] font-medium text-base sm:text-lg text-center p-6 sm:p-8 rounded-2xl shadow-md bg-cover bg-center"
+              style={{ backgroundImage: `url(${mini})` }}
+            >
+              <span className="relative z-10">
+                Every dollar supports lives, preserves heritage, and celebrates
+                craftsmanship over machinery.
+              </span>
+              <span className="absolute inset-0 bg-white/70 rounded-2xl" />
+            </p>
           </div>
-
-          <p className="max-w-2xl mx-auto mt-12 text-[#333] font-medium">
-            Every dollar supports lives, preserves heritage, and celebrates craftsmanship over machinery.
-          </p>
-        </motion.div>
+        </section>
       </div>
     </Layout>
   );

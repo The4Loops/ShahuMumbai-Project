@@ -1,22 +1,9 @@
 import { useEffect } from "react";
-import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
 
-const fadeInUp = {
-  hidden: { opacity: 0, y: 30 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.6 } },
-};
-
+// Simple reusable animation wrapper
 const AnimatedSection = ({ children, className = "" }) => (
-  <motion.div
-    initial="hidden"
-    whileInView="show"
-    viewport={{ once: true, amount: 0.3 }}
-    variants={fadeInUp}
-    className={className}
-  >
-    {children}
-  </motion.div>
+  <div className={`animate-fade-up ${className}`}>{children}</div>
 );
 
 function About() {
@@ -28,119 +15,131 @@ function About() {
     <Layout>
       <div className="bg-[#F1E7E5] text-[#3B2E1E]">
 
-        {/* OUR STORY */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 items-center">
-          <AnimatedSection className="text-left">
-            <h1 className="text-3xl font-bold mb-4">Our Story</h1>
-            <p className="text-sm text-[#6B6B6B] leading-relaxed">
-              Shahu is a luxury fashion house of Ancient Indian roots meeting timeless 
-              and effortless luxury. Founded in Mumbai by <span className="font-medium">Bhumi Shahu</span> 
-              while pursuing her degree in New York, the brand was born out of her vision 
-              to give rightful credit to Indian artisans and to create truly handmade fashion. 
-              Unlike much of the modern luxury industry that produces in bulk, Shahu is built 
-              on authenticity, transparency, and craftsmanship, ensuring every piece carries 
-              culture, meaning, and a soul.
+        {/* HERO */}
+        <section className="relative h-[500px] bg-gradient-to-r from-[#6B4226] to-[#3B2E1E] flex items-center justify-center text-center">
+          <div className="bg-black/40 p-8 rounded-xl animate-fade-in">
+            <h1 className="text-4xl md:text-5xl font-bold text-white">
+              Our Story
+            </h1>
+            <p className="mt-4 text-lg text-[#F6E7D8]">
+              Heritage, Craftsmanship & Timeless Luxury
+            </p>
+          </div>
+        </section>
+
+        {/* ROOTS */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 px-8 py-16 items-center">
+          <AnimatedSection>
+            <h2 className="text-3xl font-bold mb-6">Roots & Inspiration</h2>
+            <p className="text-base text-[#6B6B6B] leading-relaxed">
+              Shahu is a luxury fashion house of Ancient Indian roots meeting
+              effortless luxury. Rooted in India’s timeless traditions and
+              inspired by the cosmopolitan spirit of Mumbai, Shahu stands as a
+              symbol of refined indulgence.{"\n\n"}
+              Our designs are inspired by art lost 5,000–10,000 years in
+              history. Where modern fashion stops imagining, our designers begin
+              searching through ancient stories and textiles of the Indian
+              subcontinent.
             </p>
           </AnimatedSection>
-          <div
-            className="rounded-xl bg-[#6B4226] h-64 w-full"
-            role="presentation"
-            aria-hidden="true"
-          />
+          <div className="rounded-xl bg-[#6B4226] h-72 w-full animate-fade-in" />
+        </section>
+
+        {/* CHALLENGE */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 px-8 py-16 items-center">
+          <div className="rounded-xl bg-[#6B4226] h-72 w-full animate-fade-in" />
+          <AnimatedSection>
+            <h2 className="text-3xl font-bold mb-6">The Challenge in Fashion</h2>
+            <p className="text-base text-[#6B6B6B] leading-relaxed">
+              Founder Bhumi Shahu, while studying in New York, realized that
+              modern luxury brands often took inspiration from India but rarely
+              credited artisans. Many “handmade” claims were false—mass-produced
+              in factories instead of being crafted by true artisans.{"\n\n"}
+              This inspired her to create a brand that respects authenticity,
+              artistry, and people behind every garment.
+            </p>
+          </AnimatedSection>
+        </section>
+
+        {/* BIRTH OF SHAHU */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 px-8 py-16 items-center">
+          <AnimatedSection>
+            <h2 className="text-3xl font-bold mb-6">The Birth of Shahu</h2>
+            <p className="text-base text-[#6B6B6B] leading-relaxed">
+              Shahu was born in Mumbai with the vision to celebrate artisans,
+              protect the planet, and pass down timeless creations across
+              generations. Each piece is made to order, minimizing waste and
+              ensuring exclusivity.{"\n\n"}
+              This philosophy challenges the fast-fashion industry and restores
+              the dignity of craftsmanship.
+            </p>
+          </AnimatedSection>
+          <div className="rounded-xl bg-[#6B4226] h-72 w-full animate-fade-in" />
+        </section>
+
+        {/* SUSTAINABILITY */}
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 px-8 py-16 items-center">
+          <div className="rounded-xl bg-[#6B4226] h-72 w-full animate-fade-in" />
+          <AnimatedSection>
+            <h2 className="text-3xl font-bold mb-6">Sustainable Philosophy</h2>
+            <p className="text-base text-[#6B6B6B] leading-relaxed">
+              At Shahu, we follow a pre-order model: only once you place an
+              order do artisans begin crafting it. This process honors time,
+              labor, and the environment—ensuring every creation has a purpose
+              and story.
+            </p>
+          </AnimatedSection>
+        </section>
+
+        {/* ARTISAN STORIES */}
+        <section className="px-8 py-16">
+          <AnimatedSection className="max-w-4xl mx-auto text-center">
+            <h2 className="text-3xl font-bold mb-6">The Stories Behind Every Piece</h2>
+            <p className="text-base text-[#6B6B6B] leading-relaxed">
+              Every piece tells the story of an artisan—a mother funding her
+              child’s education, a father preserving traditions away from home,
+              or a widow continuing her late husband’s passion.{"\n\n"}
+              Each dollar invested in Shahu uplifts these artisans and sustains
+              India’s cultural heritage.
+            </p>
+          </AnimatedSection>
         </section>
 
         {/* QUOTE */}
-        <section className="text-center py-6 text-lg italic text-[#3B2E1E]">
-          <p>"Fashion is not just worn, it’s lived through heritage and soul."</p>
-          <p className="mt-2 text-sm text-[#6B6B6B]">- Shahu</p>
+        <section className="text-center py-12 bg-[#F1E7E5] animate-fade-in">
+          <p className="text-2xl md:text-3xl italic font-light">
+            “Fashion is not just worn, it’s lived through heritage and soul.”
+          </p>
+          <p className="mt-4 text-sm text-[#6B6B6B]">- Shahu</p>
         </section>
 
         {/* THE CRAFT */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 items-center">
-          <div
-            className="rounded-xl bg-[#6B4226] h-64 w-full"
-            role="presentation"
-            aria-hidden="true"
-          />
+        <section className="grid grid-cols-1 md:grid-cols-2 gap-12 px-8 py-16 items-center">
+          <div className="rounded-xl bg-[#6B4226] h-72 w-full animate-fade-in" />
           <AnimatedSection>
-            <h2 className="text-2xl font-semibold mb-4">The Craft</h2>
-            <p className="text-sm text-[#6B6B6B] leading-relaxed">
-              At Shahu, craftsmanship is at the heart of everything we do. Each design is a 
-              celebration of India’s artistic heritage, combining intricate handwork with 
-              contemporary silhouettes. Every piece is made slowly, thoughtfully, and 
-              sustainably—an heirloom of culture and beauty.
+            <h2 className="text-3xl font-bold mb-6">The Craft</h2>
+            <p className="text-base text-[#6B6B6B] leading-relaxed">
+              Each design is a celebration of India’s artistic heritage,
+              combining intricate handwork with contemporary silhouettes. Every
+              piece is made slowly, thoughtfully, and sustainably—an heirloom of
+              culture and beauty.
             </p>
           </AnimatedSection>
         </section>
 
         {/* THE SHAHU STORY */}
-        <motion.section
-          className="relative h-[400px] md:h-[500px] bg-gradient-to-r from-[#D6AD60] to-[#3B2E1E] flex items-center justify-center text-white text-center"
-          initial={{ opacity: 0 }}
-          whileInView={{ opacity: 1 }}
-          viewport={{ once: true }}
-          transition={{ duration: 1 }}
-        >
-          <div className="bg-black bg-opacity-40 p-6 rounded-xl">
-            <h2 className="text-3xl font-semibold">The Shahu Mumbai Story</h2>
+        <section className="relative h-[400px] md:h-[500px] bg-gradient-to-r from-[#D6AD60] to-[#3B2E1E] flex items-center justify-center text-white text-center animate-fade-in">
+          <div className="bg-black/40 p-8 rounded-xl">
+            <h2 className="text-3xl md:text-4xl font-semibold">
+              The Shahu Mumbai Story
+            </h2>
             <a
               href="/story"
-              className="mt-4 inline-block px-4 py-2 bg-[#F6E7D8] text-[#3B2E1E] rounded-full text-sm hover:bg-[#e0ccb5]"
+              className="mt-6 inline-block px-6 py-3 bg-[#F6E7D8] text-[#3B2E1E] rounded-full text-sm hover:bg-[#e0ccb5]"
             >
               Learn More
             </a>
           </div>
-        </motion.section>
-
-        {/* FASHION, HOME, RESTAURANTS */}
-        <section className="grid grid-cols-1 md:grid-cols-3 gap-4 p-8">
-          {["Fashion", "Home Furnishings", "Restaurants & Bar"].map((title, i) => (
-            <AnimatedSection
-              key={i}
-              className="relative overflow-hidden rounded-xl h-72 bg-[#6B4226] flex items-end p-4 text-[#3B2E1E] text-xl font-medium"
-            >
-              <span className="bg-white bg-opacity-60 p-2 rounded">{title}</span>
-            </AnimatedSection>
-          ))}
-        </section>
-
-        {/* FOUNDATION */}
-        <section className="grid grid-cols-1 md:grid-cols-2 gap-8 p-8 items-center">
-          <div>
-            <h2 className="text-2xl font-semibold mb-4">The Shahu Mumbai Foundation</h2>
-            <p className="text-sm text-[#6B6B6B] leading-relaxed">
-              The Foundation preserves the legacy of Indian artisans and promotes 
-              cultural heritage, education, and the arts. It also supports community-driven 
-              initiatives while ensuring that Shahu’s philosophy of authenticity and 
-              sustainability continues for generations.
-            </p>
-            <div className="grid grid-cols-2 gap-4 mt-4">
-              {[
-                { name: "Shahu Mumbai", link: "/foundation/shahu" },
-                { name: "Shahu Mumbai Art Center", link: "/foundation/art-center" }
-              ].map((item, idx) => (
-                <div className="text-sm" key={idx}>
-                  <div
-                    className="rounded-xl mb-2 bg-[#6B4226] h-32"
-                    role="presentation"
-                    aria-hidden="true"
-                  />
-                  <p className="text-[#3B2E1E]">{item.name}</p>
-                  <a
-                    href={item.link}
-                    className="text-xs text-[#D6AD60] hover:underline"
-                  >
-                    Explore More
-                  </a>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div
-            className="rounded-xl bg-[#6B4226] h-64 w-full"
-            role="presentation"
-            aria-hidden="true"
-          />
         </section>
       </div>
     </Layout>
