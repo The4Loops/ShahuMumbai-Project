@@ -4,19 +4,20 @@ const nodemailer = require("nodemailer");
 const supabase = require("../config/supabaseClient");
 
 // API: Get Users with Newsletter Subscription
-exports.getNewsletterUsers = async (req, res) => {
-
+exports.getSubscribeUser = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login, updated_at")
+      .select(
+        "id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login, updated_at"
+      )
       .eq("newsletter_subscription", true);
 
     if (error) {
       return res.status(400).json({ error: error.message });
     }
 
-    const transformedData = data.map(user => ({
+    const transformedData = data.map((user) => ({
       id: user.id,
       full_name: user.full_name,
       email: user.email,
@@ -38,9 +39,15 @@ exports.getNewsletterUsers = async (req, res) => {
       role: user.roles.label,
       active: user.active === "Y",
       joined: user.joined ? new Date(user.joined).toLocaleDateString() : "N/A",
-      last_login: user.last_login ? new Date(user.last_login).toLocaleDateString() : "Never",
-      updated_date: user.updated_at ? new Date(user.updated_at).toLocaleDateString() : "N/A",
-      updated_time: user.updated_at ? new Date(user.updated_at).toLocaleTimeString() : "N/A",
+      last_login: user.last_login
+        ? new Date(user.last_login).toLocaleDateString()
+        : "Never",
+      updated_date: user.updated_at
+        ? new Date(user.updated_at).toLocaleDateString()
+        : "N/A",
+      updated_time: user.updated_at
+        ? new Date(user.updated_at).toLocaleTimeString()
+        : "N/A",
     }));
 
     res.status(200).json({ users: transformedData });
@@ -55,9 +62,9 @@ exports.deleteUser = async (req, res) => {
 
     const { data, error } = await supabase
       .from("users")
-      .update({ 
+      .update({
         newsletter_subscription: false,
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
       })
       .eq("id", id)
       .select("id, full_name, email, newsletter_subscription")
@@ -71,8 +78,93 @@ exports.deleteUser = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    res.status(200).json({ message: "User newsletter subscription disabled", user: data });
+    res
+      .status(200)
+      .json({ message: "User newsletter subscription disabled", user: data });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+};
+
+exports.sendSubscriberMail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Fetch user to verify existence
+    const { data: user, error: userError } = await supabase
+      .from("users")
+      .select("id, email, newsletter_subscription")
+      .eq("email", email)
+      .single();
+
+    if (userError || !user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
+    // Fetch email content from module table
+    const { data: module, error: moduleError } = await supabase
+      .from("module")
+      .select("mailsubject, maildescription")
+      .eq("mailtype", "Subscriber")
+      .single();
+
+    if (moduleError || !module) {
+      return res
+        .status(400)
+        .json({ error: "Subscriber email template not found" });
+    }
+
+    // Replace #username with email in maildescription
+    const mailContent = module.maildescription.replace("#username", email);
+
+    const plainTextContent = mailContent.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+
+    // Send email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: module.mailsubject,
+      html:mailContent,
+      text: plainTextContent,
+    };
+
+    await transporter.sendMail(mailOptions);
+
+    // Update user's newsletter_subscription to true
+    const { data: updatedUser, error: updateError } = await supabase
+      .from("users")
+      .update({
+        newsletter_subscription: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", user.id)
+      .select("id, email, newsletter_subscription")
+      .single();
+
+    if (updateError) {
+      return res
+        .status(400)
+        .json({ error: "Failed to update newsletter subscription" });
+    }
+
+    res.status(200).json({
+      message: "Newsletter email sent and subscription enabled",
+      user: updatedUser,
+    });
+  } catch (error) {
+    console.error("sendNewsletterEmail error", error);
+    res.status(500).json({ error: "Server error", details: error.message });
   }
 };

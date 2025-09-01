@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Mail } from "lucide-react";
+import { toast } from "react-toastify";
+import api from "../supabase/axios";
 
 export default function NewsletterPopup() {
   const [show, setShow] = useState(false);
@@ -22,12 +24,20 @@ export default function NewsletterPopup() {
     }
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubscribed(true);
-    localStorage.setItem("newsletterPopupShown", "true"); // save on subscribe
-    setEmail("");
-    setTimeout(handleClose, 2000); // auto-close after success
+    try {
+      const response = await api.post("/api/sendSubscriberMail", { email });
+      setSubscribed(true);
+      localStorage.setItem("newsletterPopupShown", "true"); // save on subscribe
+      setEmail("");
+      toast.success(response.data.message || "Newsletter email sent and subscription enabled!");
+      setTimeout(handleClose, 2000); // auto-close after success
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.error || "Failed to subscribe to newsletter";
+      toast.error(errorMessage);
+    }
   };
 
   return (
