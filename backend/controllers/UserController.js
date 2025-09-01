@@ -33,7 +33,10 @@ const verifyUser = (req) => {
 // ADMIN API: Create User
 exports.adminCreateUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Unauthorized: Admin access required" });
+  if (authError)
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: Admin access required" });
 
   try {
     const { full_name, email, password, role, active } = req.body;
@@ -50,7 +53,9 @@ exports.adminCreateUser = async (req, res) => {
       .single();
 
     if (!roleData) {
-      return res.status(400).json({ error: `Role '${role || "user"}' not found` });
+      return res
+        .status(400)
+        .json({ error: `Role '${role || "user"}' not found` });
     }
 
     const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
@@ -83,13 +88,18 @@ exports.adminCreateUser = async (req, res) => {
 // Get all users
 exports.getAllUsers = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Unauthorized: Admin access required" });
+  if (authError)
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: Admin access required" });
 
   try {
     const { search, role, status, excludeRole } = req.query;
     let query = supabase
       .from("users")
-      .select("id, full_name, email, roles!role_id(label), active, joined, last_login");
+      .select(
+        "id, full_name, email, roles!role_id(label), active, joined, last_login"
+      );
 
     // Search by name or email
     if (search) {
@@ -124,22 +134,28 @@ exports.getAllUsers = async (req, res) => {
         .single();
 
       if (excludeRoleError || !excludeRoleData) {
-        return res.status(400).json({ error: `Exclude role '${excludeRole}' not found` });
+        return res
+          .status(400)
+          .json({ error: `Exclude role '${excludeRole}' not found` });
       }
       query = query.neq("role_id", excludeRoleData.id); // Use neq to exclude the role
     }
 
     const { data, error } = await query;
     if (error) {
-      return res.status(400).json({ error: `Database query failed: ${error.message}` });
+      return res
+        .status(400)
+        .json({ error: `Database query failed: ${error.message}` });
     }
 
-    const transformedData = data.map(user => ({
+    const transformedData = data.map((user) => ({
       ...user,
       role: user.roles.label, // Transform roles.label to role for response
       active: user.active === "Y",
       joined: user.joined ? new Date(user.joined).toLocaleDateString() : "N/A",
-      last_login: user.last_login ? new Date(user.last_login).toLocaleDateString() : "Never",
+      last_login: user.last_login
+        ? new Date(user.last_login).toLocaleDateString()
+        : "Never",
     }));
 
     res.status(200).json({ users: transformedData });
@@ -151,7 +167,10 @@ exports.getAllUsers = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Unauthorized: Admin access required" });
+  if (authError)
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: Admin access required" });
 
   try {
     const { id } = req.params;
@@ -169,7 +188,9 @@ exports.updateUser = async (req, res) => {
       .single();
 
     if (!roleData) {
-      return res.status(400).json({ error: `Role '${role || "Users"}' not found` });
+      return res
+        .status(400)
+        .json({ error: `Role '${role || "Users"}' not found` });
     }
 
     const updates = {
@@ -204,15 +225,15 @@ exports.updateUser = async (req, res) => {
 // Delete user
 exports.deleteUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Unauthorized: Admin access required" });
+  if (authError)
+    return res
+      .status(403)
+      .json({ error: "Unauthorized: Admin access required" });
 
   try {
     const { id } = req.params;
 
-    const { error } = await supabase
-      .from("users")
-      .delete()
-      .eq("id", id);
+    const { error } = await supabase.from("users").delete().eq("id", id);
 
     if (error) {
       return res.status(400).json({ error: error.message });
@@ -252,6 +273,17 @@ exports.updateUserProfile = async (req, res) => {
       return res.status(400).json({ error: "Email is required" });
     }
 
+    // Fetch current user data to check newsletter_subscription status
+    const { data: currentUser, error: fetchError } = await supabase
+      .from("users")
+      .select("newsletter_subscription")
+      .eq("id", decoded.id)
+      .single();
+
+    if (fetchError || !currentUser) {
+      return res.status(404).json({ error: "User not found" });
+    }
+
     const updates = {
       full_name: full_name || null,
       email,
@@ -274,12 +306,61 @@ exports.updateUserProfile = async (req, res) => {
       updates.password = await bcrypt.hash(password, 10);
     }
 
-    // Update user in Supabase, ensuring the user can only update their own profile
+    // Check if newsletter_subscription is changing from false to true
+    const isFirstTimeSubscription =
+      currentUser.newsletter_subscription === false &&
+      updates.newsletter_subscription === true;
+
+    // Send newsletter email if it's the first time subscription
+    if (isFirstTimeSubscription) {
+      // Fetch email content from module table
+      const { data: module, error: moduleError } = await supabase
+        .from("module")
+        .select("mailsubject, maildescription")
+        .eq("mailtype", "Subscriber")
+        .single();
+
+      if (moduleError || !module) {
+        return res
+          .status(400)
+          .json({ error: "Subscriber email template not found" });
+      }
+
+      // Replace #username with email in maildescription
+      const mailContent = module.maildescription.replace("#username", email);
+      const plainTextContent = mailContent
+        .replace(/<[^>]+>/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      const transporter = nodemailer.createTransport({
+        service: "gmail",
+        auth: {
+          user: process.env.EMAIL_USER,
+          pass: process.env.EMAIL_PASS,
+        },
+      });
+
+      // Send email
+      const mailOptions = {
+        from: process.env.EMAIL_USER,
+        to: email,
+        subject: module.mailsubject,
+        html: mailContent,
+        text: plainTextContent,
+      };
+
+      await transporter.sendMail(mailOptions);
+    }
+
+    // Update user in Supabase
     const { data, error } = await supabase
       .from("users")
       .update(updates)
-      .eq("id", decoded.id) // Ensure user can only update their own profile
-      .select("id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login")
+      .eq("id", decoded.id)
+      .select(
+        "id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login"
+      )
       .single();
 
     if (error) {
@@ -309,11 +390,16 @@ exports.updateUserProfile = async (req, res) => {
       role: data.roles.label,
       active: data.active === "Y",
       joined: data.joined ? new Date(data.joined).toLocaleDateString() : "N/A",
-      last_login: data.last_login ? new Date(data.last_login).toLocaleDateString() : "Never",
+      last_login: data.last_login
+        ? new Date(data.last_login).toLocaleDateString()
+        : "Never",
     };
 
-    res.status(200).json({ message: "Profile updated successfully", user: transformedData });
+    res
+      .status(200)
+      .json({ message: "Profile updated successfully", user: transformedData });
   } catch (err) {
+    console.error("updateUserProfile error:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -326,7 +412,9 @@ exports.getUserProfile = async (req, res) => {
   try {
     const { data, error } = await supabase
       .from("users")
-      .select("id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login")
+      .select(
+        "id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login"
+      )
       .eq("id", decoded.id)
       .single();
 
@@ -361,7 +449,9 @@ exports.getUserProfile = async (req, res) => {
       role: data.roles.label,
       active: data.active === "Y",
       joined: data.joined ? new Date(data.joined).toLocaleDateString() : "N/A",
-      last_login: data.last_login ? new Date(data.last_login).toLocaleDateString() : "Never",
+      last_login: data.last_login
+        ? new Date(data.last_login).toLocaleDateString()
+        : "Never",
     };
 
     res.status(200).json({ user: transformedData });

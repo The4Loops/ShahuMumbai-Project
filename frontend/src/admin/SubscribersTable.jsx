@@ -20,10 +20,10 @@ export default function SubscribersTable() {
       try {
         const response = await api.get("/api/subscriber");
         // Map API response to match expected subscriber structure
-        const transformedSubscribers = response.data.users.map(user => ({
+        const transformedSubscribers = response.data.users.map((user) => ({
           id: user.id,
           email: user.email,
-          subscribed_at: user.updated_at, // Use updated_at as subscribed_at
+          subscribed_at: `${user.updated_date} ${user.updated_time}`, // Combine date and time
         }));
         setSubscribers(transformedSubscribers);
       } catch (err) {
@@ -50,15 +50,13 @@ export default function SubscribersTable() {
     const headers = ["ID", "Email", "Date", "Time"];
     const rows = filteredSubscribers.map((s) => {
       const date = new Date(s.subscribed_at);
-      const formattedDate = `${String(date.getDate()).padStart(
-        2,
-        "0"
-      )}-${String(date.getMonth() + 1).padStart(2, "0")}-${date.getFullYear()}`;
+      const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
       const formattedTime = date.toLocaleTimeString([], {
-        hour: "2-digit",
+        hour: "numeric",
         minute: "2-digit",
+        second: "2-digit",
         hour12: true,
-      });
+      }).toLowerCase();
       return [s.id, s.email, formattedDate, formattedTime];
     });
 
@@ -108,10 +106,14 @@ export default function SubscribersTable() {
       const matchesEmail = sub.email
         .toLowerCase()
         .includes(search.toLowerCase());
-      const subDate = new Date(sub.subscribed_at).toISOString().split("T")[0];
+      const subDate = new Date(sub.subscribed_at);
 
-      const matchesFrom = filterFrom ? subDate >= filterFrom : true;
-      const matchesTo = filterTo ? subDate <= filterTo : true;
+      const matchesFrom = filterFrom
+        ? subDate >= new Date(filterFrom)
+        : true;
+      const matchesTo = filterTo
+        ? subDate <= new Date(filterTo + "T23:59:59")
+        : true;
 
       return matchesEmail && matchesFrom && matchesTo;
     });
@@ -210,18 +212,13 @@ export default function SubscribersTable() {
             <AnimatePresence>
               {paginatedSubscribers.map((sub) => {
                 const date = new Date(sub.subscribed_at);
-                const formattedDate = `${String(date.getDate()).padStart(
-                  2,
-                  "0"
-                )}-${String(date.getMonth() + 1).padStart(
-                  2,
-                  "0"
-                )}-${date.getFullYear()}`;
+                const formattedDate = `${date.getDate()}/${date.getMonth() + 1}/${date.getFullYear()}`;
                 const formattedTime = date.toLocaleTimeString([], {
-                  hour: "2-digit",
+                  hour: "numeric",
                   minute: "2-digit",
+                  second: "2-digit",
                   hour12: true,
-                });
+                }).toLowerCase();
 
                 return (
                   <motion.tr

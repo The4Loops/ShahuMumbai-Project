@@ -1,17 +1,33 @@
 import React, { useState } from "react";
 import { FaFacebookF, FaInstagram, FaYoutube } from "react-icons/fa";
+import { toast } from "react-toastify";
 import FAQPopup from "../FAQ";
 import CustomerServicePopup from "../CustomerService";
 import PrivacyPopup from "../Privacy";
 import TermsPopup from "../Terms";
 import ReturnsPopup from "../../pages/Returns";
 import { Link } from "react-router-dom";
+import api from "../../supabase/axios";
 
 const Footer = () => {
   const [activePopup, setActivePopup] = useState(null);
+  const [email, setEmail] = useState("");
 
   const openPopup = (popupName) => setActivePopup(popupName);
   const closePopup = () => setActivePopup(null);
+
+  const handleNewsletterSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await api.post("/api/sendSubscriberMail", { email });
+      setEmail(""); // Clear input on success
+      toast.success(response.data.message || "Successfully subscribed to newsletter!");
+    } catch (err) {
+      const errorMessage =
+        err.response?.data?.error || "Failed to subscribe to newsletter";
+      toast.error(errorMessage);
+    }
+  };
 
   return (
     <>
@@ -119,7 +135,7 @@ const Footer = () => {
               </h4>
               <form
                 className="flex flex-col gap-2 mt-2 items-center sm:items-start"
-                onSubmit={(e) => e.preventDefault()}
+                onSubmit={handleNewsletterSubmit}
               >
                 <label htmlFor="newsletter-email" className="sr-only">
                   Email address
@@ -128,6 +144,8 @@ const Footer = () => {
                   id="newsletter-email"
                   type="email"
                   placeholder="Enter your email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 border border-black rounded text-sm"
                   required
                 />

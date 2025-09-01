@@ -2,20 +2,23 @@ import React, { useState, useEffect } from "react";
 import WebFont from "webfontloader";
 import shahu from "../assets/ShahuLogo.png";
 import Hero from "../assets/HeImg.jpeg";
+import api from "../supabase/axios";
+import { toast } from "react-toastify";
 
 function NewsletterEmail() {
   const [editMode, setEditMode] = useState(false);
   const [showSettings, setShowSettings] = useState(true);
+  const [subject, setSubject] = useState("Our Monthly Newsletter");
 
   const [newsletter, setNewsletter] = useState({
-    logo: shahu,
+    logo: "",
     title: "Hello Subscriber 👋",
     content:
       "Welcome to our monthly newsletter! Here’s what we’ve been up to and what’s coming next. We’re excited to share our latest updates, insights, and exclusive offers with you.",
     featuredTitle: "✨ Upcoming Waitlist",
     featuredText:
       "We just launched a brand new feature to make your experience even better. Check it out and let us know your thoughts!",
-    heroImage: Hero,
+    heroImage: "",
     aboveHeroText:
       "✨ “Just like devotion creates temples, we create experiences you’ll cherish.” ",
     ctaText: "Explore Now",
@@ -30,14 +33,43 @@ function NewsletterEmail() {
     headerColor: "#c9a79c",
     headerImage: "",
     fontFamily: "Inter",
-
     titleColor: "#222222",
     bodyColor: "#444444",
     featuredColor: "#555555",
     footerColor: "#666666",
-
     panelMinimized: false,
   });
+
+  useEffect(() => {
+  const uploadInitialImages = async () => {
+    try {
+      // Fetch local images and upload to Cloudinary
+      const uploadImage = async (url, filename) => {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        const formData = new FormData();
+        formData.append("image", blob, filename);
+        const { data } = await api.post("/api/upload/single", formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+        return data.url;
+      };
+
+      const logoURL = await uploadImage(shahu, "ShahuLogo.png");
+      const heroURL = await uploadImage(Hero, "HeImg.jpeg");
+
+      setNewsletter((prev) => ({
+        ...prev,
+        logo: logoURL,
+        heroImage: heroURL,
+      }));
+    } catch (err) {
+      console.error("Error uploading initial images:", err);
+      toast.error("Failed to load initial images.");
+    }
+  };
+  uploadInitialImages();
+}, []);
 
   useEffect(() => {
     WebFont.load({
@@ -59,19 +91,141 @@ function NewsletterEmail() {
     setNewsletter((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleImageUpload = (e, key) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewsletter((prev) => ({ ...prev, [key]: reader.result }));
-      };
-      reader.readAsDataURL(file);
+  const handleImageUpload = async (e, key) => {
+  const file = e.target.files[0];
+  if (file) {
+    try {
+      const formData = new FormData();
+      formData.append("image", file);
+      const response = await api.post("/api/upload/single", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      let publicURL = response.data.url;
+      publicURL = publicURL.replace(
+        "/image/upload/",
+        "/image/upload/w_800,h_800,q_80/"
+      );  
+      setNewsletter((prev) => ({ ...prev, [key]: publicURL }));
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to upload image");
     }
-  };
+  }
+};
 
   const handleRemoveImage = (key) => {
     setNewsletter((prev) => ({ ...prev, [key]: "" }));
+  };
+
+  const handleSendNewsletter = async () => {
+    // Generate HTML content for the newsletter
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body { font-family: ${newsletter.fontFamily}, sans-serif; margin: 0; padding: 0; }
+          .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: ${newsletter.backgroundImage ? "transparent" : newsletter.backgroundColor};
+            ${newsletter.backgroundImage ? `background-image: url(${newsletter.backgroundImage});` : ""}
+            background-size: cover;
+            background-position: center;
+          }
+          .header {
+            text-align: center;
+            padding: 32px 24px;
+            background-color: ${newsletter.headerImage ? "transparent" : newsletter.headerColor};
+            ${newsletter.headerImage ? `background-image: url(${newsletter.headerImage});` : ""}
+            background-size: cover;
+            background-position: center;
+            color: #ffffff;
+          }
+          .header img { height: 96px; width: 96px; border-radius: 50%; margin-bottom: 8px; }
+          .header p { font-size: 14px; opacity: 0.9; }
+          .content { padding: 24px 24px 40px; }
+          .content h2 { font-size: 24px; font-weight: bold; margin-bottom: 16px; color: ${newsletter.titleColor}; }
+          .content p { font-size: 16px; line-height: 1.6; margin-bottom: 24px; color: ${newsletter.bodyColor}; }
+          .featured {
+            background: rgba(255, 255, 255, 0.6);
+            backdrop-filter: blur(8px);
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid #e5e7eb;
+            margin-bottom: 32px;
+          }
+          .featured h3 { font-size: 18px; font-weight: bold; margin-bottom: 8px; color: ${newsletter.featuredColor}; }
+          .featured p { font-size: 14px; color: ${newsletter.featuredColor}; }
+          .hero img { width: 100%; object-fit: cover; border-radius: 12px; }
+          .hero-text { text-align: center; margin: 8px 0; font-size: 16px; color: ${newsletter.bodyColor}; }
+          .cta {
+            text-align: center;
+            padding-bottom: 40px;
+          }
+          .cta a {
+            display: inline-block;
+            padding: 12px 32px;
+            border-radius: 9999px;
+            background-color: ${newsletter.ctaBgColor};
+            color: ${newsletter.ctaTextColor};
+            font-weight: 600;
+            text-decoration: none;
+            transition: transform 0.2s;
+          }
+          .cta a:hover { transform: scale(1.05); }
+          .footer {
+            text-align: center;
+            padding: 24px;
+            font-size: 14px;
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(8px);
+            border-top: 1px solid #e5e7eb;
+            color: ${newsletter.footerColor};
+          }
+          .footer .unsubscribe { font-size: 12px; margin-top: 8px; }
+          .footer a { color: ${newsletter.footerColor}; text-decoration: underline; }
+          .footer a:hover { opacity: 0.6; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            ${newsletter.logo ? `<img src="${newsletter.logo}" alt="Logo">` : ""}
+            <p>Stay updated with the latest news</p>
+          </div>
+          <div class="content">
+            <h2>${newsletter.title}</h2>
+            <p>${newsletter.content}</p>
+            <div class="featured">
+              <h3>${newsletter.featuredTitle}</h3>
+              <p>${newsletter.featuredText}</p>
+            </div>
+            ${newsletter.heroImage ? `<div class="hero"><img src="${newsletter.heroImage}" alt="Newsletter Hero"></div>` : ""}
+            <div class="hero-text">${newsletter.aboveHeroText}</div>
+          </div>
+          <div class="cta">
+            <a href="${newsletter.ctaLink}">${newsletter.ctaText}</a>
+          </div>
+          <div class="footer">
+            <p>${newsletter.footerText}</p>
+            <p class="unsubscribe">${newsletter.unsubscribeText} <a href="${process.env.REACT_APP_BASE_URL || "http://localhost:3000"}/unsubscribe">Unsubscribe</a></p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+
+    try {
+      const response = await api.post("/api/sendNewsletterMail", {
+        subject,
+        htmlContent,
+      });
+      toast.success(response.data.message || "Newsletter sent successfully!");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to send newsletter");
+    }
   };
 
   return (
@@ -81,6 +235,14 @@ function NewsletterEmail() {
         <div className="w-full max-w-2xl bg-white shadow-lg rounded-2xl p-6 overflow-y-auto">
           <h2 className="font-semibold mb-4">⚙️ Customize</h2>
           <div className="space-y-3">
+            <label className="block text-sm">Email Subject</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full border p-2 rounded"
+              placeholder="Enter email subject"
+            />
             <label className="block text-sm">Font Family</label>
             <select
               name="fontFamily"
@@ -94,7 +256,6 @@ function NewsletterEmail() {
               <option>Merriweather</option>
               <option>Lora</option>
             </select>
-
             <label className="block text-sm">Background Color</label>
             <input
               type="color"
@@ -103,7 +264,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">Header Color</label>
             <input
               type="color"
@@ -112,7 +272,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">Title Color</label>
             <input
               type="color"
@@ -121,7 +280,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">Body Color</label>
             <input
               type="color"
@@ -130,7 +288,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">Featured Color</label>
             <input
               type="color"
@@ -139,7 +296,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">CTA Background</label>
             <input
               type="color"
@@ -148,7 +304,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">CTA Text Color</label>
             <input
               type="color"
@@ -157,7 +312,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <label className="block text-sm">Footer Color</label>
             <input
               type="color"
@@ -166,7 +320,6 @@ function NewsletterEmail() {
               onChange={handleChange}
               className="w-full h-10"
             />
-
             <div>
               <label className="block text-sm mb-1">Background Image</label>
               <input
@@ -183,7 +336,6 @@ function NewsletterEmail() {
                 </button>
               )}
             </div>
-
             <div>
               <label className="block text-sm mb-1">Header Image</label>
               <input
@@ -200,7 +352,6 @@ function NewsletterEmail() {
                 </button>
               )}
             </div>
-
             <button
               onClick={() => setShowSettings(false)}
               className="w-full mt-4 bg-gray-900 text-white py-2 rounded"
@@ -509,7 +660,7 @@ function NewsletterEmail() {
         {/* SEND BUTTON */}
         <div className="flex justify-center mt-6">
           <button
-            onClick={() => alert("Newsletter sent! 🚀")}
+            onClick={handleSendNewsletter}
             className="px-6 py-2 h-12 bg-gray-900 text-white font-semibold rounded-full shadow hover:bg-gray-700 transition"
           >
             Send Newsletter

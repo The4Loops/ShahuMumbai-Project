@@ -121,7 +121,10 @@ exports.sendSubscriberMail = async (req, res) => {
     // Replace #username with email in maildescription
     const mailContent = module.maildescription.replace("#username", email);
 
-    const plainTextContent = mailContent.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
+    const plainTextContent = mailContent
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
 
     // Send email
     const transporter = nodemailer.createTransport({
@@ -136,7 +139,7 @@ exports.sendSubscriberMail = async (req, res) => {
       from: process.env.EMAIL_USER,
       to: email,
       subject: module.mailsubject,
-      html:mailContent,
+      html: mailContent,
       text: plainTextContent,
     };
 
@@ -166,5 +169,66 @@ exports.sendSubscriberMail = async (req, res) => {
   } catch (error) {
     console.error("sendNewsletterEmail error", error);
     res.status(500).json({ error: "Server error", details: error.message });
+  }
+};
+
+exports.sendNewsletterMail = async (req, res) => {
+  try {
+    const { subject, htmlContent } = req.body;
+    
+    if (!subject || !htmlContent) {
+      return res
+        .status(400)
+        .json({ error: "Subject and HTML content are required" });
+    }
+
+    // Fetch users with newsletter_subscription: true
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("email")
+      .eq("newsletter_subscription", true);
+
+    if (usersError) {
+      return res.status(400).json({ error: usersError.message });
+    }
+
+    if (!users || users.length === 0) {
+      return res.status(404).json({ error: "No subscribers found" });
+    }
+
+    // Create plain text fallback by stripping HTML tags
+    const plainTextContent = htmlContent
+      .replace(/<[^>]+>/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Configure nodemailer transporter
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    // Send email to each subscriber
+    const emailPromises = users.map((user) =>
+      transporter.sendMail({
+        from: process.env.EMAIL_USER,
+        to: user.email,
+        subject,
+        html: htmlContent,
+        text: plainTextContent,
+      })
+    );
+    
+    await Promise.all(emailPromises);
+
+    res.status(200).json({
+      message: `Newsletter sent to ${users.length} subscriber(s)`,
+    });
+  } catch (error) {
+    console.error("sendNewsletter error:", err);
+    res.status(500).json({ error: "Server error", details: err.message });
   }
 };
