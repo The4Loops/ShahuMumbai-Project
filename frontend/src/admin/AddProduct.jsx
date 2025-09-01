@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../supabase/axios";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { toast } from "react-toastify";
 import Select from "react-select";
+import DatePicker from "react-datepicker";
+import "react-datepicker/dist/react-datepicker.css";
 
 const PRODUCT_GET_URL = (id) => `/api/products/${id}`;
 const PRODUCT_CREATE_URL = `/api/products`;
@@ -16,12 +18,23 @@ const normalizeColor = (s) => s.trim();
 // --- extract URLs from many backend shapes ---
 const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
 const extractUrlsFromUnknown = (payload) => {
-  // direct arrays of strings
-  if (Array.isArray(payload) && payload.every((x) => typeof x === "string")) return payload;
+  if (Array.isArray(payload) && payload.every((x) => typeof x === "string"))
+    return payload;
 
-  // arrays of objects with a URL-ish key
-  if (Array.isArray(payload) && payload.length && typeof payload[0] === "object") {
-    const keys = ["url", "image_url", "Location", "location", "path", "publicUrl", "public_url"];
+  if (
+    Array.isArray(payload) &&
+    payload.length &&
+    typeof payload[0] === "object"
+  ) {
+    const keys = [
+      "url",
+      "image_url",
+      "Location",
+      "location",
+      "path",
+      "publicUrl",
+      "public_url",
+    ];
     const urls = payload
       .map((obj) => {
         for (const k of keys) {
@@ -33,7 +46,6 @@ const extractUrlsFromUnknown = (payload) => {
     if (urls.length) return urls;
   }
 
-  // single string
   if (typeof payload === "string") return [payload];
 
   return [];
@@ -41,7 +53,6 @@ const extractUrlsFromUnknown = (payload) => {
 const extractImageUrls = (resp) => {
   const d = resp?.data ?? resp;
 
-  // try common keys
   const candidates = [
     d?.imageUrls,
     d?.urls,
@@ -58,7 +69,6 @@ const extractImageUrls = (resp) => {
     if (urls.length) return urls;
   }
 
-  // last resort: if the whole payload itself encodes URLs
   const fallback = extractUrlsFromUnknown(d);
   if (fallback.length) return fallback;
 
@@ -74,6 +84,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
     setValue,
     watch,
     trigger,
+    control,
   } = useForm({
     defaultValues: {
       name: "",
@@ -88,6 +99,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
       isfeatured: false,
       collection_id: null,
       colors: [],
+      uploadeddate: new Date(),
     },
   });
 
@@ -110,7 +122,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
         const { data } = await api.get("/api/category");
         setCategories(data || []);
       } catch (err) {
-        toast.error(err?.response?.data?.message || "Failed to fetch categories");
+        toast.error(
+          err?.response?.data?.message || "Failed to fetch categories"
+        );
       } finally {
         setLoadingCats(false);
       }
@@ -125,7 +139,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
         const { data } = await api.get("/api/admin/collections");
         setCollections(Array.isArray(data) ? data : data?.collections || []);
       } catch (err) {
-        toast.error(err?.response?.data?.message || "Failed to fetch collections");
+        toast.error(
+          err?.response?.data?.message || "Failed to fetch collections"
+        );
       } finally {
         setLoadingCollections(false);
       }
@@ -154,6 +170,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
           isfeatured: !!p.isfeatured,
           collection_id: p.collectionid ?? null,
           colors: normalizedColors,
+          uploadeddate: p.uploadeddate ? new Date(p.uploadeddate) : new Date(),
         });
 
         const imgs = (p.product_images || []).map((img) => ({
@@ -168,6 +185,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         toast.error(err?.response?.data?.message || "Failed to load product");
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId, reset]);
 
   // Previews
@@ -199,7 +217,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
     const candidate = normalizeColor(raw);
     const valid = isHex(candidate) || isCssNamed(candidate);
     if (!valid) {
-      toast.error("Use a valid hex (#173F5F) or a CSS color name (e.g., navy).");
+      toast.error(
+        "Use a valid hex (#173F5F) or a CSS color name (e.g., navy)."
+      );
       return;
     }
     if (colors.map((c) => c.toLowerCase()).includes(candidate.toLowerCase())) {
@@ -222,8 +242,10 @@ const AddProduct = ({ editId = null, onSaved }) => {
 
     try {
       if (!editId) {
-        if (selectedImages.length === 0) throw new Error("At least one image is required");
-        if (heroImageIndex === null) throw new Error("Please select a hero image");
+        if (selectedImages.length === 0)
+          throw new Error("At least one image is required");
+        if (heroImageIndex === null)
+          throw new Error("Please select a hero image");
       }
 
       // Upload new images if present
@@ -234,18 +256,24 @@ const AddProduct = ({ editId = null, onSaved }) => {
 
         let imageUrls = [];
         try {
-          // Let axios set the Content-Type with proper boundary
-          const uploadResponse = await api.post("/api/upload/multiple", formData);
+          const uploadResponse = await api.post(
+            "/api/upload/multiple",
+            formData
+          );
           imageUrls = extractImageUrls(uploadResponse);
 
           if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
             // Show server payload for diagnosis
             // eslint-disable-next-line no-console
-            console.error("Upload endpoint returned no URLs. Raw payload:", uploadResponse?.data);
+            console.error(
+              "Upload endpoint returned no URLs. Raw payload:",
+              uploadResponse?.data
+            );
             throw new Error("Image upload failed: no URL from server");
           }
         } catch (e) {
-          const msg = e?.response?.data?.message || e?.message || "Image upload failed";
+          const msg =
+            e?.response?.data?.message || e?.message || "Image upload failed";
           throw new Error(msg);
         }
 
@@ -260,7 +288,10 @@ const AddProduct = ({ editId = null, onSaved }) => {
         // Safety: if user chose a hero among ONLY new images, ensure exactly one is flagged
         if (!newImagePayload.some((i) => i.is_hero) && !editId) {
           // On create, hero must be within new images. Default first as hero to avoid API rejection.
-          newImagePayload = newImagePayload.map((i, idx) => ({ ...i, is_hero: idx === 0 }));
+          newImagePayload = newImagePayload.map((i, idx) => ({
+            ...i,
+            is_hero: idx === 0,
+          }));
         }
       }
 
@@ -279,8 +310,14 @@ const AddProduct = ({ editId = null, onSaved }) => {
         colors: Array.isArray(form.colors) ? form.colors : [],
       };
 
-      if (!editId) {
+      // include uploaded date (if provided) as ISO string
+      if (form.uploadeddate) {
+        payload.uploadeddate = new Date(form.uploadeddate).toISOString();
+      } else {
         payload.uploadeddate = new Date().toISOString();
+      }
+
+      if (!editId) {
         payload.images = newImagePayload; // must exist on create
         const res = await api.post(PRODUCT_CREATE_URL, payload);
         if (res.status === 201) {
@@ -296,9 +333,13 @@ const AddProduct = ({ editId = null, onSaved }) => {
         // For edit: if no new images provided, keep existing ones and ensure one is hero
         if (!newImagePayload) {
           if (!existingImages.some((img) => img.is_hero)) {
-            // If user picked a hero among existing ones, mark it here
-            if (heroImageIndex != null && heroImageIndex < existingImages.length) {
-              existingImages.forEach((img, idx) => (img.is_hero = idx === heroImageIndex));
+            if (
+              heroImageIndex != null &&
+              heroImageIndex < existingImages.length
+            ) {
+              existingImages.forEach(
+                (img, idx) => (img.is_hero = idx === heroImageIndex)
+              );
             } else {
               throw new Error("Please select a hero image");
             }
@@ -315,7 +356,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
         }
       }
     } catch (err) {
-      toast.error(err?.response?.data?.message || err.message || "Failed to save product");
+      toast.error(
+        err?.response?.data?.message || err.message || "Failed to save product"
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -329,7 +372,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
         borderRadius: 6,
         backgroundColor: "#FFFFFF",
         border:
-          errors.categoryid || errors.collection_id ? "1px solid #EF4444" : "1px solid #E6DCD2",
+          errors.categoryid || errors.collection_id
+            ? "1px solid #EF4444"
+            : "1px solid #E6DCD2",
         boxShadow: s.isFocused ? "0 0 0 2px #D4A5A5" : "none",
         "&:hover": { borderColor: "#D4A5A5" },
       }),
@@ -342,7 +387,11 @@ const AddProduct = ({ editId = null, onSaved }) => {
       }),
       option: (p, s) => ({
         ...p,
-        backgroundColor: s.isSelected ? "#D4A5A5" : s.isFocused ? "#F3E8E8" : "#FFFFFF",
+        backgroundColor: s.isSelected
+          ? "#D4A5A5"
+          : s.isFocused
+          ? "#F3E8E8"
+          : "#FFFFFF",
         color: s.isSelected ? "#FFFFFF" : "#111827",
         padding: "0.5rem 0.75rem",
       }),
@@ -377,68 +426,109 @@ const AddProduct = ({ editId = null, onSaved }) => {
         {editId ? "Edit Product" : "Add Product"}
       </h2>
 
-      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+      <form
+        onSubmit={handleSubmit(onSubmit)}
+        className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6"
+      >
         {/* Product Name */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Product Name *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Product Name *
+          </label>
           <input
             type="text"
             placeholder="e.g., Vintage Silk Scarf"
-            className={`${inputBase} ${errors.name ? "border-red-500 ring-red-200" : ""}`}
+            className={`${inputBase} ${
+              errors.name ? "border-red-500 ring-red-200" : ""
+            }`}
             {...register("name", {
               required: "Product name is required",
-              minLength: { value: 2, message: "Name must be at least 2 characters" },
+              minLength: {
+                value: 2,
+                message: "Name must be at least 2 characters",
+              },
             })}
           />
-          {errors.name && <p className="text-red-600 text-xs mt-1">{errors.name.message}</p>}
+          {errors.name && (
+            <p className="text-red-600 text-xs mt-1">{errors.name.message}</p>
+          )}
         </div>
 
         {/* Brand / Designer */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Brand / Designer *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Brand / Designer *
+          </label>
           <input
             type="text"
             placeholder="e.g., Shahu Studio"
-            className={`${inputBase} ${errors.branddesigner ? "border-red-500 ring-red-200" : ""}`}
+            className={`${inputBase} ${
+              errors.branddesigner ? "border-red-500 ring-red-200" : ""
+            }`}
             {...register("branddesigner", {
               required: "Brand/Designer is required",
-              minLength: { value: 2, message: "Brand/Designer must be at least 2 characters" },
+              minLength: {
+                value: 2,
+                message: "Brand/Designer must be at least 2 characters",
+              },
             })}
           />
           {errors.branddesigner && (
-            <p className="text-red-600 text-xs mt-1">{errors.branddesigner.message}</p>
+            <p className="text-red-600 text-xs mt-1">
+              {errors.branddesigner.message}
+            </p>
           )}
         </div>
 
         {/* Description */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Description *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Description *
+          </label>
           <textarea
             placeholder="Describe the product..."
             rows={4}
-            className={`${inputBase} ${errors.description ? "border-red-500 ring-red-200" : ""}`}
-            {...register("description", { required: "Description is required" })}
+            className={`${inputBase} ${
+              errors.description ? "border-red-500 ring-red-200" : ""
+            }`}
+            {...register("description", {
+              required: "Description is required",
+            })}
           />
-          {errors.description && <p className="text-red-600 text-xs mt-1">{errors.description.message}</p>}
+          {errors.description && (
+            <p className="text-red-600 text-xs mt-1">
+              {errors.description.message}
+            </p>
+          )}
         </div>
 
         {/* Short Description */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Short Description *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Short Description *
+          </label>
           <input
             type="text"
             placeholder="Short teaser shown in listings"
-            className={`${inputBase} ${errors.shortdescription ? "border-red-500 ring-red-200" : ""}`}
-            {...register("shortdescription", { required: "Short description is required" })}
+            className={`${inputBase} ${
+              errors.shortdescription ? "border-red-500 ring-red-200" : ""
+            }`}
+            {...register("shortdescription", {
+              required: "Short description is required",
+            })}
           />
           {errors.shortdescription && (
-            <p className="text-red-600 text-xs mt-1">{errors.shortdescription.message}</p>
+            <p className="text-red-600 text-xs mt-1">
+              {errors.shortdescription.message}
+            </p>
           )}
         </div>
 
         {/* Category */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Category *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Category *
+          </label>
           <Select
             options={categoryOptions}
             value={categoryOptions.find((o) => o.value === categoryid) || null}
@@ -452,15 +542,23 @@ const AddProduct = ({ editId = null, onSaved }) => {
             styles={customSelectStyles}
             classNamePrefix="react-select"
           />
-          {errors.categoryid && <p className="text-red-600 text-xs mt-1">{errors.categoryid.message}</p>}
+          {errors.categoryid && (
+            <p className="text-red-600 text-xs mt-1">
+              {errors.categoryid.message}
+            </p>
+          )}
         </div>
 
         {/* Collection */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Collection</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Collection
+          </label>
           <Select
             options={collectionOptions}
-            value={collectionOptions.find((o) => o.value === collection_id) || null}
+            value={
+              collectionOptions.find((o) => o.value === collection_id) || null
+            }
             onChange={(opt) => {
               setValue("collection_id", opt ? opt.value : null);
               trigger("collection_id");
@@ -472,63 +570,109 @@ const AddProduct = ({ editId = null, onSaved }) => {
             classNamePrefix="react-select"
           />
           {errors.collection_id && (
-            <p className="text-red-600 text-xs mt-1">{errors.collection_id.message}</p>
+            <p className="text-red-600 text-xs mt-1">
+              {errors.collection_id.message}
+            </p>
           )}
         </div>
 
         {/* Price */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Price (₹) *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Price (₹) *
+          </label>
           <input
             type="number"
             step="0.01"
             placeholder="0.00"
-            className={`${inputBase} ${errors.price ? "border-red-500 ring-red-200" : ""}`}
+            className={`${inputBase} ${
+              errors.price ? "border-red-500 ring-red-200" : ""
+            }`}
             {...register("price", {
               required: "Price is required",
               min: { value: 0, message: "Price must be positive" },
             })}
             onBlur={() => trigger("discountprice")}
           />
-          {errors.price && <p className="text-red-600 text-xs mt-1">{errors.price.message}</p>}
+          {errors.price && (
+            <p className="text-red-600 text-xs mt-1">{errors.price.message}</p>
+          )}
         </div>
 
         {/* Discount Price */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Discount Price (₹)</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Discount Price (₹)
+          </label>
           <input
             type="number"
             step="0.01"
             placeholder="Optional"
-            className={`${inputBase} ${errors.discountprice ? "border-red-500 ring-red-200" : ""}`}
+            className={`${inputBase} ${
+              errors.discountprice ? "border-red-500 ring-red-200" : ""
+            }`}
             {...register("discountprice", {
               min: { value: 0, message: "Discount price must be positive" },
-              validate: (v) => v === "" || Number(v) <= Number(price || 0) || "Discount cannot exceed price",
+              validate: (v) =>
+                v === "" ||
+                Number(v) <= Number(price || 0) ||
+                "Discount cannot exceed price",
             })}
           />
           {errors.discountprice && (
-            <p className="text-red-600 text-xs mt-1">{errors.discountprice.message}</p>
+            <p className="text-red-600 text-xs mt-1">
+              {errors.discountprice.message}
+            </p>
           )}
         </div>
 
         {/* Stock */}
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Stock *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Stock *
+          </label>
           <input
             type="number"
             placeholder="0"
-            className={`${inputBase} ${errors.stock ? "border-red-500 ring-red-200" : ""}`}
+            className={`${inputBase} ${
+              errors.stock ? "border-red-500 ring-red-200" : ""
+            }`}
             {...register("stock", {
               required: "Stock is required",
               min: { value: 0, message: "Stock must be positive" },
             })}
           />
-          {errors.stock && <p className="text-red-600 text-xs mt-1">{errors.stock.message}</p>}
+          {errors.stock && (
+            <p className="text-red-600 text-xs mt-1">{errors.stock.message}</p>
+          )}
         </div>
 
+       {/* Uploaded Date */}
+<div>
+  <label className="block text-sm font-medium text-[#6B4226] mb-1">
+    Upload Date
+  </label>
+
+  <Controller
+    control={control}
+    name="uploadeddate"
+    render={({ field }) => (
+      <DatePicker
+        selected={field.value}
+        onChange={(date) => field.onChange(date)}
+        dateFormat="yyyy-MM-dd"
+        className={`${inputBase}`}
+        minDate={new Date()}        // 🚀 Only today & future dates
+        placeholderText="Select a date"
+      />
+    )}
+  />
+</div>
         {/* Colors (tag box) */}
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Colors</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Colors
+          </label>
           <div className="flex gap-2">
             <input
               type="text"
@@ -581,12 +725,26 @@ const AddProduct = ({ editId = null, onSaved }) => {
 
         {/* Toggles */}
         <div className="flex items-center gap-2">
-          <input id="isactive" type="checkbox" className="h-4 w-4" {...register("isactive")} />
-          <label htmlFor="isactive" className="text-sm text-[#6B4226]">Active</label>
+          <input
+            id="isactive"
+            type="checkbox"
+            className="h-4 w-4"
+            {...register("isactive")}
+          />
+          <label htmlFor="isactive" className="text-sm text-[#6B4226]">
+            Active
+          </label>
         </div>
         <div className="flex items-center gap-2">
-          <input id="isfeatured" type="checkbox" className="h-4 w-4" {...register("isfeatured")} />
-          <label htmlFor="isfeatured" className="text-sm text-[#6B4226]">Featured</label>
+          <input
+            id="isfeatured"
+            type="checkbox"
+            className="h-4 w-4"
+            {...register("isfeatured")}
+          />
+          <label htmlFor="isfeatured" className="text-sm text-[#6B4226]">
+            Featured
+          </label>
         </div>
 
         {/* Images */}
@@ -605,39 +763,53 @@ const AddProduct = ({ editId = null, onSaved }) => {
               required: editId ? false : "At least one image is required",
               validate: {
                 fileType: (files) =>
-                  Array.from(files || []).every((f) => f.type?.startsWith("image/")) ||
-                  "Please select image files only",
+                  Array.from(files || []).every((f) =>
+                    f.type?.startsWith("image/")
+                  ) || "Please select image files only",
                 ...(editId
                   ? {}
                   : {
                       minCount: (files) =>
-                        (files?.length || 0) >= 1 || "At least one image is required",
+                        (files?.length || 0) >= 1 ||
+                        "At least one image is required",
                     }),
               },
             })}
             onChange={handleImageChange}
           />
-          {errors.images && <p className="text-red-600 text-xs mt-1">{errors.images.message}</p>}
+          {errors.images && (
+            <p className="text-red-600 text-xs mt-1">{errors.images.message}</p>
+          )}
         </div>
 
         {/* Previews + Hero picker */}
         {(existingImages.length > 0 || previews.length > 0) && (
           <div className="md:col-span-2">
-            <p className="text-sm font-semibold mb-2 text-[#6B4226]">Select Hero Image:</p>
+            <p className="text-sm font-semibold mb-2 text-[#6B4226]">
+              Select Hero Image:
+            </p>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-4">
               {existingImages.map((img, idx) => (
                 <button
                   type="button"
                   key={`old-${idx}`}
                   className={`relative group rounded-md overflow-hidden border ${
-                    heroImageIndex === idx ? "border-[#D4A5A5] ring-2 ring-[#D4A5A5]" : "border-[#E6DCD2]"
+                    heroImageIndex === idx
+                      ? "border-[#D4A5A5] ring-2 ring-[#D4A5A5]"
+                      : "border-[#E6DCD2]"
                   }`}
                   onClick={() => setHeroImageIndex(idx)}
                 >
-                  <img src={img.url} alt={`Existing ${idx + 1}`} className="w-full h-24 object-cover" />
+                  <img
+                    src={img.url}
+                    alt={`Existing ${idx + 1}`}
+                    className="w-full h-24 object-cover"
+                  />
                   <span
                     className={`absolute bottom-1 left-1 right-1 text-[11px] px-1.5 py-0.5 rounded ${
-                      heroImageIndex === idx ? "bg-[#D4A5A5] text-white" : "bg-white/80 text-[#6B4226]"
+                      heroImageIndex === idx
+                        ? "bg-[#D4A5A5] text-white"
+                        : "bg-white/80 text-[#6B4226]"
                     }`}
                   >
                     {heroImageIndex === idx ? "Hero Image" : "Tap to set as Hero"}
@@ -658,20 +830,30 @@ const AddProduct = ({ editId = null, onSaved }) => {
                     onClick={() => setHeroImageIndex(absoluteIndex)}
                     aria-pressed={heroImageIndex === absoluteIndex}
                   >
-                    <img src={src} alt={`Preview ${index + 1}`} className="w-full h-24 object-cover" />
+                    <img
+                      src={src}
+                      alt={`Preview ${index + 1}`}
+                      className="w-full h-24 object-cover"
+                    />
                     <span
                       className={`absolute bottom-1 left-1 right-1 text-[11px] px-1.5 py-0.5 rounded ${
-                        heroImageIndex === absoluteIndex ? "bg-[#D4A5A5] text-white" : "bg-white/80 text-[#6B4226]"
+                        heroImageIndex === absoluteIndex
+                          ? "bg-[#D4A5A5] text-white"
+                          : "bg-white/80 text-[#6B4226]"
                       }`}
                     >
-                      {heroImageIndex === absoluteIndex ? "Hero Image" : "Tap to set as Hero"}
+                      {heroImageIndex === absoluteIndex
+                        ? "Hero Image"
+                        : "Tap to set as Hero"}
                     </span>
                   </button>
                 );
               })}
             </div>
             {!editId && heroImageIndex === null && (
-              <p className="text-red-600 text-xs mt-2">Please select a hero image</p>
+              <p className="text-red-600 text-xs mt-2">
+                Please select a hero image
+              </p>
             )}
           </div>
         )}
@@ -683,7 +865,13 @@ const AddProduct = ({ editId = null, onSaved }) => {
             disabled={isSubmitting || (!editId && heroImageIndex === null)}
             className="w-full bg-[#D4A5A5] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow disabled:opacity-50"
           >
-            {isSubmitting ? (editId ? "Updating…" : "Adding Product…") : editId ? "Update Product" : "Add Product"}
+            {isSubmitting
+              ? editId
+                ? "Updating…"
+                : "Adding Product…"
+              : editId
+              ? "Update Product"
+              : "Add Product"}
           </button>
         </div>
       </form>
