@@ -20,7 +20,7 @@ const get = (obj, keys, fallback = undefined) =>
   fallback;
 
 const IMAGE_BASE =
-  process.env.REACT_APP_IMAGE_BASE || process.env.REACT_APP_API_BASE_URL || ""; // prefix for relative urls if your uploader returns "/uploads/.."
+  process.env.REACT_APP_IMAGE_BASE || process.env.REACT_APP_API_BASE_URL || "";
 
 const normalizeImageUrl = (u) => {
   if (!u || typeof u !== "string") return "";
@@ -113,6 +113,8 @@ const ProductDetails = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [qty, setQty] = useState(1);
+  const [isInWishlist, setIsInWishlist] = useState(false);
+  const [wishlistSubmitting, setWishlistSubmitting] = useState(false);
   const sliderRef = useRef();
   const token = localStorage.getItem("token");
   let decoded = "";
@@ -191,9 +193,25 @@ const ProductDetails = () => {
       }
     };
 
+    const checkWishlist = async () => {
+      if (!token || !userid) {
+        setIsInWishlist(false);
+        return;
+      }
+      try {
+        const { data } = await api.get('/api/wishlist');
+        const isWishlisted = data.data.some(item => String(item.product_id) === String(id));
+        setIsInWishlist(isWishlisted);
+      } catch (err) {
+        console.error('Error checking wishlist:', err);
+        toast.error(err.response?.data?.error || 'Failed to check wishlist');
+      }
+    };
+
     fetchProduct();
     fetchReviews();
-  }, [id]);
+    checkWishlist();
+  }, [id, token, userid]);
 
   // Reset slider on color change
   useEffect(() => {
@@ -201,6 +219,51 @@ const ProductDetails = () => {
       sliderRef.current?.slickGoTo(0);
     } catch {}
   }, [selectedColor]);
+
+  const handleToggleWishlist = async () => {
+    if (!token || !userid) {
+      toast.error('Please log in to manage your wishlist');
+      return;
+    }
+    if (wishlistSubmitting) return;
+
+    try {
+      setWishlistSubmitting(true);
+      if (isInWishlist) {
+        const { data } = await api.get('/api/wishlist');
+        const item = data.data.find(item => String(item.product_id) === String(id));
+        if (item) {
+          await api.delete(`/api/wishlist/${item.id}`);
+          setIsInWishlist(false);
+          toast.success('Removed from wishlist');
+          try {
+            Ecom.removeFromWishlist({
+              id: product.id,
+              title: product.name,
+              category: categoryName(product),
+              price: Number(product.price) - (Number(product.discountprice || 0) || 0),
+            });
+          } catch {}
+        }
+      } else {
+        const response = await api.post('/api/wishlist', { product_id: id });
+        setIsInWishlist(true);
+        toast.success(response.data.message);
+        try {
+          Ecom.addToWishlist({
+            id: product.id,
+            title: product.name,
+            category: categoryName(product),
+            price: Number(product.price) - (Number(product.discountprice || 0) || 0),
+          });
+        } catch {}
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update wishlist');
+    } finally {
+      setWishlistSubmitting(false);
+    }
+  };
 
   const submitReview = async (e) => {
     e.preventDefault();
@@ -296,7 +359,6 @@ const ProductDetails = () => {
     prevArrow: <PrevArrow />,
   };
 
-  // Robust image ordering (hero first), tolerant of is_hero being string/number
   const imgs = Array.isArray(product.product_images)
     ? product.product_images
     : [];
@@ -547,13 +609,16 @@ const ProductDetails = () => {
                     {/* Watchlist Icon Button */}
                     <button
                       type="button"
-                      className="flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] bg-white shadow hover:bg-[#F1E7E5] transition"
-                      aria-label="Add to watchlist"
-                      onClick={() =>
-                        console.log("Add to Watchlist", product.id)
-                      }
+                      className={`flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
+                        isInWishlist
+                          ? 'bg-[#D4A5A5] text-white'
+                          : 'bg-white hover:bg-[#F1E7E5] text-[#D4A5A5]'
+                      } ${wishlistSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                      onClick={handleToggleWishlist}
+                      disabled={wishlistSubmitting}
                     >
-                      <FaHeart className="text-[#D4A5A5]" size={20} />
+                      <FaHeart size={20} />
                     </button>
 
                     {/* Waitlist Button */}
