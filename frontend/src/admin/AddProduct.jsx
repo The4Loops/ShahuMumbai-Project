@@ -99,7 +99,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
       isfeatured: false,
       collection_id: null,
       colors: [],
-      uploadeddate: new Date(),
+      launchingdate: new Date(),
     },
   });
 
@@ -308,6 +308,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
         isfeatured: !!form.isfeatured,
         collection_id: form.collection_id || null,
         colors: Array.isArray(form.colors) ? form.colors : [],
+        launchingdate: form.launchingdate
+          ? new Date(form.launchingdate).toISOString()
+          : new Date().toISOString(), // Added launchingdate
       };
 
       // include uploaded date (if provided) as ISO string
@@ -647,27 +650,27 @@ const AddProduct = ({ editId = null, onSaved }) => {
           )}
         </div>
 
-       {/* Uploaded Date */}
-<div>
-  <label className="block text-sm font-medium text-[#6B4226] mb-1">
-    Upload Date
-  </label>
+        {/* Launching Date */}
+        <div>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">
+            Launching Date
+          </label>
 
-  <Controller
-    control={control}
-    name="uploadeddate"
-    render={({ field }) => (
-      <DatePicker
-        selected={field.value}
-        onChange={(date) => field.onChange(date)}
-        dateFormat="yyyy-MM-dd"
-        className={`${inputBase}`}
-        minDate={new Date()}        // 🚀 Only today & future dates
-        placeholderText="Select a date"
-      />
-    )}
-  />
-</div>
+          <Controller
+            control={control}
+            name="launchingdate"
+            render={({ field }) => (
+              <DatePicker
+                selected={field.value}
+                onChange={(date) => field.onChange(date)}
+                dateFormat="yyyy-MM-dd"
+                className={`${inputBase}`}
+                minDate={new Date()} // 🚀 Only today & future dates
+                placeholderText="Select a date"
+              />
+            )}
+          />
+        </div>
         {/* Colors (tag box) */}
         <div className="md:col-span-2">
           <label className="block text-sm font-medium text-[#6B4226] mb-1">
@@ -812,7 +815,9 @@ const AddProduct = ({ editId = null, onSaved }) => {
                         : "bg-white/80 text-[#6B4226]"
                     }`}
                   >
-                    {heroImageIndex === idx ? "Hero Image" : "Tap to set as Hero"}
+                    {heroImageIndex === idx
+                      ? "Hero Image"
+                      : "Tap to set as Hero"}
                   </span>
                 </button>
               ))}

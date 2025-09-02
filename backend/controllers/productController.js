@@ -40,6 +40,7 @@ exports.createProduct = async (req, res) => {
       isactive,
       isfeatured,
       uploadeddate,
+      launchingdate,
       images,
       collection_id,
       colors, // array only
@@ -81,6 +82,7 @@ exports.createProduct = async (req, res) => {
           isactive: isactive === true || isactive === "true",
           isfeatured: isfeatured === true || isfeatured === "true",
           uploadeddate: new Date(uploadeddate),
+          launchingdate: launchingdate ? new Date(launchingdate) : new Date(),
           collectionid: collection_id || null,
           colors: cleanColors,
         },
@@ -218,10 +220,26 @@ exports.updateProduct = async (req, res) => {
       isactive,
       isfeatured,
       uploadeddate,
+      launchingdate,
       images,
       collection_id,
       colors, // optional array
     } = req.body;
+
+    // Validate required fields
+    if (
+      !name ||
+      !description ||
+      !shortdescription ||
+      !categoryid ||
+      !branddesigner ||
+      !price ||
+      !stock
+    ) {
+      return res.status(400).json({
+        message: "All required fields are required",
+      });
+    }
 
     const updateFields = {
       name,
@@ -240,6 +258,10 @@ exports.updateProduct = async (req, res) => {
 
     if (uploadeddate) {
       updateFields.uploadeddate = new Date(uploadeddate);
+    }
+
+    if (launchingdate) {
+      updateFields.launchingdate = new Date(launchingdate); // Added
     }
 
     if (typeof colors !== "undefined") {
@@ -273,6 +295,7 @@ exports.updateProduct = async (req, res) => {
         image_url: img.url,
         is_hero: img.is_hero,
       }));
+
       const { error: imageError } = await supabase.from("product_images").insert(imageRecords);
       if (imageError) {
         return res.status(400).json({ message: "Error inserting images", error: imageError });
@@ -373,5 +396,62 @@ exports.setProductCollection = async (req, res) => {
   } catch (e) {
     console.error("setProductCollection", e);
     res.status(500).json({ error: e.message });
+  }
+};
+
+exports.getUpcomingProducts = async (req, res) => {
+  try {
+    // Authentication
+    const token = req.headers.authorization?.split(" ")[1];
+    if (!token) {
+      return res.status(401).json({ message: "Unauthorized: Token missing" });
+    }
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== "Admin") {
+      return res.status(403).json({ message: "Forbidden: Admins only" });
+    }
+
+    // Build query
+    const { data: products, error } = await supabase
+      .from("products")
+      .select(
+        `
+        *,
+        product_images (
+          id,
+          image_url,
+          is_hero
+        ),
+        categories (
+          categoryid,
+          name
+        )
+      `
+      )
+      .gt("launchingdate", new Date().toISOString()) // Filter for upcoming products
+      .order("launchingdate", { ascending: true });
+
+    if (error) {
+      console.error("Supabase query error:", error);
+      return res
+        .status(400)
+        .json({ message: "Error fetching products", error });
+    }
+
+    // Format response
+    const formattedProducts = products.map((product) => ({
+      ...product,
+      product_images: product.product_images || [],
+      categories: product.categories || null,
+    }));
+
+    return res.status(200).json({
+      message: "Upcoming products retrieved successfully",
+      products: formattedProducts,
+    });
+  } catch (error) {
+    console.error("Server error:", error);
+    return res.status(500).json({ message: "Server error", error: error.message });
   }
 };

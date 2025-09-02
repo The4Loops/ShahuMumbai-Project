@@ -138,6 +138,11 @@ const ProductDetails = () => {
   // Color (string)
   const [selectedColor, setSelectedColor] = useState(null);
 
+  // Check if product is upcoming
+  const isUpcoming = product?.launchingdate
+    ? new Date(product.launchingdate) > new Date()
+    : false;
+
   useEffect(() => {
     const fetchProduct = async () => {
       try {
@@ -339,6 +344,7 @@ const ProductDetails = () => {
     }
   };
 
+  // Show "Coming Soon" if product is upcoming
   if (loading)
     return <p className="p-6 text-center text-[#6B4226]">Loading...</p>;
   if (error || !product)
@@ -347,6 +353,29 @@ const ProductDetails = () => {
         {error || "Product not found"}
       </p>
     );
+  if (isUpcoming) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5] font-serif">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-[#6B4226] mb-4">
+              Coming Soon
+            </h1>
+            <p className="text-lg text-[#3E2C23]">
+              {product.name} will be available soon!
+            </p>
+            <p className="text-sm text-[#3E2C23] mt-2">
+              Launching on: {new Date(product.launchingdate).toLocaleString("en-IN", {
+                dateStyle: "medium",
+                timeStyle: "short",
+                timeZone: "Asia/Kolkata",
+              })}
+            </p>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   const sliderSettings = {
     dots: false,
