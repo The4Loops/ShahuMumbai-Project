@@ -154,9 +154,7 @@ async function sendCartReminderEmails(req, res) {
         items.forEach((item) => {
           const product = item.products;
           if (!product) return;
-          console.log("Product name:", product.name);
           const escapedName = product.name ? product.name.replace(/['"]/g, '&quot;') : 'Unknown Product';
-          console.log('Escaped name:', escapedName);
           const salePrice =
             product.discountprice && product.discountprice < product.price
               ? (product.price - product.discountprice).toFixed(2)
@@ -168,12 +166,11 @@ async function sendCartReminderEmails(req, res) {
             product.shortdescription || "No description available";
 
           const itemHtml = cartItemTemplate
-            .replace("{{image_url}}", imageUrl)
-            .replace("{{productName}}",escapedName)
-            .replace("{{description}}", description.replace(/['"]/g, "&quot;"))
-            .replace("{{price}}", salePrice);
+            .replace(/{{image_url}}/g, imageUrl)
+            .replace(/{{productName}}/g, escapedName) // Use regex with global flag
+            .replace(/{{description}}/g, description.replace(/['"]/g, "&quot;"))
+            .replace(/{{price}}/g, salePrice);
 
-          console.log("itemHtml:", itemHtml); // Log to verify {{name}} replacement
           cartItemsHtml += itemHtml;
         });
 
@@ -190,7 +187,6 @@ async function sendCartReminderEmails(req, res) {
           .replace(/\s+/g, " ")
           .trim();
 
-        console.log(`[sendCartReminderMail] Sending email to ${email}`);
         return transporter
           .sendMail({
             from: process.env.EMAIL_USER,
@@ -220,7 +216,7 @@ async function sendCartReminderEmails(req, res) {
 
 module.exports = () => {
   cron.schedule(
-    "* * * * *",
+    "0 8 */3 * *",
     async () => {
       if (running) {
         console.warn(

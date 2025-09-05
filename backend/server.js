@@ -33,7 +33,7 @@ const teamMembersRoutes = require('./routes/teamMembersRoutes');
 const collectionsRoutes = require('./routes/collectionsRoutes');
 const subscriberRoutes = require('./routes/subscriberRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
-const paymentsRoutes = require('./routes/payments.routes'); // ✅ keep name consistent
+const paymentsRoutes = require('./routes/paymentsRoutes'); // ✅ keep name consistent
 
 const app = express();
 app.set('trust proxy', 1);
