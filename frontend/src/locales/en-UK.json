@@ -1,0 +1,37 @@
+{
+  "common": {
+    "language": "Language",
+    "search": "Search",
+    "cart": "Basket",
+    "account": "Account",
+    "myProfile": "My Profile",
+    "trackOrder": "Track Order",
+    "wishlist": "Wishlist",
+    "waitlist": "Waitlist",
+    "logout": "Log Out"
+  },
+  "navbar": {
+    "searchPlaceholder": "Search",
+    "admin": "Admin"
+  },
+  "heritage": {
+    "title": "Our Heritage",
+    "milestones": [
+      {
+        "year": "5,000 – 10,000 years ago",
+        "title": "Inspiration",
+        "description": "Rooted in lost Indian art and history."
+      },
+      {
+        "year": "Textile Traditions",
+        "title": "Celebrating Heritage",
+        "description": "The Indian Subcontinent, home to the richest textile legacies."
+      },
+      {
+        "year": "Today",
+        "title": "Modern Elegance",
+        "description": "Bridging ancient techniques with modern aesthetics, Shahu continues India’s story of elegance."
+      }
+    ]
+  }
+}

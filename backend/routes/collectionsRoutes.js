@@ -1,12 +1,13 @@
-// backend/routes/collectionRoutes.js
+// routes/collectionsRoutes.js
 const express = require("express");
 const router = express.Router();
-const collectionController = require("../controllers/collectionsController");
+const ctrl = require("../controllers/collectionsController");
 
-router.get('/admin/collections', collectionController.listCollections); // List all with optional filters
-router.post('/admin/collections', collectionController.createCollection); // Create new
-router.get('/admin/collections/:id', collectionController.getCollection); // Get one by ID
-router.put('/admin/collections/:id', collectionController.updateCollection); // Update by ID
-router.delete('/admin/collections/:id', collectionController.deleteCollection); // Delete by ID
+// Consistent with app.use('/api', …)
+router.get("/collections", ctrl.listCollections);
+router.get("/collections/:id", ctrl.getCollection);
+router.post("/collections", ctrl.createCollection);
+router.put("/collections/:id", ctrl.updateCollection);
+router.delete("/collections/:id", ctrl.deleteCollection);
 
 module.exports = router;

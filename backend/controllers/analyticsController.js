@@ -45,14 +45,12 @@ exports.trackEvent = async (req, res) => {
 };
 
 // GET /api/analytics/summary?from=YYYY-MM-DD&to=YYYY-MM-DD
-// Returns KPIs + top products. Tries RPCs if present; falls back gracefully.
 exports.getSummary = async (req, res) => {
   try {
     const { from, to } = req.query;
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    // ---- Try RPC 'analytics_kpis' (if you ran the optional SQL)
     let kpis = null;
     try {
       const k = await supabase.rpc("analytics_kpis", { p_from, p_to });
@@ -63,7 +61,6 @@ exports.getSummary = async (req, res) => {
 
     // ---- Fallback: compute KPIs in Node by fetching a reasonable window
     if (!kpis) {
-      // fetch capped number of events (admin view; keep simple)
       let q = supabase
         .from("analytics_events")
         .select("id, name, anon_id, user_id, props, occurred_at", { count: "exact" })
@@ -97,7 +94,7 @@ exports.getSummary = async (req, res) => {
       };
     }
 
-    // ---- Top products (prefer RPC; fallback to simple Node tally)
+    // ---- Top products
     let topProducts = [];
     let tp = null;
     try {
@@ -106,7 +103,6 @@ exports.getSummary = async (req, res) => {
     } catch (_) {}
 
     if (!topProducts.length) {
-      // fallback: fetch add_to_cart events and tally title
       let q = supabase
         .from("analytics_events")
         .select("props, occurred_at")
@@ -186,5 +182,91 @@ exports.getEvents = async (req, res) => {
   } catch (e) {
     console.error("getEvents error", e);
     return res.status(500).json({ error: "internal_error" });
+  }
+};
+
+exports.getSalesReport = async (req, res) => {
+  try {
+    const now = new Date();
+    const last24hISO = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const last30dISO = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const PAID_PAYMENT_STATUSES = ["PAID", "SUCCESS", "CAPTURED"];
+    const PAID_ORDER_STATUSES   = ["PAID", "COMPLETED", "SUCCESS", "FULFILLED"];
+
+
+    const fetchPaidOrderIds = async (fromISO = null) => {
+      let q1 = supabase
+        .from("orders")
+        .select("id", { count: "exact" })
+        .in("payment_status", PAID_PAYMENT_STATUSES);
+      if (fromISO) q1 = q1.gte("placed_at", fromISO);
+      const { data: p1rows, error: p1err, count: p1count } = await q1;
+      if (p1err) throw p1err;
+
+      // 2) Fallback: status if payment_status not used
+      let q2 = supabase
+        .from("orders")
+        .select("id", { count: "exact" })
+        .is("payment_status", null)
+        .in("status", PAID_ORDER_STATUSES);
+      if (fromISO) q2 = q2.gte("placed_at", fromISO);
+      const { data: p2rows, error: p2err, count: p2count } = await q2;
+      if (p2err) throw p2err;
+
+      const ids = new Set();
+      (p1rows || []).forEach(r => ids.add(r.id));
+      (p2rows || []).forEach(r => ids.add(r.id));
+
+      return { ids: Array.from(ids), count: (p1count || 0) + (p2count || 0) };
+    };
+
+    const [s24, s30, sAll] = await Promise.all([
+      fetchPaidOrderIds(last24hISO),
+      fetchPaidOrderIds(last30dISO),
+      fetchPaidOrderIds(null),
+    ]);
+
+    let topProducts = [];
+    if (sAll.ids.length > 0) {
+      const { data: items, error: itemsErr } = await supabase
+        .from("order_items")
+        .select("product_id, product_title, qty, order_id")
+        .in("order_id", sAll.ids);
+      if (itemsErr) throw itemsErr;
+
+      const byProduct = new Map();
+      for (const row of items || []) {
+        const pid = row.product_id || null;
+        const name = row.product_title || "Untitled";
+        const qty = Number(row.qty || 0);
+        const key = pid || `title:${name}`; 
+
+        const prev = byProduct.get(key) || {
+          id: pid,            
+          name,               
+          image: null,        
+          sales: 0,
+        };
+        prev.sales += qty;
+        byProduct.set(key, prev);
+      }
+
+      topProducts = Array.from(byProduct.values())
+        .sort((a, b) => b.sales - a.sales)
+        .slice(0, 6);
+    }
+
+    return res.json({
+      summary: [
+        { name: "Last 24h", sales: s24.count ?? 0 },
+        { name: "30 Days",  sales: s30.count ?? 0 },
+        { name: "All Time", sales: sAll.count ?? 0 },
+      ],
+      topProducts,
+    });
+  } catch (e) {
+    console.error("getSalesReport error", e);
+    return res.status(500).json({ error: "internal_error", details: e.message });
   }
 };

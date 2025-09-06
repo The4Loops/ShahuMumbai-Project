@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaUser, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
-import {jwtDecode} from "jwt-decode"; // ✅ fixed import
+import { FaUser, FaShoppingCart, FaBars, FaTimes, FaGlobe } from "react-icons/fa";
+import { jwtDecode } from "jwt-decode";
 import { motion, AnimatePresence } from "framer-motion";
 import Logo from "../../assets/ShahuLogo.png";
 import api from "../../supabase/axios";
 import { toast } from "react-toastify";
+import { useTranslation } from "react-i18next";
+import "../../i18n"; 
 
 // Reusable Dropdown section
-const DropdownSection = ({ title, links, onLinkClick }) => (
+export const DropdownSection = ({ title, links, onLinkClick }) => (
   <div className="min-w-[180px] mt-4 first:mt-0">
     {title && (
       <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
@@ -31,9 +33,9 @@ const DropdownSection = ({ title, links, onLinkClick }) => (
   </div>
 );
 
-// Desktop dropdown component
-const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
-  const timerRef = useRef(null);
+// Desktop dropdown wrapper
+export const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
+  const timerRef = React.useRef(null);
   const handleMouseEnter = () => {
     clearTimeout(timerRef.current);
     setOpen(true);
@@ -80,6 +82,27 @@ const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
 };
 
 export default function Navbar() {
+  const { i18n /*, t*/ } = useTranslation();
+
+  const LOCALES = [
+    { code: "en-US", label: "English (US)" },
+    { code: "en-CA", label: "English (CA)" },
+    { code: "en-AU", label: "English (AU)" },
+    { code: "en-UK", label: "English (UK)" },
+    { code: "es-ES", label: "Español (ES)" },
+    { code: "fr-FR", label: "Français (FR)" },
+    { code: "fr-MC", label: "Français (MC)" },
+    { code: "hi-IN", label: "हिंदी (IN)" },
+  ];
+
+  const [lang, setLang] = useState(i18n.language);
+  useEffect(() => setLang(i18n.language), [i18n.language]);
+  const changeLanguage = (lng) => {
+    i18n.changeLanguage(lng);
+    setLang(lng);
+    localStorage.setItem("lang", lng);
+  };
+
   const [menus, setMenus] = useState([]);
   const [dropdown, setDropdown] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -102,7 +125,7 @@ export default function Navbar() {
     }
   }
 
-  // Fetch menus
+  // Menus
   const fetchMenuData = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -125,7 +148,7 @@ export default function Navbar() {
       setMenus(sorted);
       const initDrop = {};
       sorted.forEach((m) => (initDrop[m.id] = false));
-      setDropdown({ ...initDrop, account: false });
+      setDropdown({ ...initDrop, account: false, lang: false }); // include lang
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to load menus");
     } finally {
@@ -133,7 +156,6 @@ export default function Navbar() {
     }
   }, [userRole]);
 
-  // Fetch cart item count
   const fetchCartItemCount = useCallback(async () => {
     if (!token) {
       setCartItemCount(0);
@@ -153,7 +175,6 @@ export default function Navbar() {
     fetchCartItemCount();
   }, [fetchMenuData, fetchCartItemCount]);
 
-  // Close dropdowns on outside click
   const handleClickOutside = useCallback((e) => {
     Object.keys(refs.current).forEach((key) => {
       if (refs.current[key] && !refs.current[key].contains(e.target)) {
@@ -161,7 +182,6 @@ export default function Navbar() {
       }
     });
   }, []);
-
   useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -179,10 +199,10 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
-   const handleSearchSubmit = (e) => {
+  const handleSearchSubmit = (e) => {
     if (e.key === "Enter" && searchQuery.trim()) {
       navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery(""); // Clear the search input
+      setSearchQuery("");
     }
   };
 
@@ -203,6 +223,7 @@ export default function Navbar() {
         <button
           className="lg:hidden text-[#6B4226] p-2 ml-auto"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
+          aria-label="Toggle menu"
         >
           {mobileMenuOpen ? <FaTimes size={26} /> : <FaBars size={26} />}
         </button>
@@ -221,14 +242,18 @@ export default function Navbar() {
             onKeyDown={handleSearchSubmit}
           />
         </div>
+
+        {/* Menus */}
         <ul className="flex items-center gap-8 flex-[1]">
           {menus.map((menu) => {
             const hasDropdown =
               menu.dropdown_items && menu.dropdown_items.length > 0;
+
             if (hasDropdown) {
               const sortedItems = [...menu.dropdown_items].sort(
                 (a, b) => a.order_index - b.order_index
               );
+
               return (
                 <DesktopDropdown
                   key={menu.id}
@@ -273,6 +298,7 @@ export default function Navbar() {
                 />
               );
             }
+
             return (
               <li key={menu.id}>
                 <Link
@@ -286,15 +312,78 @@ export default function Navbar() {
           })}
         </ul>
 
-        {/* Account & Cart */}
+        {/* Language + Account + Cart */}
         <ul className="flex items-center gap-6 justify-end flex-[1] relative">
-          <li>
+          {/* Language dropdown (desktop) */}
+          <li
+            ref={(el) => (refs.current.lang = el)}
+            className="relative"
+          >
             <button
+              onClick={() =>
+                setDropdown((prev) => ({
+                  ...Object.keys(prev).reduce((acc, k) => ({ ...acc, [k]: false }), {}),
+                  lang: !prev.lang,
+                }))
+              }
+              aria-label="Select language"
+              className="flex items-center gap-2 text-[#6B4226] hover:text-[#D4A5A5]"
+              title="Select language"
+            >
+              <FaGlobe size={18} />
+              <span className="text-sm font-medium">{lang}</span>
+            </button>
+
+            <AnimatePresence>
+              {dropdown.lang && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  transition={{ duration: 0.2 }}
+                  className="absolute right-0 mt-2 bg-white border border-[#e6dcd2] rounded-md shadow p-2 z-20 w-56"
+                >
+                  <ul className="max-h-72 overflow-auto">
+                    {LOCALES.map((l) => {
+                      const active = l.code === lang;
+                      return (
+                        <li key={l.code}>
+                          <button
+                            onClick={() => {
+                              changeLanguage(l.code);
+                              setDropdown((prev) => ({ ...prev, lang: false }));
+                            }}
+                            className={`w-full text-left px-3 py-2 rounded hover:bg-[#F7F0EE] ${
+                              active ? "bg-[#F7F0EE] font-semibold text-[#6B4226]" : "text-gray-700"
+                            }`}
+                          >
+                            {l.label}
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </li>
+
+          {/* Account */}
+          <li ref={(el) => (refs.current.account = el)}>
+            <button
+              aria-label="Account"
               onClick={() =>
                 !token
                   ? navigate("/account")
-                  : setDropdown((prev) => ({ ...prev, account: !prev.account }))
+                  : setDropdown((prev) => {
+                      const closedAll = Object.keys(prev).reduce(
+                        (acc, id) => ({ ...acc, [id]: false }),
+                        {}
+                      );
+                      return { ...closedAll, account: !prev.account };
+                    })
               }
+              className="text-[#6B4226] hover:text-[#D4A5A5]"
             >
               <FaUser size={20} />
             </button>
@@ -342,8 +431,10 @@ export default function Navbar() {
               )}
             </AnimatePresence>
           </li>
+
+          {/* Cart */}
           <li className="relative">
-            <Link to="/cart">
+            <Link to="/cart" aria-label="Cart" className="text-[#6B4226] hover:text-[#D4A5A5]">
               <FaShoppingCart size={20} />
               {cartItemCount > 0 && (
                 <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
@@ -365,6 +456,55 @@ export default function Navbar() {
             transition={{ duration: 0.2 }}
             className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]"
           >
+            {/* Language (mobile, icon + list to match style) */}
+            <div className="border-b border-[#d4c4b6] pb-2">
+              <button
+                className="w-full flex items-center justify-between py-2"
+                onClick={() =>
+                  setMobileDropdownOpen((prev) =>
+                    prev === "lang" ? null : "lang"
+                  )
+                }
+              >
+                <span className="flex items-center gap-2">
+                  <FaGlobe />
+                  <span>Language</span>
+                </span>
+                <span>{mobileDropdownOpen === "lang" ? "−" : "+"}</span>
+              </button>
+              <AnimatePresence>
+                {mobileDropdownOpen === "lang" && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    exit={{ height: 0, opacity: 0 }}
+                    transition={{ duration: 0.25 }}
+                    className="pl-2 pt-1 space-y-1 overflow-hidden"
+                  >
+                    {LOCALES.map((l) => {
+                      const active = l.code === lang;
+                      return (
+                        <button
+                          key={l.code}
+                          onClick={() => {
+                            changeLanguage(l.code);
+                            setMobileDropdownOpen(null);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded ${
+                            active
+                              ? "bg-white text-[#6B4226] font-semibold"
+                              : "text-gray-700 hover:text-[#D4A5A5]"
+                          }`}
+                        >
+                          {l.label}
+                        </button>
+                      );
+                    })}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
             {/* Mobile Menus */}
             {menus.map((menu) => {
               const hasDropdown =
@@ -443,7 +583,7 @@ export default function Navbar() {
               );
             })}
 
-            {/* Account Menu Item */}
+            {/* Account (mobile) */}
             <div className="border-b border-[#d4c4b6] pb-2">
               <button
                 className="w-full flex justify-between items-center py-2"
@@ -500,7 +640,7 @@ export default function Navbar() {
               </AnimatePresence>
             </div>
 
-            {/* Cart Menu Item */}
+            {/* Cart (mobile) */}
             <Link
               to="/cart"
               onClick={() => setMobileMenuOpen(false)}

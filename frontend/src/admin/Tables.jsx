@@ -1,31 +1,62 @@
-import React, { useState, lazy, Suspense, useMemo } from "react";
+// src/admin/Tables.jsx
+import React, { useState, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { Box, Users, Tag, Image as ImageIcon, MessageSquare, FileText } from "lucide-react";
+import {
+  Box,
+  Users,
+  Tag,
+  Image as ImageIcon,
+  MessageSquare,
+  FileText,
+  Layers,
+} from "lucide-react";
+
+// Helper to lazy-load with a fallback to a named export
+const lazyWithFallback = (importer, named = null) =>
+  lazy(async () => {
+    const m = await importer();
+    const Comp = m.default ?? (named ? m[named] : undefined);
+    if (typeof Comp !== "function") {
+      const keys = Object.keys(m || {});
+      throw new Error(
+        `Bad export for ${importer}.\n` +
+        `Expected a React component as default${named ? ` or named '${named}'` : ""}.\n` +
+        `Got exports: [${keys.join(", ")}]`
+      );
+    }
+    return { default: Comp };
+  });
 
 // Lazy load all tab components
-const ProductsTable = lazy(() => import("./tabs/ProductsTable"));
-const UsersTable = lazy(() => import("./tabs/UsersTable"));
-const CategoriesTable = lazy(() => import("./tabs/CategoriesTable"));
-const BannersTable = lazy(() => import("./tabs/BannersTable"));
-const ReviewsTable = lazy(() => import("./tabs/ReviewsTable"));
-const BlogsTable = lazy(() => import("./tabs/BlogsTable"));
+const ProductsTable    = lazyWithFallback(() => import("./tabs/ProductsTable"));
+const UsersTable       = lazyWithFallback(() => import("./tabs/UsersTable"));
+const CategoriesTable  = lazyWithFallback(() => import("./tabs/CategoriesTable"));
+const BannersTable     = lazyWithFallback(() => import("./tabs/BannersTable"));
+const ReviewsTable     = lazyWithFallback(() => import("./tabs/ReviewsTable"));
+const BlogsTable       = lazyWithFallback(() => import("./tabs/BlogsTable"));
+const CollectionsTable = lazyWithFallback(() => import("./tabs/CollectionsTable"), "CollectionsTable");
+const HeritageTable    = lazyWithFallback(() => import("./tabs/HeritageTable"), "HeritageTable");
 
 const tabs = [
-  { name: "Products", icon: Box },
-  { name: "Users", icon: Users },
-  { name: "Categories", icon: Tag },
-  { name: "Banners", icon: ImageIcon },
-  { name: "Reviews", icon: MessageSquare },
-  { name: "Blogs", icon: FileText },
+  { name: "Products",    icon: Box },
+  { name: "Users",       icon: Users },
+  { name: "Categories",  icon: Tag },
+  { name: "Collections", icon: Layers },
+  { name: "Heritage",    icon: Layers }, // new
+  { name: "Banners",     icon: ImageIcon },
+  { name: "Reviews",     icon: MessageSquare },
+  { name: "Blogs",       icon: FileText },
 ];
 
 const tabComponents = {
-  Products: ProductsTable,
-  Users: UsersTable,
-  Categories: CategoriesTable,
-  Banners: BannersTable,
-  Reviews: ReviewsTable,
-  Blogs: BlogsTable,
+  Products:    ProductsTable,
+  Users:       UsersTable,
+  Categories:  CategoriesTable,
+  Collections: CollectionsTable,
+  Heritage:    HeritageTable,
+  Banners:     BannersTable,
+  Reviews:     ReviewsTable,
+  Blogs:       BlogsTable,
 };
 
 export default function Tables() {
@@ -42,12 +73,11 @@ export default function Tables() {
     });
   };
 
-  // For the animated pill highlight (doesn't change header height)
   const highlightTransition = { type: "spring", stiffness: 300, damping: 26 };
 
   return (
     <div className="w-full">
-      {/* Tabs header (sticky optional) */}
+      {/* Tabs header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur supports-[backdrop-filter]:bg-white/60">
         <div className="flex gap-3 p-4">
           {tabs.map((tab) => {
@@ -78,19 +108,12 @@ export default function Tables() {
 
       {/* Panels: keep-mounted approach */}
       <div className="p-4 relative">
-        {/* optional min-height so fallback doesn't jiggle */}
         <div className="min-h-[200px]">
           {tabs.map(({ name }) => {
-            if (!visited.has(name)) return null; // mount only after first visit
+            if (!visited.has(name)) return null;
             const Comp = tabComponents[name];
-
             return (
-              <div
-                key={name}
-                // Hide inactive panels without unmounting
-                className={activeTab === name ? "block" : "hidden"}
-              >
-                {/* Gentle fade-in for new tab first mount only */}
+              <div key={name} className={activeTab === name ? "block" : "hidden"}>
                 <motion.div
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}

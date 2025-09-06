@@ -34,6 +34,7 @@ const collectionsRoutes = require('./routes/collectionsRoutes');
 const subscriberRoutes = require('./routes/subscriberRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const paymentsRoutes = require('./routes/paymentsRoutes'); // ✅ keep name consistent
+const heritageRoutes = require('./routes/heritageRoutes');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -110,6 +111,7 @@ app.use('/api', collectionsRoutes);
 app.use('/api', subscriberRoutes);
 app.use('/api', wishlistRoutes);
 app.use('/api/payments', paymentsRoutes); // Razorpay routes
+app.use('/api', heritageRoutes);
 
 // --- Start server ---
 const PORT = process.env.PORT || 5000;

@@ -1,54 +1,46 @@
-import React, { useState } from "react";
+// src/pages/HeritageTimeline.jsx
+import React, { useState, useMemo } from "react";
 import Layout from "../layout/Layout";
 import { GiStoneCrafting, GiSpinningWheel } from "react-icons/gi";
 import { MdOutlineDiamond } from "react-icons/md";
 import { IoMdClose } from "react-icons/io";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { useTranslation } from "react-i18next";
 
-// Import images
+// Images (keep your assets)
 import inspirationImg from "../assets/Heritage/inspiration.png";
 import celebratingImg from "../assets/Heritage/Celebrating.png";
 import modernImg from "../assets/Heritage/modern.png";
 
-const HeritageTimeline = () => {
-  const [activeIndex, setActiveIndex] = useState(null);
+const iconMap = [GiStoneCrafting, GiSpinningWheel, MdOutlineDiamond];
+const colorMap = [
+  { titleColor: "text-amber-700", dotColor: "bg-amber-700" },
+  { titleColor: "text-red-600", dotColor: "bg-red-600" },
+  { titleColor: "text-blue-600", dotColor: "bg-blue-600" }
+];
+const imageMap = [inspirationImg, celebratingImg, modernImg];
 
-  const milestones = [
-    {
-      year: "5,000 – 10,000 years ago",
-      title: "Inspiration",
-      description: "Rooted in lost Indian art and history.",
-      titleColor: "text-amber-700",
-      dotColor: "bg-amber-700",
-      Icon: GiStoneCrafting,
-      image: inspirationImg,
-    },
-    {
-      year: "Textile Traditions",
-      title: "Celebrating Heritage",
-      description:
-        "The Indian Subcontinent, home to the richest textile legacies.",
-      titleColor: "text-red-600",
-      dotColor: "bg-red-600",
-      Icon: GiSpinningWheel,
-      image: celebratingImg,
-    },
-    {
-      year: "Today",
-      title: "Modern Elegance",
-      description:
-        "Bridging ancient techniques with modern aesthetics, Shahu continues India’s story of elegance.",
-      titleColor: "text-blue-600",
-      dotColor: "bg-blue-600",
-      Icon: MdOutlineDiamond,
-      image: modernImg,
-    },
-  ];
+export default function HeritageTimeline() {
+  const { t } = useTranslation();
+
+  // milestones come from i18n array: heritage.milestones
+  const milestones = useMemo(() => {
+    const data = t("heritage.milestones", { returnObjects: true }) || [];
+    return data.map((item, idx) => ({
+      year: item.year,
+      title: item.title,
+      description: item.description,
+      Icon: iconMap[idx % iconMap.length],
+      image: imageMap[idx % imageMap.length],
+      ...colorMap[idx % colorMap.length]
+    }));
+  }, [t]);
+
+  const [activeIndex, setActiveIndex] = useState(null);
 
   const handleNext = () => {
     setActiveIndex((prev) => (prev + 1) % milestones.length);
   };
-
   const handlePrev = () => {
     setActiveIndex((prev) => (prev === 0 ? milestones.length - 1 : prev - 1));
   };
@@ -58,7 +50,7 @@ const HeritageTimeline = () => {
       <section className="bg-[#F1E7E5] py-16 px-6">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16 text-gray-800 tracking-wide">
-            Our Heritage
+            {t("heritage.title")}
           </h2>
 
           {/* Desktop Timeline */}
@@ -135,7 +127,7 @@ const HeritageTimeline = () => {
       </section>
 
       {/* Modal */}
-      {activeIndex !== null && (
+      {activeIndex !== null && milestones[activeIndex] && (
         <div
           className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
           onClick={() => setActiveIndex(null)}
@@ -198,7 +190,6 @@ const HeritageTimeline = () => {
           .animate-fadeUp {
             animation: fadeUp 0.8s forwards;
           }
-
           @keyframes modalScale {
             0% { opacity: 0; transform: scale(0.9); }
             100% { opacity: 1; transform: scale(1); }
@@ -210,6 +201,4 @@ const HeritageTimeline = () => {
       </style>
     </Layout>
   );
-};
-
-export default HeritageTimeline;
+}

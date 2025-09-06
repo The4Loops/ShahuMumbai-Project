@@ -1,0 +1,37 @@
+{
+  "common": {
+    "language": "Langue",
+    "search": "Rechercher",
+    "cart": "Panier",
+    "account": "Compte",
+    "myProfile": "Mon Profil",
+    "trackOrder": "Suivi de commande",
+    "wishlist": "Liste de souhaits",
+    "waitlist": "Liste d’attente",
+    "logout": "Se déconnecter"
+  },
+  "navbar": {
+    "searchPlaceholder": "Rechercher",
+    "admin": "Admin"
+  },
+  "heritage": {
+    "title": "Notre Héritage",
+    "milestones": [
+      {
+        "year": "Il y a 5 000 – 10 000 ans",
+        "title": "Inspiration",
+        "description": "Enraciné dans l’art et l’histoire perdus de l’Inde."
+      },
+      {
+        "year": "Traditions textiles",
+        "title": "Célébrer l’Héritage",
+        "description": "Le sous-continent indien, foyer des héritages textiles les plus riches."
+      },
+      {
+        "year": "Aujourd’hui",
+        "title": "Élégance Moderne",
+        "description": "Alliant techniques anciennes et esthétique moderne, Shahu poursuit l’histoire d’élégance de l’Inde."
+      }
+    ]
+  }
+}
