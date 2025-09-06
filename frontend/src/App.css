@@ -1,3 +1,21 @@
 body{
     font-family:'Trebuchet MS', 'Lucida Sans Unicode', 'Lucida Grande', 'Lucida Sans', Arial, sans-serif; 
 }
+
+/* Mobile view adjustments */
+@media (max-width: 768px) {
+  .Toastify__toast-container--top-right {
+    top: 50px !important;
+    right: 15px !important;
+    left: auto !important;
+    width: auto !important;
+    max-width: 400px !important;
+  }
+
+  .Toastify__toast {
+    border-radius: 8px !important; /* Adjust the value as needed (e.g., 8px, 12px) */
+    width: 100% !important; /* Ensure toast respects container width */
+    max-width: 100% !important; /* Prevent overflow */
+    margin: 0 !important; /* Remove default margins */
+  }
+}
