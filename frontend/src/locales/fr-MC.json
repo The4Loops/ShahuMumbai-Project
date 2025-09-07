@@ -10,10 +10,6 @@
     "waitlist": "Liste d’attente",
     "logout": "Se déconnecter"
   },
-  "navbar": {
-    "searchPlaceholder": "Rechercher",
-    "admin": "Admin"
-  },
   "heritage": {
     "title": "Notre Héritage",
     "milestones": [
@@ -33,5 +29,36 @@
         "description": "Alliant techniques anciennes et esthétique moderne, Shahu poursuit l’histoire d’élégance de l’Inde."
       }
     ]
+  },
+  "footer": {
+    "services": {
+      "title": "Services",
+      "customerService": "Service à la Clientèle",
+      "faq": "Questions Fréquentes"
+    },
+    "orders": {
+      "title": "Commandes",
+      "trackOrder": "Suivi de Commande",
+      "returns": "Retours"
+    },
+    "legal": {
+      "title": "Légal",
+      "privacy": "Politique de Confidentialité",
+      "terms": "Conditions Générales"
+    },
+    "followUs": {
+      "title": "Suivez-nous",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "youtube": "YouTube"
+    },
+    "newsletter": {
+      "title": "Newsletter",
+      "placeholder": "Entrez votre courriel",
+      "subscribe": "S'abonner",
+      "success": "Inscription à la newsletter réussie !",
+      "error": "Échec de l'inscription à la newsletter"
+    },
+    "copyright": "© Shahu Mumbai {{year}}. Tous droits réservés."
   }
 }

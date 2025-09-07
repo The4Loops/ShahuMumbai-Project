@@ -21,7 +21,7 @@ function Collections() {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get('/api/admin/collections'); // Adjust endpoint as needed
+        const response = await api.get('/api/collections'); // Adjust endpoint as needed
         const data = response.data;
         
         // ✅ Process API data to match component structure

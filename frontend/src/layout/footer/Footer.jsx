@@ -8,8 +8,10 @@ import TermsPopup from "../Terms";
 import ReturnsPopup from "../../pages/Returns";
 import { Link } from "react-router-dom";
 import api from "../../supabase/axios";
+import { useTranslation } from "react-i18next";
 
 const Footer = () => {
+  const { t } = useTranslation();
   const [activePopup, setActivePopup] = useState(null);
   const [email, setEmail] = useState("");
 
@@ -21,10 +23,11 @@ const Footer = () => {
     try {
       const response = await api.post("/api/sendSubscriberMail", { email });
       setEmail(""); // Clear input on success
-      toast.success(response.data.message || "Successfully subscribed to newsletter!");
+      if(response){
+        toast.success(t("footer.newsletter.success"));
+      }
     } catch (err) {
-      const errorMessage =
-        err.response?.data?.error || "Failed to subscribe to newsletter";
+      const errorMessage = err.response?.data?.error || t("footer.newsletter.error");
       toast.error(errorMessage);
     }
   };
@@ -38,69 +41,69 @@ const Footer = () => {
             {/* Services */}
             <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
-                Services
+                {t("footer.services.title")}
               </h4>
               <button
                 onClick={() => openPopup("customerService")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Customer Service
+                {t("footer.services.customerService")}
               </button>
               <button
                 onClick={() => openPopup("faq")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                FAQs
+                {t("footer.services.faq")}
               </button>
             </div>
 
             {/* Orders */}
             <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
-                Orders
+                {t("footer.orders.title")}
               </h4>
               <Link
                 to="/myorder"
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Track Order
+                {t("footer.orders.trackOrder")}
               </Link>
               <button
                 onClick={() => openPopup("returns")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Returns
+                {t("footer.orders.returns")}
               </button>
             </div>
 
             {/* Legal */}
             <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
-                Legal
+                {t("footer.legal.title")}
               </h4>
               <button
                 onClick={() => openPopup("privacy")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Privacy Policy
+                {t("footer.legal.privacy")}
               </button>
               <button
                 onClick={() => openPopup("terms")}
                 className="block text-sm mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                Terms & Conditions
+                {t("footer.legal.terms")}
               </button>
             </div>
 
             {/* Follow Us */}
             <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
-                Follow Us
+                {t("footer.followUs.title")}
               </h4>
               <div className="flex gap-4 mt-2 justify-center sm:justify-start">
                 <a
                   href="https://www.facebook.com/yourpage"
-                  aria-label="Facebook"
+                  aria-label={t("footer.followUs.facebook")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xl text-[#000] hover:text-[#1877F2] transition-colors"
@@ -109,7 +112,7 @@ const Footer = () => {
                 </a>
                 <a
                   href="https://www.instagram.com/shahumumbai?igsh=ZDl1YnN6cTFybmtx"
-                  aria-label="Instagram"
+                  aria-label={t("footer.followUs.instagram")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xl text-[#000] hover:text-[#E1306C] transition-colors"
@@ -118,7 +121,7 @@ const Footer = () => {
                 </a>
                 <a
                   href="https://youtube.com/@bhumishahu?si=DiWMIpcvxRkBy8kb"
-                  aria-label="YouTube"
+                  aria-label={t("footer.followUs.youtube")}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xl text-[#000] hover:text-[#FF0000] transition-colors"
@@ -131,19 +134,19 @@ const Footer = () => {
             {/* Newsletter */}
             <div>
               <h4 className="text-base font-bold border-b-2 border-dotted border-black pb-1 mb-3">
-                Newsletter
+                {t("footer.newsletter.title")}
               </h4>
               <form
                 className="flex flex-col gap-2 mt-2 items-center sm:items-start"
                 onSubmit={handleNewsletterSubmit}
               >
                 <label htmlFor="newsletter-email" className="sr-only">
-                  Email address
+                  {t("footer.newsletter.placeholder")}
                 </label>
                 <input
                   id="newsletter-email"
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder={t("footer.newsletter.placeholder")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full px-3 py-2 border border-black rounded text-sm"
@@ -153,7 +156,7 @@ const Footer = () => {
                   type="submit"
                   className="bg-black text-white px-4 py-2 rounded font-bold hover:bg-gray-800 transition-colors w-full sm:w-auto"
                 >
-                  Subscribe
+                  {t("footer.newsletter.subscribe")}
                 </button>
               </form>
             </div>
@@ -161,7 +164,7 @@ const Footer = () => {
 
           {/* Copyright */}
           <div className="w-full text-center text-sm border-t border-dashed border-black pt-4 mt-8">
-            <p>&copy; Shahu Mumbai 2025. All rights reserved.</p>
+            <p>{t("footer.copyright", { year: new Date().getFullYear() })}</p>
           </div>
         </div>
       </footer>
