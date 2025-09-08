@@ -28,6 +28,7 @@ import NewsletterPopup from "./layout/NewsletterSection";
 import PageTracker from "./PageTracker"; 
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
+import CollectionsPage from "./pages/CollectionsPage";
 
 function App() {
   useAutoLogout(); // Initialize auto logout functionality
@@ -72,6 +73,7 @@ function App() {
         <Route path="/blogs/:id" element={<BlogsView />} />
         <Route path="/returns" element={<Returns />} />
         <Route path="waitlist" element={<WaitlistProductCard />} />
+        <Route path="/collections/:id" element={<CollectionsPage />} />
       </Routes>
 
       <NewsletterPopup />

@@ -1,31 +1,30 @@
 import React, { useState } from "react";
+import Layout from "../layout/Layout";
 
-// Category Card Component
-function CollectionCard({ collection }) {
+function CollectionCard({ category }) {
   return (
     <div className="rounded-xl shadow hover:shadow-lg transition overflow-hidden cursor-pointer border border-[#E5D1C5] bg-[#FFF9F7] relative group">
       {/* Placeholder Color Block */}
       <div
-        className="w-full h-48"
-        style={{ backgroundColor: collection.color }}
-      ></div>
+        className="w-full h-48 flex items-center justify-center relative"
+        style={{ backgroundColor: category.color }}
+      >
+        {/* Hover Overlay with Name + Description */}
+        <div className="absolute inset-0 bg-[#2C1C15]/80 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center text-white text-center px-4">
+          <h2 className="text-xl font-bold mb-2">{category.name}</h2>
+          <p className="text-sm">{category.description}</p>
+        </div>
+      </div>
 
-      {/* Info Section */}
+      {/* Info Section (only item count now) */}
       <div className="p-4 text-center">
-        <h2 className="text-lg font-semibold text-[#2C1C15]">
-          {collection.name}
-        </h2>
-        <p className="text-[#6D4C41] text-sm">{collection.items} items</p>
+        <p className="text-[#6D4C41] text-sm">{category.items} items</p>
       </div>
 
-      {/* Hover Overlay (desktop only) */}
-      <div className="absolute inset-0 bg-[#2C1C15]/80 text-white flex items-center justify-center text-center px-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hidden sm:flex">
-        <p>{collection.description}</p>
-      </div>
-
-      {/* Mobile Description (always visible) */}
+      {/* Mobile Description (always visible on mobile) */}
       <div className="p-3 text-center text-sm text-[#6D4C41] sm:hidden">
-        {collection.description}
+        <h2 className="text-lg font-semibold">{category.name}</h2>
+        <p>{category.description}</p>
       </div>
     </div>
   );
@@ -71,7 +70,8 @@ export default function CollectionPage() {
   );
 
   return (
-    <div className="min-h-screen bg-[#F9F2EF]">
+    <Layout>
+      <div className="min-h-screen bg-[#F1E7E5]">
       {/* Header */}
       <div className="text-center mb-8 pt-8">
         <h1 className="text-3xl font-bold text-[#2C1C15]">Shop by Category</h1>
@@ -104,5 +104,6 @@ export default function CollectionPage() {
         </div>
       </div>
     </div>
+    </Layout>
   );
 }  
