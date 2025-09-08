@@ -47,7 +47,11 @@
       "terms": "Terms & Conditions"
     },
     "followUs": {
-      "title": "Follow Us"
+      "title": "Follow Us",
+      "facebook": "Facebook",
+      "twitter": "Twitter",
+      "instagram": "Instagram",
+      "youtube":"Youtube"
     },
     "newsletter": {
       "title": "Newsletter",

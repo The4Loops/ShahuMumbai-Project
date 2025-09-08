@@ -16,11 +16,11 @@ const LANGUAGE_ALIASES = {
   "en-GB": "en-UK",
   "en": "en-US",
   "es": "es-ES",
-  "fr": "fr-FR",
+  "fr": "fr-FR", // Map generic 'fr' to 'fr-FR'
   "hi": "hi-IN",
-  "en-NZ": "en-AU", // Map New Zealand to Australian English
-  "en-IE": "en-UK", // Map Irish English to UK English
-  "fr-CA": "fr-FR"  // Map Canadian French to French
+  "en-NZ": "en-AU",
+  "en-IE": "en-UK",
+  "fr-CA": "fr-FR"
 };
 
 const resources = {
@@ -40,16 +40,29 @@ i18n
   .init({
     resources,
     fallbackLng: "en-US",
-    supportedLngs: Object.keys(resources),
+    supportedLngs: [
+      "en-US",
+      "en-AU",
+      "en-CA",
+      "en-UK",
+      "es-ES",
+      "fr-FR",
+      "fr-MC",
+      "hi-IN",
+      "en", // Include generic codes
+      "es",
+      "fr",
+      "hi"
+    ],
     interpolation: { escapeValue: false },
     debug: process.env.NODE_ENV === "development",
     detection: {
       order: ["localStorage", "navigator", "htmlTag", "path", "subdomain"],
-      lookupLocalStorage: "i18nextLng", // Explicitly name the localStorage key
+      lookupLocalStorage: "i18nextLng",
       caches: ["localStorage"],
       convertDetectedLanguage: (lng) => {
-        // Handle full matches (e.g., en-US) and partial matches (e.g., en)
-        const normalizedLng = lng.split("-")[0]; // Extract base language (e.g., en from en-NZ)
+        // Handle both full codes (e.g., fr-FR) and generic codes (e.g., fr)
+        const normalizedLng = lng.split("-")[0]; // Extract base language
         return LANGUAGE_ALIASES[lng] || LANGUAGE_ALIASES[normalizedLng] || lng;
       }
     }
