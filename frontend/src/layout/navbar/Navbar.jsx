@@ -168,8 +168,9 @@ export default function Navbar() {
 
   useEffect(() => {
     fetchMenuData();
+    setLang(i18n.language);
     fetchCartItemCount();
-  }, [fetchMenuData, fetchCartItemCount]);
+  }, [fetchMenuData, fetchCartItemCount,i18n.language]);
 
   const handleClickOutside = useCallback((e) => {
     Object.keys(refs.current).forEach((key) => {
@@ -324,7 +325,7 @@ export default function Navbar() {
               title={t("navbar.selectLanguage")}
             >
               <FaGlobe size={18} />
-              <span className="text-sm font-medium">{lang}</span>
+              <span className="text-sm font-medium">{LOCALES.find(l => l.code === lang)?.label || lang}</span>
             </button>
 
             <AnimatePresence>

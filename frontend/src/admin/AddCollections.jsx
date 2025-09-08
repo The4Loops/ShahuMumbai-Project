@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../supabase/axios';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import { useParams, useNavigate } from 'react-router-dom';
+import Select from 'react-select';
 
 const slugify = (s) =>
   s
@@ -23,6 +24,8 @@ const AddCollections = () => {
     setValue,
     reset,
     watch,
+    trigger,
+    control,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -32,12 +35,15 @@ const AddCollections = () => {
       status: 'DRAFT',
       is_active: true,
       cover_image: null,
+      categoryid: '',
     },
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingCover, setExistingCover] = useState(null);
   const [preview, setPreview] = useState(null);
+  const [categories, setCategories] = useState([]);
+  const [categoriesError, setCategoriesError] = useState(null);
 
   // Auto-slug from title
   const title = watch('title');
@@ -57,6 +63,21 @@ const AddCollections = () => {
     return () => URL.revokeObjectURL(url);
   }, [coverFile, existingCover]);
 
+  // Fetch categories
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const { data } = await api.get('/api/category');
+        const categoriesData = Array.isArray(data) ? data : data?.categories || [];
+        setCategories(categoriesData);
+      } catch (err) {
+        setCategoriesError(err?.response?.data?.message || 'Failed to fetch categories');
+        toast.error(err?.response?.data?.message || 'Failed to fetch categories');
+      }
+    };
+    fetchCategories();
+  }, []);
+
   // Load for edit
   useEffect(() => {
     if (!isEdit) return;
@@ -70,6 +91,7 @@ const AddCollections = () => {
           status: data.status || 'DRAFT',
           is_active: data.is_active,
           cover_image: null, // Reset file input
+          categoryid: data.categoryid || '',
         });
         setExistingCover(data.cover_image || null);
         setPreview(data.cover_image || null);
@@ -104,11 +126,12 @@ const AddCollections = () => {
         const fd = new FormData();
         fd.append('image', file);
         const { data } = await api.post('/api/upload/single', fd, {
-          headers: { 'Content-Type': 'multipart/form-data' },
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+          },
         });
-        const urls = data?.url || [];
-        if (!urls.length) throw new Error('Cover image upload failed');
-        cover_url = urls;
+        cover_url = data.url; // Adjusted to match expected response
       }
 
       const payload = {
@@ -118,12 +141,13 @@ const AddCollections = () => {
         cover_image: cover_url,
         status: form.status,
         is_active: !!form.is_active,
+        categoryid: form.categoryid || null,
       };
 
       if (isEdit) {
         await api.put(`/api/admin/collections/${id}`, payload);
         toast.success('Collection updated!');
-        navigate('/admin/collections'); // Redirect to collections list
+        navigate('/admin/collections');
       } else {
         await api.post('/api/admin/collections', payload);
         toast.success('Collection created!');
@@ -134,6 +158,7 @@ const AddCollections = () => {
           status: 'DRAFT',
           is_active: true,
           cover_image: null,
+          categoryid: '',
         });
         setExistingCover(null);
         setPreview(null);
@@ -149,11 +174,55 @@ const AddCollections = () => {
     'rounded-md px-4 py-3 w-full border border-[#E6DCD2] text-[#6B4226] placeholder-[#6B4226]/50 ' +
     'focus:outline-none focus:ring-2 focus:ring-[#D4A5A5] focus:border-[#D4A5A5]';
 
+  const customSelectStyles = useMemo(
+    () => ({
+      control: (p, s) => ({
+        ...p,
+        minHeight: 44,
+        borderRadius: 6,
+        backgroundColor: '#FFFFFF',
+        border: errors.categoryid ? '1px solid #EF4444' : '1px solid #E6DCD2',
+        boxShadow: s.isFocused ? '0 0 0 2px #D4A5A5' : 'none',
+        '&:hover': { borderColor: '#D4A5A5' },
+      }),
+      menu: (p) => ({
+        ...p,
+        border: '1px solid #D4A5A5',
+        borderRadius: 6,
+        backgroundColor: '#FFFFFF',
+        zIndex: 50,
+      }),
+      option: (p, s) => ({
+        ...p,
+        backgroundColor: s.isSelected ? '#D4A5A5' : s.isFocused ? '#F3E8E8' : '#FFFFFF',
+        color: s.isSelected ? '#FFFFFF' : '#111827',
+        padding: '0.5rem 0.75rem',
+      }),
+      singleValue: (p) => ({ ...p, color: '#111827' }),
+      placeholder: (p) => ({ ...p, color: '#9CA3AF' }),
+      dropdownIndicator: (p) => ({
+        ...p,
+        color: '#D4A5A5',
+        '&:hover': { color: '#C39898' },
+      }),
+    }),
+    [errors.categoryid]
+  );
+
+  const categoryOptions = categories.map((c) => ({
+    value: c.categoryid,
+    label: c.name,
+  }));
+
   return (
     <div className="max-w-3xl mx-auto p-4 sm:p-6 bg-white rounded-lg border border-[#E6DCD2]">
       <h2 className="text-xl font-semibold text-[#6B4226] mb-4">
         {isEdit ? 'Edit Collection' : 'Add Collection'}
       </h2>
+
+      {categoriesError && (
+        <div className="mb-4 text-sm text-red-600">{categoriesError}</div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4">
         <div>
@@ -174,6 +243,33 @@ const AddCollections = () => {
             {...register('slug', { required: 'Slug is required' })}
           />
           {errors.slug && <p className="text-red-600 text-xs mt-1">{errors.slug.message}</p>}
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">Category *</label>
+          <Controller
+            name="categoryid"
+            control={control}
+            rules={{ required: 'Category is required' }}
+            render={({ field }) => (
+              <Select
+                options={categoryOptions}
+                value={categoryOptions.find((o) => o.value === field.value) || null}
+                onChange={(opt) => {
+                  field.onChange(opt ? opt.value : '');
+                  trigger('categoryid');
+                }}
+                placeholder={categories.length ? 'Select Category' : 'Loading...'}
+                isLoading={!categories.length}
+                isClearable
+                styles={customSelectStyles}
+                classNamePrefix="react-select"
+              />
+            )}
+          />
+          {errors.categoryid && (
+            <p className="text-red-600 text-xs mt-1">{errors.categoryid.message}</p>
+          )}
         </div>
 
         <div>

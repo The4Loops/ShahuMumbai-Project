@@ -136,7 +136,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
     (async () => {
       try {
         setLoadingCollections(true);
-        const { data } = await api.get("/api/admin/collections");
+        const { data } = await api.get("/api/collections");
         setCollections(Array.isArray(data) ? data : data?.collections || []);
       } catch (err) {
         toast.error(

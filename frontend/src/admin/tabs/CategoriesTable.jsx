@@ -38,6 +38,7 @@ export default function CategoriesTable() {
   const handleSaveEdit = async (e) => {
     e.preventDefault();
     const name = e.target.name.value.trim();
+    const image = e.target.image.files[0]; // Get the image file
 
     if (!name) {
       toast.error("Category name is required");
@@ -45,7 +46,30 @@ export default function CategoriesTable() {
     }
 
     try {
-      const payload = { name };
+      let imageUrl = editCategory.image || ''; // Use existing image URL if no new image is uploaded
+
+      // Handle image upload if a file is selected
+      if (image) {
+        const formData = new FormData();
+        formData.append('image', image);
+
+        const uploadResponse = await api.post('/api/upload/single', formData, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (uploadResponse.status === 200 || uploadResponse.status === 201) {
+          imageUrl = uploadResponse.data.url; // Assuming the response contains the URL in data.url
+        } else {
+          throw new Error('Image upload failed');
+        }
+      }
+
+      // Prepare payload for category update
+      const payload = { name, image: imageUrl || undefined };
+
       await api.put(`/api/category/${editCategory.categoryid}`, payload);
       fetchCategories();
       setEditCategory(null);
@@ -72,6 +96,9 @@ export default function CategoriesTable() {
   const filteredCategories = categories.filter((c) =>
     c.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const inputBase =
+    'w-full rounded-lg p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400';
 
   return (
     <div className="p-4 sm:p-6">
@@ -220,6 +247,19 @@ export default function CategoriesTable() {
                 <strong>Products Count:</strong>{" "}
                 {selectedCategory.products_count}
               </p>
+              {selectedCategory.image && (
+                <p>
+                  <strong>Image:</strong>{" "}
+                  <a
+                    href={selectedCategory.image}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    View Image
+                  </a>
+                </p>
+              )}
             </motion.div>
           </motion.div>
         )}
@@ -254,14 +294,52 @@ export default function CategoriesTable() {
               </h2>
               <div className="flex flex-col gap-4">
                 <div className="relative">
+                  <label
+                    htmlFor="name"
+                    className="block text-sm font-medium text-gray-600 mb-1"
+                  >
+                    Category Name *
+                  </label>
                   <input
                     name="name"
+                    id="name"
                     type="text"
                     defaultValue={editCategory.name}
                     placeholder="Category Name"
-                    className="peer w-full border border-gray-300 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-green-400"
+                    className={`${inputBase} peer`}
                     required
                   />
+                </div>
+                <div className="relative">
+                  <label
+                    htmlFor="image"
+                    className="block text-sm font-medium text-gray-600 mb-1"
+                  >
+                    Category Image (optional)
+                  </label>
+                  <input
+                    name="image"
+                    id="image"
+                    type="file"
+                    accept="image/*"
+                    className={inputBase}
+                  />
+                  {editCategory.image && (
+                    <p className="text-xs text-gray-600 mt-1">
+                      Current image:{" "}
+                      <a
+                        href={editCategory.image}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        View
+                      </a>
+                    </p>
+                  )}
+                  <p className="text-xs text-gray-600 mt-1">
+                    Upload a new image to replace the current one.
+                  </p>
                 </div>
               </div>
               <button

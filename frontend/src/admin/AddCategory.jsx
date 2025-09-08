@@ -21,7 +21,7 @@ const AddCategory = () => {
     watch,
     setValue,
   } = useForm({
-    defaultValues: { name: '', slug: '' },
+    defaultValues: { name: '', slug: '', image: null },
   });
 
   const [slugTouched, setSlugTouched] = useState(false);
@@ -36,9 +36,33 @@ const AddCategory = () => {
   const onSubmit = async (data) => {
     toast.dismiss();
     try {
-      // If your backend ONLY expects { name }, remove slug here:
-      // const payload = { name: data.name };
-      const payload = { name: data.name, slug: data.slug || slugify(data.name) };
+      let imageUrl = '';
+      
+      // Handle image upload if a file is selected
+      if (data.image && data.image[0]) {
+        const formData = new FormData();
+        formData.append('image', data.image[0]);
+
+        const uploadResponse = await api.post('/api/upload/single', formData, {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem('token')}`,
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        if (uploadResponse.status === 200 || uploadResponse.status === 201) {
+          imageUrl = uploadResponse.data.url; // Assuming the response contains the URL in data.url
+        } else {
+          throw new Error('Image upload failed');
+        }
+      }
+
+      // Prepare payload for category creation
+      const payload = {
+        name: data.name,
+        slug: data.slug || slugify(data.name),
+        image: imageUrl || undefined, // Include image URL if available
+      };
 
       const response = await api.post('/api/category', payload, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
@@ -46,7 +70,7 @@ const AddCategory = () => {
 
       if (response.status === 201) {
         toast.success('Category created successfully!');
-        reset({ name: '', slug: '' });
+        reset({ name: '', slug: '', image: null });
         setSlugTouched(false);
       }
     } catch (err) {
@@ -98,7 +122,6 @@ const AddCategory = () => {
             className={inputBase}
             onChange={(e) => {
               setSlugTouched(true);
-              // always keep it URL-safe
               setValue('slug', slugify(e.target.value));
             }}
             {...register('slug')}
@@ -106,12 +129,28 @@ const AddCategory = () => {
           <p className="text-xs text-[#6B4226]/60 mt-1">Leave blank to auto-generate.</p>
         </div>
 
+        {/* Image Upload */}
+        <div>
+          <label htmlFor="image" className="block text-sm font-medium text-[#6B4226] mb-1">
+            Category Image (optional)
+          </label>
+          <input
+            id="image"
+            type="file"
+            accept="image/*"
+            className={`${inputBase} ${errors.image ? 'border-red-500 ring-red-200' : ''}`}
+            {...register('image')}
+          />
+          <p className="text-xs text-[#6B4226]/60 mt-1">Upload an image for the category.</p>
+          {errors.image && <p className="text-red-600 text-xs mt-1">{errors.image.message}</p>}
+        </div>
+
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-end pt-2">
           <button
             type="button"
             onClick={() => {
-              reset({ name: '', slug: '' });
+              reset({ name: '', slug: '', image: null });
               setSlugTouched(false);
               toast.dismiss();
             }}

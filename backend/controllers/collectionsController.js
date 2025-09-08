@@ -94,24 +94,36 @@ exports.getCollection = async (req, res) => {
 // POST /api/collections
 exports.createCollection = async (req, res) => {
   try {
-    let { title, slug, description, cover_image, status, is_active } = req.body;
-    if (!title || !slug || !status) {
-      return res
-        .status(400)
-        .json({ error: "Missing required fields: title, slug, status" });
+    const { title, slug, description, cover_image, status, is_active, categoryid } = req.body;
+
+    // Validate required fields
+    if (!title || !slug || !status || !categoryid) {
+      return res.status(400).json({ error: "Missing required fields: title, slug, status, categoryid" });
     }
 
-    slug = String(slug).trim().toLowerCase();
+    // Validate slug format
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(slug)) {
+      return res.status(400).json({ error: "Slug must contain only lowercase letters, numbers, and hyphens" });
+    }
+
+    // Validate categoryid format (assuming UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(categoryid)) {
+      return res.status(400).json({ error: "Invalid category ID format" });
+    }
+
     const { data, error } = await supabase
       .from("collections")
       .insert([
         {
           title,
-          slug,
+          slug: String(slug).trim().toLowerCase(),
           description,
           cover_image,
           status: String(status).toUpperCase(),
           is_active: !!is_active,
+          categoryid,
         },
       ])
       .select()
@@ -121,9 +133,13 @@ exports.createCollection = async (req, res) => {
       if (error.code === "23505") {
         return res.status(400).json({ error: "Slug already exists" });
       }
+      if (error.code === "23503") {
+        return res.status(400).json({ error: "Invalid category ID: category does not exist" });
+      }
       throw error;
     }
-    return res.status(201).json(data);
+
+    return res.status(201).json({ message: "Collection created successfully", collection: data });
   } catch (e) {
     console.error("collections.createCollection error", e);
     return res.status(500).json({ error: "Internal server error" });
@@ -134,15 +150,28 @@ exports.createCollection = async (req, res) => {
 exports.updateCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    let { title, slug, description, cover_image, status, is_active } = req.body;
+    const { title, slug, description, cover_image, status, is_active, categoryid } = req.body;
 
     const updates = {};
     if (title !== undefined) updates.title = title;
-    if (slug !== undefined) updates.slug = String(slug).trim().toLowerCase();
+    if (slug !== undefined) {
+      updates.slug = String(slug).trim().toLowerCase();
+      const slugRegex = /^[a-z0-9-]+$/;
+      if (!slugRegex.test(slug)) {
+        return res.status(400).json({ error: "Slug must contain only lowercase letters, numbers, and hyphens" });
+      }
+    }
     if (description !== undefined) updates.description = description;
     if (cover_image !== undefined) updates.cover_image = cover_image;
     if (status !== undefined) updates.status = String(status).toUpperCase();
     if (is_active !== undefined) updates.is_active = !!is_active;
+    if (categoryid !== undefined) {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(categoryid)) {
+        return res.status(400).json({ error: "Invalid category ID format" });
+      }
+      updates.categoryid = categoryid;
+    }
 
     if (!Object.keys(updates).length) {
       return res.status(400).json({ error: "No fields to update" });
@@ -159,10 +188,16 @@ exports.updateCollection = async (req, res) => {
       if (error.code === "23505") {
         return res.status(400).json({ error: "Slug already exists" });
       }
+      if (error.code === "23503") {
+        return res.status(400).json({ error: "Invalid category ID: category does not exist" });
+      }
       throw error;
     }
-    if (!data) return res.status(404).json({ error: "Collection not found" });
-    return res.json(data);
+    if (!data) {
+      return res.status(404).json({ error: "Collection not found" });
+    }
+
+    return res.status(200).json({ message: "Collection updated successfully", collection: data });
   } catch (e) {
     console.error("collections.updateCollection error", e);
     return res.status(500).json({ error: "Internal server error" });

@@ -13,14 +13,14 @@ import frMC from "./locales/fr-MC.json";
 import hiIN from "./locales/hi-IN.json";
 
 const LANGUAGE_ALIASES = {
-  "en-GB": "en-UK",
   "en": "en-US",
   "es": "es-ES",
-  "fr": "fr-FR", // Map generic 'fr' to 'fr-FR'
+  "fr": "fr-FR",
   "hi": "hi-IN",
   "en-NZ": "en-AU",
   "en-IE": "en-UK",
-  "fr-CA": "fr-FR"
+  "fr-CA": "fr-FR",
+  "en-GB": "en-UK" // Explicitly map en-GB
 };
 
 const resources = {
@@ -49,7 +49,7 @@ i18n
       "fr-FR",
       "fr-MC",
       "hi-IN",
-      "en", // Include generic codes
+      "en",
       "es",
       "fr",
       "hi"
@@ -61,14 +61,17 @@ i18n
       lookupLocalStorage: "i18nextLng",
       caches: ["localStorage"],
       convertDetectedLanguage: (lng) => {
-        // Handle both full codes (e.g., fr-FR) and generic codes (e.g., fr)
-        const normalizedLng = lng.split("-")[0]; // Extract base language
-        return LANGUAGE_ALIASES[lng] || LANGUAGE_ALIASES[normalizedLng] || lng;
+        console.log("Detected language:", lng); // Debug
+        const normalizedLng = lng.split("-")[0];
+        const resolvedLng = LANGUAGE_ALIASES[lng] || LANGUAGE_ALIASES[normalizedLng] || lng;
+        console.log("Resolved language:", resolvedLng); // Debug
+        return resolvedLng;
       }
     }
   });
 
 i18n.on("languageChanged", (lng) => {
+  console.log("Language changed to:", lng); // Debug
   document.documentElement.setAttribute("lang", lng);
 });
 

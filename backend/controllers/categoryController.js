@@ -22,17 +22,39 @@ exports.createCategory = async (req, res) => {
   if (authError) return res.status(403).json({ message: authError });
 
   try {
-    const { name } = req.body;
-    if (!name)
-      return res.status(400).json({ message: "Category name is required" });
+    const { name, slug, image } = req.body;
 
+    // Validate inputs
+    if (!name) {
+      return res.status(400).json({ message: "Category name is required" });
+    }
+    if (!slug) {
+      return res.status(400).json({ message: "Slug is required" });
+    }
+
+    // Validate slug format
+    const slugRegex = /^[a-z0-9-]+$/;
+    if (!slugRegex.test(slug)) {
+      return res.status(400).json({ message: "Slug must contain only lowercase letters, numbers, and hyphens" });
+    }
+
+    // Optional: Validate image URL format if provided
+    if (image && !image.startsWith('http://')) {
+      return res.status(400).json({ message: "Invalid image URL" });
+    }
+
+    // Insert into Supabase
     const { data, error } = await supabase
       .from("categories")
-      .insert([{ name }])
+      .insert([{ name, slug, image }])
       .select();
 
-    if (error)
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(400).json({ message: "Slug already exists" });
+      }
       return res.status(400).json({ message: "Error adding category", error });
+    }
 
     res
       .status(201)
@@ -104,18 +126,25 @@ exports.updateCategory = async (req, res) => {
 
   try {
     const { id } = req.params;
-    const { name } = req.body;
+    const { name, slug, image } = req.body;
 
+    // Update in Supabase
     const { data, error } = await supabase
       .from("categories")
-      .update({ name })
-      .eq("categoryid", id)
+      .update({ name, slug, image })
+      .eq('categoryid', id)
       .select();
 
-    if (error || !data.length)
-      return res
-        .status(400)
-        .json({ message: "Error updating category", error });
+    if (error) {
+      if (error.code === '23505') {
+        return res.status(400).json({ message: "Slug already exists" });
+      }
+      return res.status(400).json({ message: "Error updating category", error });
+    }
+
+    if (!data || data.length === 0) {
+      return res.status(404).json({ message: "Category not found" });
+    }
 
     res
       .status(200)
