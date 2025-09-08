@@ -60,5 +60,46 @@
       "error": "Échec de l'inscription à la newsletter"
     },
     "copyright": "© Shahu Mumbai {{year}}. Tous droits réservés."
+  },
+  "navbar": {
+    "searchPlaceholder": "Rechercher",
+    "logoAlt": "Logo Shahu Mumbai",
+    "toggleMenu": "Basculer le menu",
+    "selectLanguage": "Sélectionner la langue",
+    "language": "Langue",
+    "cart": "Panier",
+    "account": {
+      "label": "Compte",
+      "profile": "Mon Profil",
+      "trackOrder": "Suivre la Commande",
+      "wishlist": "Liste de Souhaits",
+      "waitlist": "Liste d'Attente",
+      "logout": "Déconnexion"
+    },
+    "languages": {
+      "en-US": "Anglais (États-Unis)",
+      "en-AU": "Anglais (Australie)",
+      "en-CA": "Anglais (Canada)",
+      "en-UK": "Anglais (Royaume-Uni)",
+      "es-ES": "Espagnol (Espagne)",
+      "fr-FR": "Français (France)",
+      "fr-MC": "Français (Monaco)",
+      "hi-IN": "Hindi (Inde)"
+    },
+    "menus": {
+      "admin": "Administrateur"
+    },
+    "dropdown": {
+      "women": "Femmes",
+      "men": "Hommes",
+      "kids": "Enfants",
+      "shop": "Boutique",
+      "collections": "Collections"
+    },
+    "errors": {
+      "fetchMenus": "Échec du chargement des menus",
+      "fetchCart": "Échec de la récupération des articles du panier"
+    },
+    "logoutSuccess": "Déconnexion réussie"
   }
 }

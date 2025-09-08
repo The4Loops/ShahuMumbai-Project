@@ -60,5 +60,46 @@
       "error": "Failed to subscribe to the newsletter"
     },
     "copyright": "© Shahu Mumbai {{year}}. All rights reserved."
+  },
+  "navbar": {
+    "searchPlaceholder": "Buscar",
+    "logoAlt": "Logo de Shahu Mumbai",
+    "toggleMenu": "Alternar menú",
+    "selectLanguage": "Seleccionar idioma",
+    "language": "Idioma",
+    "cart": "Carrito",
+    "account": {
+      "label": "Cuenta",
+      "profile": "Mi Perfil",
+      "trackOrder": "Rastrear Pedido",
+      "wishlist": "Lista de Deseos",
+      "waitlist": "Lista de Espera",
+      "logout": "Cerrar Sesión"
+    },
+    "languages": {
+      "en-US": "Inglés (Estados Unidos)",
+      "en-AU": "Inglés (Australia)",
+      "en-CA": "Inglés (Canadá)",
+      "en-UK": "Inglés (Reino Unido)",
+      "es-ES": "Español (España)",
+      "fr-FR": "Francés (Francia)",
+      "fr-MC": "Francés (Mónaco)",
+      "hi-IN": "Hindi (India)"
+    },
+    "menus": {
+      "admin": "Administrador"
+    },
+    "dropdown": {
+      "women": "Mujeres",
+      "men": "Hombres",
+      "kids": "Niños",
+      "shop": "Tienda",
+      "collections": "Colecciones"
+    },
+    "errors": {
+      "fetchMenus": "Error al cargar los menús",
+      "fetchCart": "Error al obtener los elementos del carrito"
+    },
+    "logoutSuccess": "Sesión cerrada"
   }
 }

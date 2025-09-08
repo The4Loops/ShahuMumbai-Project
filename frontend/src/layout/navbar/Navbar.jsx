@@ -7,31 +7,34 @@ import Logo from "../../assets/ShahuLogo.png";
 import api from "../../supabase/axios";
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
-import "../../i18n"; 
+import "../../i18n";
 
 // Reusable Dropdown section
-export const DropdownSection = ({ title, links, onLinkClick }) => (
-  <div className="min-w-[180px] mt-4 first:mt-0">
-    {title && (
-      <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
-        {title.toUpperCase()}
-      </h3>
-    )}
-    <ul className="space-y-1">
-      {links?.map(({ label, href }) => (
-        <li key={label}>
-          <Link
-            to={href}
-            className="text-gray-700 hover:text-[#D4A5A5]"
-            onClick={onLinkClick}
-          >
-            {label}
-          </Link>
-        </li>
-      ))}
-    </ul>
-  </div>
-);
+export const DropdownSection = ({ title, links, onLinkClick }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="min-w-[180px] mt-4 first:mt-0">
+      {title && (
+        <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
+          {t(`navbar.dropdown.${title.toLowerCase().replace(/\s+/g, '_')}`, title).toUpperCase()}
+        </h3>
+      )}
+      <ul className="space-y-1">
+        {links?.map(({ label, href }) => (
+          <li key={label}>
+            <Link
+              to={href}
+              className="text-gray-700 hover:text-[#D4A5A5]"
+              onClick={onLinkClick}
+            >
+              {label} {/* Backend translates; no client-side t() needed */}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+};
 
 // Desktop dropdown wrapper
 export const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
@@ -61,7 +64,7 @@ export const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
           if (e.key === "Escape") setOpen(false);
         }}
       >
-        {label}
+        {label} {/* Backend translates */}
       </span>
 
       <AnimatePresence>
@@ -82,27 +85,20 @@ export const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
 };
 
 export default function Navbar() {
-  const { i18n /*, t*/ } = useTranslation();
+  const { i18n, t } = useTranslation();
 
   const LOCALES = [
-    { code: "en-US", label: "English (US)" },
-    { code: "en-CA", label: "English (CA)" },
-    { code: "en-AU", label: "English (AU)" },
-    { code: "en-UK", label: "English (UK)" },
-    { code: "es-ES", label: "Español (ES)" },
-    { code: "fr-FR", label: "Français (FR)" },
-    { code: "fr-MC", label: "Français (MC)" },
-    { code: "hi-IN", label: "हिंदी (IN)" },
+    { code: "en-US", label: t("navbar.languages.en-US") },
+    { code: "en-CA", label: t("navbar.languages.en-CA") },
+    { code: "en-AU", label: t("navbar.languages.en-AU") },
+    { code: "en-UK", label: t("navbar.languages.en-UK") },
+    { code: "es-ES", label: t("navbar.languages.es-ES") },
+    { code: "fr-FR", label: t("navbar.languages.fr-FR") },
+    { code: "fr-MC", label: t("navbar.languages.fr-MC") },
+    { code: "hi-IN", label: t("navbar.languages.hi-IN") },
   ];
 
   const [lang, setLang] = useState(i18n.language);
-  useEffect(() => setLang(i18n.language), [i18n.language]);
-  const changeLanguage = (lng) => {
-    i18n.changeLanguage(lng);
-    setLang(lng);
-    localStorage.setItem("lang", lng);
-  };
-
   const [menus, setMenus] = useState([]);
   const [dropdown, setDropdown] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -129,7 +125,7 @@ export default function Navbar() {
   const fetchMenuData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get("/api/navbar/menus");
+      const res = await api.get(`/api/navbar/menus?lang=${i18n.language}`);
       let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
 
       sorted = sorted.map((menu) => ({
@@ -142,19 +138,19 @@ export default function Navbar() {
       }));
 
       if (userRole !== "Admin") {
-        sorted = sorted.filter((m) => m.label.toLowerCase() !== "admin");
+        sorted = sorted.filter((m) => m.label.toLowerCase() !== t("navbar.menus.admin").toLowerCase());
       }
 
       setMenus(sorted);
       const initDrop = {};
       sorted.forEach((m) => (initDrop[m.id] = false));
-      setDropdown({ ...initDrop, account: false, lang: false }); // include lang
+      setDropdown({ ...initDrop, account: false, lang: false });
     } catch (err) {
-      toast.error(err.response?.data?.message || "Failed to load menus");
+      toast.error(err.response?.data?.message || t("navbar.errors.fetchMenus"));
     } finally {
       setIsLoading(false);
     }
-  }, [userRole]);
+  }, [userRole, i18n.language, t]);
 
   const fetchCartItemCount = useCallback(async () => {
     if (!token) {
@@ -165,10 +161,10 @@ export default function Navbar() {
       const response = await api.get("/api/cartById");
       setCartItemCount(response.data.length || 0);
     } catch (err) {
-      toast.error(err.response?.data?.error || "Failed to fetch cart items");
+      toast.error(err.response?.data?.error || t("navbar.errors.fetchCart"));
       setCartItemCount(0);
     }
-  }, [token]);
+  }, [token, t]);
 
   useEffect(() => {
     fetchMenuData();
@@ -194,7 +190,7 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.clear();
-    toast.success("Logged out");
+    toast.success(t("navbar.logoutSuccess"));
     navigate("/");
     setMobileMenuOpen(false);
   };
@@ -216,14 +212,14 @@ export default function Navbar() {
         >
           <img
             src={Logo}
-            alt="Shahu Mumbai Logo"
+            alt={t("navbar.logoAlt")}
             className="h-24 object-contain"
           />
         </Link>
         <button
           className="lg:hidden text-[#6B4226] p-2 ml-auto"
           onClick={() => setMobileMenuOpen((prev) => !prev)}
-          aria-label="Toggle menu"
+          aria-label={t("navbar.toggleMenu")}
         >
           {mobileMenuOpen ? <FaTimes size={26} /> : <FaBars size={26} />}
         </button>
@@ -235,7 +231,7 @@ export default function Navbar() {
         <div className="flex justify-start bg-transparent backdrop-blur-lg flex-[1]">
           <input
             type="text"
-            placeholder="Search"
+            placeholder={t("navbar.searchPlaceholder")}
             className="w-[300px] px-2 py-1.5 bg-transparent backdrop-blur-sm font-bold rounded-full border border-gray-300"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -315,10 +311,7 @@ export default function Navbar() {
         {/* Language + Account + Cart */}
         <ul className="flex items-center gap-6 justify-end flex-[1] relative">
           {/* Language dropdown (desktop) */}
-          <li
-            ref={(el) => (refs.current.lang = el)}
-            className="relative"
-          >
+          <li ref={(el) => (refs.current.lang = el)} className="relative">
             <button
               onClick={() =>
                 setDropdown((prev) => ({
@@ -326,9 +319,9 @@ export default function Navbar() {
                   lang: !prev.lang,
                 }))
               }
-              aria-label="Select language"
+              aria-label={t("navbar.selectLanguage")}
               className="flex items-center gap-2 text-[#6B4226] hover:text-[#D4A5A5]"
-              title="Select language"
+              title={t("navbar.selectLanguage")}
             >
               <FaGlobe size={18} />
               <span className="text-sm font-medium">{lang}</span>
@@ -350,7 +343,9 @@ export default function Navbar() {
                         <li key={l.code}>
                           <button
                             onClick={() => {
-                              changeLanguage(l.code);
+                              i18n.changeLanguage(l.code);
+                              setLang(l.code);
+                              localStorage.setItem("lang", l.code);
                               setDropdown((prev) => ({ ...prev, lang: false }));
                             }}
                             className={`w-full text-left px-3 py-2 rounded hover:bg-[#F7F0EE] ${
@@ -371,7 +366,7 @@ export default function Navbar() {
           {/* Account */}
           <li ref={(el) => (refs.current.account = el)}>
             <button
-              aria-label="Account"
+              aria-label={t("navbar.account.label")}
               onClick={() =>
                 !token
                   ? navigate("/account")
@@ -399,12 +394,12 @@ export default function Navbar() {
                   <ul className="space-y-2 text-sm">
                     <li>
                       <button onClick={() => handleProtectedClick("/profile")}>
-                        My Profile
+                        {t("navbar.account.profile")}
                       </button>
                     </li>
                     <li>
                       <button onClick={() => handleProtectedClick("/myorder")}>
-                        Track Order
+                        {t("navbar.account.trackOrder")}
                       </button>
                     </li>
                     <li>
@@ -412,7 +407,7 @@ export default function Navbar() {
                         to="/wishlist"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        Wishlist
+                        {t("navbar.account.wishlist")}
                       </Link>
                     </li>
                     <li>
@@ -420,11 +415,11 @@ export default function Navbar() {
                         to="/waitlist"
                         onClick={() => setMobileMenuOpen(false)}
                       >
-                        Waitlist
+                        {t("navbar.account.waitlist")}
                       </Link>
                     </li>
                     <li>
-                      <button onClick={handleLogout}>Logout</button>
+                      <button onClick={handleLogout}>{t("navbar.account.logout")}</button>
                     </li>
                   </ul>
                 </motion.div>
@@ -434,7 +429,11 @@ export default function Navbar() {
 
           {/* Cart */}
           <li className="relative">
-            <Link to="/cart" aria-label="Cart" className="text-[#6B4226] hover:text-[#D4A5A5]">
+            <Link
+              to="/cart"
+              aria-label={t("navbar.cart")}
+              className="text-[#6B4226] hover:text-[#D4A5A5]"
+            >
               <FaShoppingCart size={20} />
               {cartItemCount > 0 && (
                 <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
@@ -456,7 +455,7 @@ export default function Navbar() {
             transition={{ duration: 0.2 }}
             className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]"
           >
-            {/* Language (mobile, icon + list to match style) */}
+            {/* Language (mobile) */}
             <div className="border-b border-[#d4c4b6] pb-2">
               <button
                 className="w-full flex items-center justify-between py-2"
@@ -468,7 +467,7 @@ export default function Navbar() {
               >
                 <span className="flex items-center gap-2">
                   <FaGlobe />
-                  <span>Language</span>
+                  <span>{t("navbar.language")}</span>
                 </span>
                 <span>{mobileDropdownOpen === "lang" ? "−" : "+"}</span>
               </button>
@@ -487,7 +486,9 @@ export default function Navbar() {
                         <button
                           key={l.code}
                           onClick={() => {
-                            changeLanguage(l.code);
+                            i18n.changeLanguage(l.code);
+                            setLang(l.code);
+                            localStorage.setItem("lang", l.code);
                             setMobileDropdownOpen(null);
                           }}
                           className={`w-full text-left px-3 py-2 rounded ${
@@ -550,7 +551,7 @@ export default function Navbar() {
                                 <div key={section.title}>
                                   {section.title && (
                                     <p className="text-sm font-semibold text-[#6B4226] mt-2">
-                                      {section.title}
+                                      {t(`navbar.dropdown.${section.title.toLowerCase().replace(/\s+/g, '_')}`, section.title)}
                                     </p>
                                   )}
                                   {section.links.map(({ label, href }) => (
@@ -595,7 +596,7 @@ export default function Navbar() {
                       )
                 }
               >
-                <span>Account</span>
+                <span>{t("navbar.account.label")}</span>
                 <span>{mobileDropdownOpen === "account" ? "−" : "+"}</span>
               </button>
 
@@ -613,27 +614,34 @@ export default function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                       className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
                     >
-                      My Profile
+                      {t("navbar.account.profile")}
                     </Link>
                     <Link
                       to="/myorder"
                       onClick={() => setMobileMenuOpen(false)}
                       className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
                     >
-                      Track Order
+                      {t("navbar.account.trackOrder")}
                     </Link>
                     <Link
                       to="/wishlist"
                       onClick={() => setMobileMenuOpen(false)}
                       className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
                     >
-                      Wishlist
+                      {t("navbar.account.wishlist")}
+                    </Link>
+                    <Link
+                      to="/waitlist"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                    >
+                      {t("navbar.account.waitlist")}
                     </Link>
                     <button
                       onClick={handleLogout}
                       className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full"
                     >
-                      Logout
+                      {t("navbar.account.logout")}
                     </button>
                   </motion.div>
                 )}
@@ -646,7 +654,7 @@ export default function Navbar() {
               onClick={() => setMobileMenuOpen(false)}
               className="block py-2 border-b align-items-center border-[#d4c4b6] relative"
             >
-              Cart
+              {t("navbar.cart")}
               {cartItemCount > 0 && (
                 <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
                   {cartItemCount}
@@ -658,4 +666,4 @@ export default function Navbar() {
       </AnimatePresence>
     </nav>
   );
-}
+};
