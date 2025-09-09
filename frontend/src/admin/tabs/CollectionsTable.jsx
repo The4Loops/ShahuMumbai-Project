@@ -1,8 +1,8 @@
-// src/admin/tabs/CollectionsTable.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useContext } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Search, Edit, Trash2, Plus, X } from "lucide-react";
+import { Search, Trash2, Edit } from "lucide-react";
 import api from "../../supabase/axios";
+import { AdminActionsContext } from "../AdminActionsContext";
 
 function useSearch(rows, query, keys) {
   return useMemo(() => {
@@ -23,14 +23,11 @@ export default function CollectionsTable() {
   const [offset, setOffset] = useState(0);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const [searchQuery, setSearchQuery] = useState("");
   const [status, setStatus] = useState("");
   const [isActive, setIsActive] = useState("");
-
-  const [modalRow, setModalRow] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
   const [deleteRow, setDeleteRow] = useState(null);
+  const { openCollectionEditor } = useContext(AdminActionsContext);
 
   const filtered = useSearch(rows, searchQuery, ["title", "slug", "description"]);
   const page = Math.floor(offset / limit) + 1;
@@ -57,67 +54,18 @@ export default function CollectionsTable() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status, isActive, limit, offset]);
 
-  const openCreate = () => {
-    setIsEditing(false);
-    setModalRow({
-      title: "",
-      slug: "",
-      description: "",
-      cover_image: "",
-      status: "DRAFT",
-      is_active: true,
-    });
+  const handleCreate = () => {
+    openCollectionEditor(null);
   };
 
-  const openEdit = (r) => {
-    setIsEditing(true);
-    setModalRow({
-      id: r.id,
-      title: r.title ?? "",
-      slug: r.slug ?? "",
-      description: r.description ?? "",
-      cover_image: r.cover_image ?? "",
-      status: r.status ?? "DRAFT",
-      is_active: !!r.is_active,
-    });
-  };
-
-  const onSave = async () => {
-    if (!modalRow?.title || !modalRow?.slug) {
-      alert("Title and Slug are required");
-      return;
-    }
-    const payload = {
-      title: modalRow.title.trim(),
-      slug: modalRow.slug.trim().toLowerCase(),
-      description: modalRow.description || null,
-      cover_image: modalRow.cover_image || null,
-      status: modalRow.status || "DRAFT",
-      is_active: !!modalRow.is_active,
-    };
-    try {
-      if (isEditing && modalRow.id) {
-        await api.put(`/api/collections/${modalRow.id}`, payload);
-      } else {
-        await api.post(`/api/collections`, payload);
-        setOffset(0);
-      }
-      setModalRow(null);
-      load();
-    } catch (e) {
-      alert(e?.response?.data?.error || "Failed to save collection");
-    }
+  const handleEdit = (r) => {
+    openCollectionEditor(r.id);
   };
 
   const onDelete = async () => {
     if (!deleteRow) return;
-    if (!window.confirm(`Delete collection "${deleteRow.title}"?`)) {
-      setDeleteRow(null);
-      return;
-    }
     try {
       await api.delete(`/api/collections/${deleteRow.id}`);
       setDeleteRow(null);
@@ -178,14 +126,6 @@ export default function CollectionsTable() {
             <option value="false">Inactive</option>
           </select>
         </div>
-
-        <button
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 h-10 px-4 rounded-md bg-blue-600 text-white self-start"
-        >
-          <Plus size={16} />
-          New Collection
-        </button>
       </div>
 
       {/* Load/Error */}
@@ -246,7 +186,7 @@ export default function CollectionsTable() {
                   <td className="px-3 py-2">
                     <div className="flex items-center gap-2">
                       <button
-                        onClick={() => openEdit(r)}
+                        onClick={() => handleEdit(r)}
                         className="p-2 rounded hover:bg-gray-100 transition"
                         title="Edit"
                       >
@@ -308,31 +248,38 @@ export default function CollectionsTable() {
         </div>
       </div>
 
-      {/* Modals (Add/Edit + Delete) — unchanged from earlier snippet, using window.confirm */}
-      <AnimatePresence>
-        {modalRow && (
-          <motion.div className="fixed inset-0 flex items-end md:items-center justify-center bg-black bg-opacity-50 z-50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="bg-white rounded-t-xl md:rounded-xl shadow-xl p-6 w-full md:w-[640px] relative" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
-              <button onClick={() => setModalRow(null)} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600">
-                <X size={20} />
-              </button>
-              <h2 className="text-lg font-semibold mb-4">{isEditing ? "Edit Collection" : "New Collection"}</h2>
-              {/* form inputs exactly as above */}
-              {/* ... keep the inputs & Save/Cancel buttons from the previous block ... */}
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
+      {/* Delete Confirmation Modal */}
       <AnimatePresence>
         {deleteRow && (
-          <motion.div className="fixed inset-0 flex items-end md:items-center justify-center bg-black bg-opacity-50 z-50" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="bg-white rounded-t-xl md:rounded-xl shadow-xl p-6 w-full md:w-[420px]" initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
+          <motion.div
+            className="fixed inset-0 flex items-end md:items-center justify-center bg-black bg-opacity-50 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-t-xl md:rounded-xl shadow-xl p-6 w-full md:w-[420px]"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+            >
               <h3 className="text-lg font-semibold mb-2">Delete Collection</h3>
-              <p className="text-gray-700 mb-4">Are you sure you want to delete <strong>{deleteRow.title}</strong>?</p>
+              <p className="text-gray-700 mb-4">
+                Are you sure you want to delete <strong>{deleteRow.title}</strong>?
+              </p>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setDeleteRow(null)} className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition">Cancel</button>
-                <button onClick={onDelete} className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition font-semibold">Delete</button>
+                <button
+                  onClick={() => setDeleteRow(null)}
+                  className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={onDelete}
+                  className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition font-semibold"
+                >
+                  Delete
+                </button>
               </div>
             </motion.div>
           </motion.div>

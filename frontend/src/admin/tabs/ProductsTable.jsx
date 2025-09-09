@@ -109,7 +109,7 @@ function ProductsTab() {
         );
 
         // Fetch collections
-        const { data: collectionData } = await api.get("/api/admin/collections");
+        const { data: collectionData } = await api.get("/api/collections");
         if (!alive) return;
 
         const collectionList = Array.isArray(collectionData)

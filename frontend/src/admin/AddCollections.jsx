@@ -35,7 +35,7 @@ const AddCollections = () => {
       status: 'DRAFT',
       is_active: true,
       cover_image: null,
-      categoryid: '',
+      categoryids: [], // Changed from categoryid to categoryids array
     },
   });
 
@@ -83,15 +83,15 @@ const AddCollections = () => {
     if (!isEdit) return;
     (async () => {
       try {
-        const { data } = await api.get(`/api/admin/collections/${id}`);
+        const { data } = await api.get(`/api/collections/${id}`);
         reset({
           title: data.title,
           slug: data.slug,
           description: data.description || '',
           status: data.status || 'DRAFT',
           is_active: data.is_active,
-          cover_image: null, // Reset file input
-          categoryid: data.categoryid || '',
+          cover_image: null,
+          categoryids: data.categoryids || [], // Changed to categoryids array
         });
         setExistingCover(data.cover_image || null);
         setPreview(data.cover_image || null);
@@ -109,7 +109,6 @@ const AddCollections = () => {
 
       // If a new file was chosen, upload it
       if (form.cover_image && form.cover_image[0]) {
-        // Validate file
         const file = form.cover_image[0];
         const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
         if (!validTypes.includes(file.type)) {
@@ -131,7 +130,7 @@ const AddCollections = () => {
             Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
         });
-        cover_url = data.url; // Adjusted to match expected response
+        cover_url = data.url;
       }
 
       const payload = {
@@ -141,15 +140,15 @@ const AddCollections = () => {
         cover_image: cover_url,
         status: form.status,
         is_active: !!form.is_active,
-        categoryid: form.categoryid || null,
+        categoryids: form.categoryids || [], // Changed to categoryids array
       };
 
       if (isEdit) {
-        await api.put(`/api/admin/collections/${id}`, payload);
+        await api.put(`/api/collections/${id}`, payload);
         toast.success('Collection updated!');
-        navigate('/admin/collections');
+        navigate('/collections');
       } else {
-        await api.post('/api/admin/collections', payload);
+        await api.post('/api/collections', payload);
         toast.success('Collection created!');
         reset({
           title: '',
@@ -158,7 +157,7 @@ const AddCollections = () => {
           status: 'DRAFT',
           is_active: true,
           cover_image: null,
-          categoryid: '',
+          categoryids: [],
         });
         setExistingCover(null);
         setPreview(null);
@@ -181,7 +180,7 @@ const AddCollections = () => {
         minHeight: 44,
         borderRadius: 6,
         backgroundColor: '#FFFFFF',
-        border: errors.categoryid ? '1px solid #EF4444' : '1px solid #E6DCD2',
+        border: errors.categoryids ? '1px solid #EF4444' : '1px solid #E6DCD2',
         boxShadow: s.isFocused ? '0 0 0 2px #D4A5A5' : 'none',
         '&:hover': { borderColor: '#D4A5A5' },
       }),
@@ -206,7 +205,7 @@ const AddCollections = () => {
         '&:hover': { color: '#C39898' },
       }),
     }),
-    [errors.categoryid]
+    [errors.categoryids]
   );
 
   const categoryOptions = categories.map((c) => ({
@@ -224,7 +223,7 @@ const AddCollections = () => {
         <div className="mb-4 text-sm text-red-600">{categoriesError}</div>
       )}
 
-      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 gap-4">
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">Title *</label>
           <input
@@ -246,20 +245,21 @@ const AddCollections = () => {
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">Category *</label>
+          <label className="block text-sm font-medium text-[#6B4226] mb-1">Categories *</label>
           <Controller
-            name="categoryid"
+            name="categoryids"
             control={control}
-            rules={{ required: 'Category is required' }}
+            rules={{ required: 'At least one category is required' }}
             render={({ field }) => (
               <Select
+                isMulti
                 options={categoryOptions}
-                value={categoryOptions.find((o) => o.value === field.value) || null}
-                onChange={(opt) => {
-                  field.onChange(opt ? opt.value : '');
-                  trigger('categoryid');
+                value={categoryOptions.filter((o) => field.value?.includes(o.value))}
+                onChange={(opts) => {
+                  field.onChange(opts ? opts.map((o) => o.value) : []);
+                  trigger('categoryids');
                 }}
-                placeholder={categories.length ? 'Select Category' : 'Loading...'}
+                placeholder={categories.length ? 'Select Categories' : 'Loading...'}
                 isLoading={!categories.length}
                 isClearable
                 styles={customSelectStyles}
@@ -267,8 +267,8 @@ const AddCollections = () => {
               />
             )}
           />
-          {errors.categoryid && (
-            <p className="text-red-600 text-xs mt-1">{errors.categoryid.message}</p>
+          {errors.categoryids && (
+            <p className="text-red-600 text-xs mt-1">{errors.categoryids.message}</p>
           )}
         </div>
 
@@ -326,14 +326,15 @@ const AddCollections = () => {
 
         <div>
           <button
-            type="submit"
+            type="button"
+            onClick={handleSubmit(onSubmit)}
             disabled={isSubmitting}
             className="w-full bg-[#D4A5A5] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow disabled:opacity-50"
           >
             {isSubmitting ? (isEdit ? 'Updating…' : 'Creating…') : (isEdit ? 'Update Collection' : 'Create Collection')}
           </button>
         </div>
-      </form>
+      </div>
     </div>
   );
 };

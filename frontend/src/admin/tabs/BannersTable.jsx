@@ -1,78 +1,63 @@
-import React, { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import { Pencil, X, Search } from "lucide-react";
+import React, { useState, useEffect, useMemo, useContext } from "react";
+import { Search, Edit, } from "lucide-react";
+import api from "../../supabase/axios";
+import { AdminActionsContext } from "../AdminActionsContext";
+
+function useSearch(rows, query, keys) {
+  return useMemo(() => {
+    const q = (query || "").toLowerCase().trim();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      keys.some((k) => String(r?.[k] ?? "").toLowerCase().includes(q))
+    );
+  }, [rows, query, keys]);
+}
 
 const BannerCards = () => {
-  const [banners, setBanners] = useState([
-    {
-      id: 1,
-      title: "Summer Sale",
-      description: "Up to 50% off on electronics",
-      status: "Active",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      id: 2,
-      title: "New Arrivals",
-      description: "Check out the latest products",
-      status: "Inactive",
-      image: "https://via.placeholder.com/150",
-    },
-    {
-      id: 3,
-      title: "Festive Offer",
-      description: "Special discounts for Diwali",
-      status: "Active",
-      image: "https://via.placeholder.com/150",
-    },
-  ]);
-
-  const [editingBanner, setEditingBanner] = useState(null);
-  const [formData, setFormData] = useState({
-    title: "",
-    description: "",
-    status: "Active",
-    image: "",
-  });
+  const [banners, setBanners] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
+  const { openBannerEditor } = useContext(AdminActionsContext);
+
+  const filteredBanners = useSearch(banners, search, ["title", "description"]);
+
+  useEffect(() => {
+    let alive = true;
+    const fetchBanners = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const { data } = await api.get("/api/banners");
+        if (!alive) return;
+        const bannerList = Array.isArray(data) ? data : data?.banners || [];
+        setBanners(bannerList);
+      } catch (e) {
+        if (!alive) return;
+        setError(e?.response?.data?.error || "Failed to load banners");
+      } finally {
+        if (alive) setLoading(false);
+      }
+    };
+    fetchBanners();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   const handleEdit = (banner) => {
-    setEditingBanner(banner);
-    setFormData(banner);
+    openBannerEditor(banner.id);
   };
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFormData({
-        ...formData,
-        image: URL.createObjectURL(file),
-      });
-    }
-  };
-
-  const handleSave = () => {
-    setBanners((prev) =>
-      prev.map((b) => (b.id === editingBanner.id ? formData : b))
-    );
-    setEditingBanner(null);
-  };
-
-  // Filter banners by search text
-  const filteredBanners = banners.filter(
-    (b) =>
-      b.title.toLowerCase().includes(search.toLowerCase()) ||
-      b.description.toLowerCase().includes(search.toLowerCase())
-  );
 
   return (
     <div className="p-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
         <h2 className="text-xl font-semibold">Banners</h2>
-
-        {/* Search Bar */}
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+          <Search
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+            size={18}
+          />
           <input
             type="text"
             placeholder="Search banners..."
@@ -82,8 +67,8 @@ const BannerCards = () => {
           />
         </div>
       </div>
-
-      {/* Cards grid */}
+      {loading && <div className="text-sm text-gray-500 mb-4">Loading banners…</div>}
+      {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredBanners.length > 0 ? (
           filteredBanners.map((banner) => (
@@ -92,7 +77,7 @@ const BannerCards = () => {
               className="border rounded-xl shadow-sm hover:shadow-md transition p-4 bg-white flex flex-col"
             >
               <img
-                src={banner.image}
+                src={banner.image_url}
                 alt={banner.title}
                 className="w-full h-40 object-cover rounded-lg"
               />
@@ -109,12 +94,12 @@ const BannerCards = () => {
                   {banner.status}
                 </span>
               </div>
-              <div className="mt-4 flex justify-end">
+              <div className="mt-4 flex justify-end gap-2">
                 <button
                   onClick={() => handleEdit(banner)}
                   className="p-2 rounded bg-blue-500 hover:bg-blue-600 text-white"
                 >
-                  <Pencil size={16} />
+                  <Edit size={16} />
                 </button>
               </div>
             </div>
@@ -125,106 +110,6 @@ const BannerCards = () => {
           </p>
         )}
       </div>
-
-      {/* Edit Modal */}
-      <AnimatePresence>
-        {editingBanner && (
-          <motion.div
-            className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.div
-              className="bg-white rounded-2xl shadow-lg w-full max-w-lg p-6 relative"
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-            >
-              {/* Close button */}
-              <button
-                onClick={() => setEditingBanner(null)}
-                className="absolute top-3 right-3 p-2 rounded-full hover:bg-gray-100"
-              >
-                <X size={20} />
-              </button>
-
-              <h3 className="text-lg font-semibold mb-4">Edit Banner</h3>
-
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium mb-1">Title</label>
-                  <input
-                    type="text"
-                    value={formData.title}
-                    onChange={(e) =>
-                      setFormData({ ...formData, title: e.target.value })
-                    }
-                    className="w-full border rounded-lg p-2"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) =>
-                      setFormData({ ...formData, description: e.target.value })
-                    }
-                    className="w-full border rounded-lg p-2"
-                    rows="3"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">Status</label>
-                  <select
-                    value={formData.status}
-                    onChange={(e) =>
-                      setFormData({ ...formData, status: e.target.value })
-                    }
-                    className="w-full border rounded-lg p-2"
-                  >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Upload Image
-                  </label>
-                  <input type="file" onChange={handleImageChange} />
-                  {formData.image && (
-                    <img
-                      src={formData.image}
-                      alt="Preview"
-                      className="w-24 h-24 mt-2 rounded-md object-cover"
-                    />
-                  )}
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 mt-6">
-                <button
-                  onClick={() => setEditingBanner(null)}
-                  className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 };

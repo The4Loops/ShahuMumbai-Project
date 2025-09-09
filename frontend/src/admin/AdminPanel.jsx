@@ -19,7 +19,6 @@ import News from "./News";
 import AddCollections from "./AddCollections";
 import { FiGrid } from "react-icons/fi";
 import { AdminActionsContext } from "./AdminActionsContext";
-
 import {
   FaBars,
   FaTimes,
@@ -35,8 +34,6 @@ import { MdOutlineCategory, MdOutlineAnalytics, MdInventory2 } from "react-icons
 import { TbReportAnalytics, TbUsersGroup } from "react-icons/tb";
 import { FiPackage, FiMenu, FiMail } from "react-icons/fi";
 import { AiOutlineTable, AiOutlineTeam } from "react-icons/ai";
-
-// Small dashboard chart
 import {
   LineChart,
   Line,
@@ -50,13 +47,10 @@ import {
 const API_BASE = process.env.REACT_APP_SERVER_API_BASE_URL || "";
 const apiUrl = (path, params) => `${API_BASE}${path}${params ? `?${params}` : ""}`;
 
-// currency helper (keep yours)
 const formatINR = (n) =>
   typeof n === "number" && !Number.isNaN(n)
     ? `₹${Math.round(n).toLocaleString("en-IN")}`
     : "₹0";
-
-
 
 const MENU_REGISTRY = [
   { id: "Order Dashboard", label: "Order Dashboard", icon: FiPackage, category: "Orders", component: OrderDashboard },
@@ -76,7 +70,6 @@ const MENU_REGISTRY = [
   { id: "Subscribers Table", label: "Subscribers Table Management", icon: AiOutlineTable, category: "Utilities", component: SubscribersTable },
   { id: "News", label: "News Management", icon: AiOutlineTable, category: "Utilities", component: News },
   { id: "Add Collections", label: "Add Collections", icon: FiGrid, category: "Catalog", component: AddCollections },
-
 ];
 
 const getInitialFavorites = () => {
@@ -86,7 +79,9 @@ const getInitialFavorites = () => {
   } catch {}
   return ["Order Dashboard", "Sales Report", "Add Product"];
 };
+
 const saveFavorites = (list) => localStorage.setItem("admin.favorites", JSON.stringify(list));
+
 const useIsMobile = () => {
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -98,18 +93,16 @@ const useIsMobile = () => {
   return isMobile;
 };
 
-
 const AdminPanel = () => {
   const isMobile = useIsMobile();
-
-  // null = show Dashboard; otherwise show page by id
   const [activeId, setActiveId] = useState(null);
   const [favorites, setFavorites] = useState(getInitialFavorites);
-  const [sidebarOpen, setSidebarOpen] = useState(true); // collapsible menu
-  const [drawerOpen, setDrawerOpen] = useState(false); // mobile
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [editProductId, setEditProductId] = useState(null);
   const [editCollectionId, setEditCollectionId] = useState(null);
+  const [editBannerId, setEditBannerId] = useState(null);
 
   const isFavorite = (id) => favorites.includes(id);
   const toggleFavorite = (id) => {
@@ -124,12 +117,16 @@ const AdminPanel = () => {
     setEditProductId(id ?? null);
     setActiveId("Add Product");
   };
+
   const openCollectionEditor = (id) => {
-   setEditCollectionId(id ?? null);
-   setActiveId("Add Collections");
-   };
+    setEditCollectionId(id ?? null);
+    setActiveId("Add Collections");
+  };
 
-
+  const openBannerEditor = (id) => {
+    setEditBannerId(id ?? null);
+    setActiveId("Add Banners");
+  };
 
   useEffect(() => {
     const onK = (e) => {
@@ -149,7 +146,6 @@ const AdminPanel = () => {
   );
   const ActiveComponent = activeItem?.component;
 
-  // Group menu by category for shorter menu (accordion-style)
   const grouped = useMemo(() => {
     const map = new Map();
     MENU_REGISTRY.forEach((it) => {
@@ -162,104 +158,93 @@ const AdminPanel = () => {
 
   return (
     <Layout>
-      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor }}>
-      <div className="min-h-screen bg-[#f7f5f2]">
-        {/* Header */}
-        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[#EAD8D8]">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
-            {/* Collapser / Drawer */}
-            <button
-              className="text-[#6B4226] text-xl p-2 border border-[#EAD8D8] rounded-lg"
-              onClick={() => (isMobile ? setDrawerOpen(true) : setSidebarOpen((v) => !v))}
-              aria-label="Toggle Navigation"
-            >
-              {isMobile ? <FaBars /> : sidebarOpen ? <FaChevronLeft /> : <FaChevronRight />}
-            </button>
-
-            {/* Brand */}
-            <button
-              className="flex items-center gap-2"
-              onClick={() => setActiveId(null)}
-              title="Go to Dashboard"
-            >
-              <FaHome className="text-[#6B4226]" />
-              <div className="font-semibold text-[#6B4226]">Admin</div>
-              <span className="text-gray-400">/</span>
-              <div className="text-gray-700">
-                {activeItem ? activeItem.label : "Dashboard"}
+      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor, openBannerEditor }}>
+        <div className="min-h-screen bg-[#f7f5f2]">
+          <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[#EAD8D8]">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
+              <button
+                className="text-[#6B4226] text-xl p-2 border border-[#EAD8D8] rounded-lg"
+                onClick={() => (isMobile ? setDrawerOpen(true) : setSidebarOpen((v) => !v))}
+                aria-label="Toggle Navigation"
+              >
+                {isMobile ? <FaBars /> : sidebarOpen ? <FaChevronLeft /> : <FaChevronRight />}
+              </button>
+              <button
+                className="flex items-center gap-2"
+                onClick={() => setActiveId(null)}
+                title="Go to Dashboard"
+              >
+                <FaHome className="text-[#6B4226]" />
+                <div className="font-semibold text-[#6B4226]">Admin</div>
+                <span className="text-gray-400">/</span>
+                <div className="text-gray-700">
+                  {activeItem ? activeItem.label : "Dashboard"}
+                </div>
+              </button>
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => setPaletteOpen(true)}
+                  className="hidden sm:flex items-center gap-2 px-3 py-2 border rounded-lg text-gray-600 hover:bg-gray-50"
+                  title="Search tools"
+                >
+                  <FaSearch />
+                  <span className="text-sm">Search</span>
+                </button>
+                <button
+                  onClick={() => setPaletteOpen(true)}
+                  className="sm:hidden p-2 border rounded-lg text-gray-600 hover:bg-gray-50"
+                  aria-label="Search"
+                >
+                  <FaSearch />
+                </button>
+                <button className="p-2 border rounded-lg text-gray-600 hover:bg-gray-50" title="Notifications">
+                  <FaBell />
+                </button>
               </div>
-            </button>
-
-            {/* Right actions */}
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                onClick={() => setPaletteOpen(true)}
-                className="hidden sm:flex items-center gap-2 px-3 py-2 border rounded-lg text-gray-600 hover:bg-gray-50"
-                title="Search tools"
-              >
-                <FaSearch />
-                <span className="text-sm">Search</span>
-              </button>
-              <button
-                onClick={() => setPaletteOpen(true)}
-                className="sm:hidden p-2 border rounded-lg text-gray-600 hover:bg-gray-50"
-                aria-label="Search"
-              >
-                <FaSearch />
-              </button>
-              <button className="p-2 border rounded-lg text-gray-600 hover:bg-gray-50" title="Notifications">
-                <FaBell />
-              </button>
             </div>
-          </div>
-        </header>
-
-        {/* Body */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-          <div className="flex gap-6">
-            {/* Collapsible Sidebar / Drawer */}
-            {!isMobile ? (
-              <Sidebar
-                open={sidebarOpen}
-                favorites={favorites}
-                grouped={grouped}
-                activeId={activeId}
-                onOpen={(id) => setActiveId(id)}
-                toggleFavorite={toggleFavorite}
-              />
-            ) : (
-              drawerOpen && (
-                <>
-                  <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDrawerOpen(false)} />
-                  <div className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#EAD8D8] rounded-r-xl">
-                    <div className="flex items-center justify-between mb-4">
-                      <h2 className="text-lg font-semibold text-[#6B4226]">Menu</h2>
-                      <button
-                        className="text-[#6B4226] text-xl border border-[#EAD8D8] px-2 py-1 rounded-md"
-                        onClick={() => setDrawerOpen(false)}
-                        aria-label="Close Sidebar"
-                      >
-                        <FaTimes />
-                      </button>
+          </header>
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+            <div className="flex gap-6">
+              {!isMobile ? (
+                <Sidebar
+                  open={sidebarOpen}
+                  favorites={favorites}
+                  grouped={grouped}
+                  activeId={activeId}
+                  onOpen={(id) => setActiveId(id)}
+                  toggleFavorite={toggleFavorite}
+                />
+              ) : (
+                drawerOpen && (
+                  <>
+                    <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDrawerOpen(false)} />
+                    <div className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#EAD8D8] rounded-r-xl">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-[#6B4226]">Menu</h2>
+                        <button
+                          className="text-[#6B4226] text-xl border border-[#EAD8D8] px-2 py-1 rounded-md"
+                          onClick={() => setDrawerOpen(false)}
+                          aria-label="Close Sidebar"
+                        >
+                          <FaTimes />
+                        </button>
+                      </div>
+                      <Sidebar
+                        open={true}
+                        favorites={favorites}
+                        grouped={grouped}
+                        activeId={activeId}
+                        onOpen={(id) => {
+                          setActiveId(id);
+                          setDrawerOpen(false);
+                        }}
+                        toggleFavorite={toggleFavorite}
+                        asDrawer
+                      />
                     </div>
-                    <Sidebar
-                      open={true}
-                      favorites={favorites}
-                      grouped={grouped}
-                      activeId={activeId}
-                      onOpen={(id) => {
-                        setActiveId(id);
-                        setDrawerOpen(false);
-                      }}
-                      toggleFavorite={toggleFavorite}
-                      asDrawer
-                    />
-                  </div>
-                </>
-              )
-            )}
-
-            {/* Content */}
+                  </>
+                )
+              )}
               <main className="flex-1">
                 {!activeItem ? (
                   <Dashboard
@@ -284,45 +269,38 @@ const AdminPanel = () => {
                         </span>
                       </button>
                     </div>
-
-                    {/* ✅ Render exactly ONE component */}
                     {activeItem.id === "Add Product" ? (
                       <AddProduct editId={editProductId} onSaved={() => setEditProductId(null)} />
                     ) : activeItem.id === "Add Collections" ? (
                       <AddCollections editId={editCollectionId} onSaved={() => setEditCollectionId(null)} />
+                    ) : activeItem.id === "Add Banners" ? (
+                      <BannerManager editId={editBannerId} onSaved={() => setEditBannerId(null)} />
                     ) : (
                       <activeItem.component />
                     )}
                   </section>
                 )}
               </main>
-
+            </div>
           </div>
+          {paletteOpen && (
+            <Palette
+              items={MENU_REGISTRY}
+              onClose={() => setPaletteOpen(false)}
+              onSelect={(id) => {
+                setActiveId(id);
+                setPaletteOpen(false);
+              }}
+            />
+          )}
         </div>
-      </div>
-
-      {/* Simple, minimal Command Palette */}
-      {paletteOpen && (
-        <Palette
-          items={MENU_REGISTRY}
-          onClose={() => setPaletteOpen(false)}
-          onSelect={(id) => {
-            setActiveId(id);
-            setPaletteOpen(false);
-          }}
-        />
-      )}
       </AdminActionsContext.Provider>
     </Layout>
   );
 };
 
-export default AdminPanel;
-
-
 const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, asDrawer }) => {
-  // Accordion open/close per category (keep short to reduce scroll)
-  const defaultOpen = new Set(grouped.slice(0, 2).map(([k]) => k)); // first 2 categories open
+  const defaultOpen = new Set(grouped.slice(0, 2).map(([k]) => k));
   const [openCats, setOpenCats] = useState(defaultOpen);
 
   const toggleCat = (c) => {
@@ -333,12 +311,9 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
 
   return (
     <aside
-      className={`${
-        asDrawer ? "" : "sticky top-24"
-      } ${open ? "w-64" : "w-16"} transition-all duration-200`}
+      className={`${asDrawer ? "" : "sticky top-24"} ${open ? "w-64" : "w-16"} transition-all duration-200`}
     >
       <div className="bg-white border border-[#EAD8D8] rounded-2xl shadow p-3">
-        {/* Favorites (small) */}
         <div className="mb-2">
           <div className={`text-xs uppercase tracking-wide text-gray-400 ${open ? "px-1" : "text-center"}`}>
             Favorites
@@ -375,10 +350,7 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
             })}
           </div>
         </div>
-
         <div className="h-px bg-gray-200 my-2" />
-
-        {/* Categories (accordion) */}
         <div className={`space-y-2 ${open ? "" : "flex flex-col items-center"}`}>
           {grouped.map(([cat, items]) => (
             <div key={cat} className="w-full">
@@ -409,7 +381,6 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
                           </button>
                         );
                       })}
-                     
                       {items.length > 6 && (
                         <div className="px-2 text-xs text-gray-500">+ {items.length - 6} more (use Search)</div>
                       )}
@@ -431,15 +402,11 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
   );
 };
 
-
-
 const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
-  // state that replaces mock data
   const [kpiCards, setKpiCards] = useState([]);
-  const [sales, setSales] = useState([]); // [{ d, v }]
-  const [topProducts, setTopProducts] = useState([]); // [{ id, name, sales }]
-  const [recentOrders, setRecentOrders] = useState([]); // [{ id, customer, total, status }]
-
+  const [sales, setSales] = useState([]);
+  const [topProducts, setTopProducts] = useState([]);
+  const [recentOrders, setRecentOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -448,24 +415,18 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
       try {
         setLoading(true);
         setError("");
-
-        // --- date window (last 30d)
         const from = new Date(Date.now() - 29 * 24 * 3600 * 1000).toISOString().slice(0, 10);
         const to = new Date().toISOString().slice(0, 10);
-
-        // 1) Summary (KPIs + Top Products)
         const p1 = new URLSearchParams({ from, to, top_limit: "5" });
         const r1 = await fetch(apiUrl('/api/dashboard/summary', p1.toString()));
         if (!r1.ok) throw new Error('summary fetch failed');
         const { kpis, topProducts: tp } = await r1.json();
-
         setKpiCards([
           { label: "Revenue (30d)", value: formatINR(Number(kpis?.revenue_30d || 0)), diff: "" },
           { label: "Orders (30d)", value: String(kpis?.orders_30d ?? 0), diff: "" },
           { label: "Avg. Order", value: formatINR(Number(kpis?.avg_order_value || 0)), diff: "" },
           { label: "Refunds", value: `${Number(kpis?.refund_rate_pct || 0).toFixed(1)}%`, diff: "" },
         ]);
-
         setTopProducts(
           (tp || []).map((t, i) => ({
             id: i + 1,
@@ -473,8 +434,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             sales: Number(t.qty || t.purchases || 0),
           }))
         );
-
-        // 2) Sales chart (revenue)
         const p2 = new URLSearchParams({ from, to, metric: "revenue" });
         const r2 = await fetch(apiUrl('/api/dashboard/sales', p2.toString()));
         if (!r2.ok) throw new Error('sales fetch failed');
@@ -485,8 +444,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             v: Number(row.value || 0),
           }))
         );
-
-        // 3) Recent orders
         const r3 = await fetch(apiUrl('/api/dashboard/recent-orders', 'limit=5'));
         if (!r3.ok) throw new Error('recent-orders fetch failed');
         const j3 = await r3.json();
@@ -509,7 +466,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
 
   return (
     <div className="space-y-6">
-      {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {(loading && !kpiCards.length ? Array.from({ length: 4 }).map((_, i) => (
           <div key={i} className="rounded-2xl border border-[#EAD8D8] bg-white p-4 animate-pulse h-24" />
@@ -527,10 +483,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
           ) : null
         )}
       </div>
-
-      {/* Middle: Sales + Top Products */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {/* Sales Chart (span 2) */}
         <div className="xl:col-span-2 rounded-2xl border border-[#EAD8D8] bg-white p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-[#6B4226]">Sales (Last 2 Weeks)</h3>
@@ -557,8 +510,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             )}
           </div>
         </div>
-
-        {/* Top Products (compact list) */}
         <div className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-lg font-semibold text-[#6B4226]">Top Products</h3>
@@ -590,8 +541,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
           </ul>
         </div>
       </div>
-
-      {/* Recent Orders (small table) */}
       <div className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-semibold text-[#6B4226]">Recent Orders</h3>
@@ -602,9 +551,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             View All
           </button>
         </div>
-
         {error && <div className="text-sm text-red-600 mb-2">{error}</div>}
-
         <div className="max-h-60 overflow-auto">
           {loading && !recentOrders.length ? (
             <div className="h-32 animate-pulse bg-gray-100 rounded-lg" />
@@ -646,8 +593,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
           )}
         </div>
       </div>
-
-      {/* Quick Launch (unchanged) */}
       <div className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-lg font-semibold text-[#6B4226]">Quick Launch</h3>
@@ -679,8 +624,6 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
     </div>
   );
 };
-
-
 
 const Palette = ({ items, onClose, onSelect }) => {
   const [q, setQ] = useState("");
@@ -734,3 +677,5 @@ const Palette = ({ items, onClose, onSelect }) => {
     </div>
   );
 };
+
+export default AdminPanel;

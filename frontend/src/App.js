@@ -29,6 +29,7 @@ import PageTracker from "./PageTracker";
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
+import AddCollections from "./admin/AddCollections";
 
 function App() {
   useAutoLogout(); // Initialize auto logout functionality
