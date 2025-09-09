@@ -12,7 +12,7 @@ const slugify = (text) =>
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-');
 
-const AddCategory = () => {
+const AddCategory = ({ editId = null, onSaved }) => {
   const {
     register,
     handleSubmit,
@@ -25,6 +25,8 @@ const AddCategory = () => {
   });
 
   const [slugTouched, setSlugTouched] = useState(false);
+  const [existingImage, setExistingImage] = useState(''); // stores current image when editing
+
   const nameValue = watch('name');
   const slugValue = watch('slug');
 
@@ -33,15 +35,32 @@ const AddCategory = () => {
     if (!slugTouched) setValue('slug', slugify(nameValue || ''));
   }, [nameValue, slugTouched, setValue]);
 
-  const onSubmit = async (data) => {
+  // If editing: fetch category by id and prefill
+  useEffect(() => {
+    if (!editId) return;
+    (async () => {
+      try {
+        const { data } = await api.get(`/api/category/${editId}`);
+        // Expect: { categoryid, name, slug, image }
+        reset({ name: data?.name || '', slug: data?.slug || '', image: null });
+        setExistingImage(data?.image || '');
+        setSlugTouched(true); // prevent auto-overwriting slug after we set it
+      } catch (err) {
+        toast.error(err?.response?.data?.message || 'Failed to load category');
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId]);
+
+  const onSubmit = async (form) => {
     toast.dismiss();
     try {
-      let imageUrl = '';
-      
+      let imageUrl = existingImage || '';
+
       // Handle image upload if a file is selected
-      if (data.image && data.image[0]) {
+      if (form.image && form.image[0]) {
         const formData = new FormData();
-        formData.append('image', data.image[0]);
+        formData.append('image', form.image[0]);
 
         const uploadResponse = await api.post('/api/upload/single', formData, {
           headers: {
@@ -51,30 +70,42 @@ const AddCategory = () => {
         });
 
         if (uploadResponse.status === 200 || uploadResponse.status === 201) {
-          imageUrl = uploadResponse.data.url; // Assuming the response contains the URL in data.url
+          imageUrl = uploadResponse.data.url; // backend returns { url }
         } else {
           throw new Error('Image upload failed');
         }
       }
 
-      // Prepare payload for category creation
       const payload = {
-        name: data.name,
-        slug: data.slug || slugify(data.name),
-        image: imageUrl || undefined, // Include image URL if available
+        name: form.name,
+        slug: form.slug || slugify(form.name),
+        image: imageUrl || undefined, // omit if empty
       };
 
-      const response = await api.post('/api/category', payload, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-      });
-
-      if (response.status === 201) {
-        toast.success('Category created successfully!');
-        reset({ name: '', slug: '', image: null });
-        setSlugTouched(false);
+      if (!editId) {
+        // CREATE
+        const resp = await api.post('/api/category', payload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (resp.status === 201) {
+          toast.success('Category created successfully!');
+          reset({ name: '', slug: '', image: null });
+          setSlugTouched(false);
+          setExistingImage('');
+          onSaved?.();
+        }
+      } else {
+        // UPDATE
+        const resp = await api.put(`/api/category/${editId}`, payload, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        });
+        if (resp.status >= 200 && resp.status < 300) {
+          toast.success('Category updated successfully!');
+          onSaved?.();
+        }
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to create category');
+      toast.error(err?.response?.data?.message || (editId ? 'Failed to update category' : 'Failed to create category'));
     }
   };
 
@@ -83,7 +114,9 @@ const AddCategory = () => {
 
   return (
     <div className="max-w-2xl mx-auto p-4 sm:p-6 bg-white rounded-lg border border-[#E6DCD2]">
-      <h2 className="text-xl font-semibold text-[#6B4226] mb-4">Add Category</h2>
+      <h2 className="text-xl font-semibold text-[#6B4226] mb-4">
+        {editId ? 'Edit Category' : 'Add Category'}
+      </h2>
 
       <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4">
         {/* Category Name */}
@@ -129,10 +162,10 @@ const AddCategory = () => {
           <p className="text-xs text-[#6B4226]/60 mt-1">Leave blank to auto-generate.</p>
         </div>
 
-        {/* Image Upload */}
+        {/* Image Upload + Current Preview (when editing) */}
         <div>
           <label htmlFor="image" className="block text-sm font-medium text-[#6B4226] mb-1">
-            Category Image (optional)
+            {editId ? 'Replace Image (optional)' : 'Category Image (optional)'}
           </label>
           <input
             id="image"
@@ -141,7 +174,24 @@ const AddCategory = () => {
             className={`${inputBase} ${errors.image ? 'border-red-500 ring-red-200' : ''}`}
             {...register('image')}
           />
-          <p className="text-xs text-[#6B4226]/60 mt-1">Upload an image for the category.</p>
+          {existingImage && (
+            <div className="mt-2 flex items-center gap-3">
+              <div className="w-16 h-16 rounded overflow-hidden border border-[#E6DCD2] bg-gray-50">
+                <img src={existingImage} alt="Current" className="w-full h-full object-cover" />
+              </div>
+              <a
+                href={existingImage}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline text-sm"
+              >
+                View current image
+              </a>
+            </div>
+          )}
+          <p className="text-xs text-[#6B4226]/60 mt-1">
+            {editId ? 'Leave blank to keep current image.' : 'Upload an image for the category.'}
+          </p>
           {errors.image && <p className="text-red-600 text-xs mt-1">{errors.image.message}</p>}
         </div>
 
@@ -152,6 +202,7 @@ const AddCategory = () => {
             onClick={() => {
               reset({ name: '', slug: '', image: null });
               setSlugTouched(false);
+              setExistingImage('');
               toast.dismiss();
             }}
             className="px-4 py-2 rounded-md border border-[#D4A5A5] text-[#6B4226] hover:bg-[#F3DEDE]"
@@ -164,7 +215,13 @@ const AddCategory = () => {
             disabled={isSubmitting}
             className="bg-[#D4A5A5] hover:opacity-90 disabled:opacity-60 text-white px-6 py-3 rounded-md transition font-semibold shadow"
           >
-            {isSubmitting ? 'Adding Category…' : 'Add Category'}
+            {isSubmitting
+              ? editId
+                ? 'Updating…'
+                : 'Adding Category…'
+              : editId
+              ? 'Update Category'
+              : 'Add Category'}
           </button>
         </div>
       </form>

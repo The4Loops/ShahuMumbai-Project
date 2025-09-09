@@ -22,7 +22,12 @@ exports.createCategory = async (req, res) => {
   if (authError) return res.status(403).json({ message: authError });
 
   try {
-    const { name, slug, image } = req.body;
+    let { name, slug, image } = req.body || {};
+
+    // Normalize / trim
+    name = (name || "").trim();
+    slug = (slug || "").trim().toLowerCase();
+    image = (image || "").trim();
 
     // Validate inputs
     if (!name) {
@@ -32,38 +37,54 @@ exports.createCategory = async (req, res) => {
       return res.status(400).json({ message: "Slug is required" });
     }
 
-    // Validate slug format
+    // Validate slug format: lowercase letters, numbers, hyphens
     const slugRegex = /^[a-z0-9-]+$/;
     if (!slugRegex.test(slug)) {
-      return res.status(400).json({ message: "Slug must contain only lowercase letters, numbers, and hyphens" });
+      return res
+        .status(400)
+        .json({
+          message:
+            "Slug must contain only lowercase letters, numbers, and hyphens",
+        });
     }
 
-    // Optional: Validate image URL format if provided
-    if (image && !image.startsWith('http://')) {
+    // Optional: validate image URL if provided (allow http or https)
+    if (
+      image &&
+      !(
+        image.startsWith("http://") ||
+        image.startsWith("https://")
+      )
+    ) {
       return res.status(400).json({ message: "Invalid image URL" });
     }
 
     // Insert into Supabase
     const { data, error } = await supabase
       .from("categories")
-      .insert([{ name, slug, image }])
-      .select();
+      .insert([{ name, slug, image: image || null }])
+      .select("categoryid, name, slug, image")
+      .single();
 
     if (error) {
-      if (error.code === '23505') {
+      // Unique violation (e.g., unique index on slug)
+      if (error.code === "23505") {
         return res.status(400).json({ message: "Slug already exists" });
       }
-      return res.status(400).json({ message: "Error adding category", error });
+      return res
+        .status(400)
+        .json({ message: "Error adding category", error });
     }
 
-    res
+    return res
       .status(201)
-      .json({ message: "Category created successfully", category: data[0] });
+      .json({ message: "Category created successfully", category: data });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: "Server error", error });
+    console.error("createCategory error:", error);
+    return res.status(500).json({ message: "Server error", error });
   }
 };
+
 
 // GET All Categories — Public
 exports.getAllCategories = async (req, res) => {
@@ -71,7 +92,7 @@ exports.getAllCategories = async (req, res) => {
     // Fetch all categories
     const { data: categories, error: categoriesError } = await supabase
       .from("categories")
-      .select("categoryid, name");
+      .select("categoryid, name, slug, image");
 
     if (categoriesError) {
       return res
@@ -178,5 +199,20 @@ exports.deleteCategory = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: "Server error", error });
+  }
+};
+
+exports.getCategoryById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { data, error } = await supabase
+      .from("categories")
+      .select("categoryid, name, slug, image")
+      .eq("categoryid", id)
+      .single();
+    if (error || !data) return res.status(404).json({ message: "Category not found" });
+    res.status(200).json(data);
+  } catch (e) {
+    res.status(500).json({ message: "Server error", error: e.message });
   }
 };

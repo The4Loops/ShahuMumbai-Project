@@ -3,6 +3,7 @@ import { Eye, Edit, Trash2, X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../../supabase/axios";
 import { toast } from "react-toastify";
+import { useAdminActions } from "../AdminActionsContext";
 
 export default function CategoriesTable() {
   const [categories, setCategories] = useState([]);
@@ -12,6 +13,7 @@ export default function CategoriesTable() {
   const [editCategory, setEditCategory] = useState(null);
   const [deleteCategory, setDeleteCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const { openCategoryEditor } = useAdminActions();
 
   const fetchCategories = async () => {
     try {
@@ -132,6 +134,7 @@ export default function CategoriesTable() {
               <th className="px-4 py-3 text-gray-600 font-medium text-center">
                 ID
               </th>
+              <th className="px-4 py-3 text-gray-600 font-medium">Image</th>
               <th className="px-4 py-3 text-gray-600 font-medium text-center">
                 Category
               </th>
@@ -160,6 +163,15 @@ export default function CategoriesTable() {
                     <td className="px-4 py-3 text-center align-middle">
                       {index + 1}
                     </td>
+                    <td className="px-4 py-3">
+                      <div className="w-10 h-10 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+                        {c.image ? (
+                          <img src={c.image} alt={c.name} className="w-full h-full object-cover" loading="lazy" />
+                        ) : (
+                          <span className="text-gray-500 font-semibold">{c.name?.[0] || "?"}</span>
+                        )}
+                      </div>
+                    </td>
                     <td className="px-4 py-5 flex items-center justify-center gap-3">
                       <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
                         {c.name[0]}
@@ -177,8 +189,7 @@ export default function CategoriesTable() {
                       >
                         <Eye size={18} />
                       </button>
-                      <button
-                        onClick={() => setEditCategory(c)}
+                      <button onClick={() => openCategoryEditor(c.categoryid)}
                         className="p-2 rounded-full hover:bg-green-100 text-green-600"
                         title="Edit"
                       >

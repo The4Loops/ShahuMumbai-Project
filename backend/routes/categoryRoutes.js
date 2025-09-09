@@ -6,5 +6,6 @@ router.post('/category', categoryController.createCategory);        // Create Ca
 router.get('/category', categoryController.getAllCategories);       // Get All Categories (Public)
 router.put('/category/:id', categoryController.updateCategory);     // Update Category (Admin)
 router.delete('/category/:id', categoryController.deleteCategory); 
+router.get('/category/:id', categoryController.getCategoryById);
 
 module.exports = router;

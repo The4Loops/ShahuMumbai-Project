@@ -110,6 +110,7 @@ const AdminPanel = () => {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [editProductId, setEditProductId] = useState(null);
   const [editCollectionId, setEditCollectionId] = useState(null);
+  const [editCategoryId, setEditCategoryId] = useState(null);
 
   const isFavorite = (id) => favorites.includes(id);
   const toggleFavorite = (id) => {
@@ -129,6 +130,10 @@ const AdminPanel = () => {
    setActiveId("Add Collections");
    };
 
+   const openCategoryEditor = (id) => {           
+   setEditCategoryId(id ?? null);
+   setActiveId("Add Category");
+ };
 
 
   useEffect(() => {
@@ -162,7 +167,7 @@ const AdminPanel = () => {
 
   return (
     <Layout>
-      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor }}>
+      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor, openCategoryEditor }}>
       <div className="min-h-screen bg-[#f7f5f2]">
         {/* Header */}
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[#EAD8D8]">
@@ -285,11 +290,13 @@ const AdminPanel = () => {
                       </button>
                     </div>
 
-                    {/* ✅ Render exactly ONE component */}
+                    {/* Render exactly ONE component */}
                     {activeItem.id === "Add Product" ? (
                       <AddProduct editId={editProductId} onSaved={() => setEditProductId(null)} />
                     ) : activeItem.id === "Add Collections" ? (
                       <AddCollections editId={editCollectionId} onSaved={() => setEditCollectionId(null)} />
+                     ) : activeItem.id === "Add Category" ? (
+                       <AddCategory editId={editCategoryId} onSaved={() => setEditCategoryId(null)} />
                     ) : (
                       <activeItem.component />
                     )}
