@@ -102,7 +102,7 @@ const AdminPanel = () => {
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [editProductId, setEditProductId] = useState(null);
   const [editCollectionId, setEditCollectionId] = useState(null);
-  const [editBannerId, setEditBannerId] = useState(null);
+  const [editCategoryId, setEditCategoryId] = useState(null);
 
   const isFavorite = (id) => favorites.includes(id);
   const toggleFavorite = (id) => {
@@ -123,10 +123,11 @@ const AdminPanel = () => {
     setActiveId("Add Collections");
   };
 
-  const openBannerEditor = (id) => {
-    setEditBannerId(id ?? null);
-    setActiveId("Add Banners");
-  };
+   const openCategoryEditor = (id) => {           
+   setEditCategoryId(id ?? null);
+   setActiveId("Add Category");
+ };
+
 
   useEffect(() => {
     const onK = (e) => {
@@ -158,93 +159,104 @@ const AdminPanel = () => {
 
   return (
     <Layout>
-      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor, openBannerEditor }}>
-        <div className="min-h-screen bg-[#f7f5f2]">
-          <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[#EAD8D8]">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
-              <button
-                className="text-[#6B4226] text-xl p-2 border border-[#EAD8D8] rounded-lg"
-                onClick={() => (isMobile ? setDrawerOpen(true) : setSidebarOpen((v) => !v))}
-                aria-label="Toggle Navigation"
-              >
-                {isMobile ? <FaBars /> : sidebarOpen ? <FaChevronLeft /> : <FaChevronRight />}
-              </button>
-              <button
-                className="flex items-center gap-2"
-                onClick={() => setActiveId(null)}
-                title="Go to Dashboard"
-              >
-                <FaHome className="text-[#6B4226]" />
-                <div className="font-semibold text-[#6B4226]">Admin</div>
-                <span className="text-gray-400">/</span>
-                <div className="text-gray-700">
-                  {activeItem ? activeItem.label : "Dashboard"}
-                </div>
-              </button>
-              <div className="ml-auto flex items-center gap-2">
-                <button
-                  onClick={() => setPaletteOpen(true)}
-                  className="hidden sm:flex items-center gap-2 px-3 py-2 border rounded-lg text-gray-600 hover:bg-gray-50"
-                  title="Search tools"
-                >
-                  <FaSearch />
-                  <span className="text-sm">Search</span>
-                </button>
-                <button
-                  onClick={() => setPaletteOpen(true)}
-                  className="sm:hidden p-2 border rounded-lg text-gray-600 hover:bg-gray-50"
-                  aria-label="Search"
-                >
-                  <FaSearch />
-                </button>
-                <button className="p-2 border rounded-lg text-gray-600 hover:bg-gray-50" title="Notifications">
-                  <FaBell />
-                </button>
+      <AdminActionsContext.Provider value={{ openProductEditor, openCollectionEditor, openCategoryEditor }}>
+      <div className="min-h-screen bg-[#f7f5f2]">
+        {/* Header */}
+        <header className="sticky top-0 z-30 bg-white/80 backdrop-blur border-b border-[#EAD8D8]">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center gap-3">
+            {/* Collapser / Drawer */}
+            <button
+              className="text-[#6B4226] text-xl p-2 border border-[#EAD8D8] rounded-lg"
+              onClick={() => (isMobile ? setDrawerOpen(true) : setSidebarOpen((v) => !v))}
+              aria-label="Toggle Navigation"
+            >
+              {isMobile ? <FaBars /> : sidebarOpen ? <FaChevronLeft /> : <FaChevronRight />}
+            </button>
+
+            {/* Brand */}
+            <button
+              className="flex items-center gap-2"
+              onClick={() => setActiveId(null)}
+              title="Go to Dashboard"
+            >
+              <FaHome className="text-[#6B4226]" />
+              <div className="font-semibold text-[#6B4226]">Admin</div>
+              <span className="text-gray-400">/</span>
+              <div className="text-gray-700">
+                {activeItem ? activeItem.label : "Dashboard"}
               </div>
+            </button>
+
+            {/* Right actions */}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                onClick={() => setPaletteOpen(true)}
+                className="hidden sm:flex items-center gap-2 px-3 py-2 border rounded-lg text-gray-600 hover:bg-gray-50"
+                title="Search tools"
+              >
+                <FaSearch />
+                <span className="text-sm">Search</span>
+              </button>
+              <button
+                onClick={() => setPaletteOpen(true)}
+                className="sm:hidden p-2 border rounded-lg text-gray-600 hover:bg-gray-50"
+                aria-label="Search"
+              >
+                <FaSearch />
+              </button>
+              <button className="p-2 border rounded-lg text-gray-600 hover:bg-gray-50" title="Notifications">
+                <FaBell />
+              </button>
             </div>
-          </header>
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
-            <div className="flex gap-6">
-              {!isMobile ? (
-                <Sidebar
-                  open={sidebarOpen}
-                  favorites={favorites}
-                  grouped={grouped}
-                  activeId={activeId}
-                  onOpen={(id) => setActiveId(id)}
-                  toggleFavorite={toggleFavorite}
-                />
-              ) : (
-                drawerOpen && (
-                  <>
-                    <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDrawerOpen(false)} />
-                    <div className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#EAD8D8] rounded-r-xl">
-                      <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-[#6B4226]">Menu</h2>
-                        <button
-                          className="text-[#6B4226] text-xl border border-[#EAD8D8] px-2 py-1 rounded-md"
-                          onClick={() => setDrawerOpen(false)}
-                          aria-label="Close Sidebar"
-                        >
-                          <FaTimes />
-                        </button>
-                      </div>
-                      <Sidebar
-                        open={true}
-                        favorites={favorites}
-                        grouped={grouped}
-                        activeId={activeId}
-                        onOpen={(id) => {
-                          setActiveId(id);
-                          setDrawerOpen(false);
-                        }}
-                        toggleFavorite={toggleFavorite}
-                        asDrawer
-                      />
+          </div>
+        </header>
+
+        {/* Body */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-10">
+          <div className="flex gap-6">
+            {/* Collapsible Sidebar / Drawer */}
+            {!isMobile ? (
+              <Sidebar
+                open={sidebarOpen}
+                favorites={favorites}
+                grouped={grouped}
+                activeId={activeId}
+                onOpen={(id) => setActiveId(id)}
+                toggleFavorite={toggleFavorite}
+              />
+            ) : (
+              drawerOpen && (
+                <>
+                  <div className="fixed inset-0 bg-black/40 z-40" onClick={() => setDrawerOpen(false)} />
+                  <div className="fixed z-50 top-0 left-0 h-full w-80 max-w-[85vw] bg-white p-6 shadow-2xl border-r border-[#EAD8D8] rounded-r-xl">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-lg font-semibold text-[#6B4226]">Menu</h2>
+                      <button
+                        className="text-[#6B4226] text-xl border border-[#EAD8D8] px-2 py-1 rounded-md"
+                        onClick={() => setDrawerOpen(false)}
+                        aria-label="Close Sidebar"
+                      >
+                        <FaTimes />
+                      </button>
                     </div>
-                  </>
-                )
-              )}
+                    <Sidebar
+                      open={true}
+                      favorites={favorites}
+                      grouped={grouped}
+                      activeId={activeId}
+                      onOpen={(id) => {
+                        setActiveId(id);
+                        setDrawerOpen(false);
+                      }}
+                      toggleFavorite={toggleFavorite}
+                      asDrawer
+                    />
+                  </div>
+                </>
+              )
+            )}
+
+            {/* Content */}
               <main className="flex-1">
                 {!activeItem ? (
                   <Dashboard
@@ -269,12 +281,14 @@ const AdminPanel = () => {
                         </span>
                       </button>
                     </div>
+
+                    {/* Render exactly ONE component */}
                     {activeItem.id === "Add Product" ? (
                       <AddProduct editId={editProductId} onSaved={() => setEditProductId(null)} />
                     ) : activeItem.id === "Add Collections" ? (
                       <AddCollections editId={editCollectionId} onSaved={() => setEditCollectionId(null)} />
-                    ) : activeItem.id === "Add Banners" ? (
-                      <BannerManager editId={editBannerId} onSaved={() => setEditBannerId(null)} />
+                     ) : activeItem.id === "Add Category" ? (
+                       <AddCategory editId={editCategoryId} onSaved={() => setEditCategoryId(null)} />
                     ) : (
                       <activeItem.component />
                     )}
