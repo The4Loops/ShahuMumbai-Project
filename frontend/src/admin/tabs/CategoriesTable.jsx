@@ -3,15 +3,17 @@ import { Eye, Edit, Trash2, X, Search } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../../supabase/axios";
 import { toast } from "react-toastify";
+import { useAdminActions } from "../AdminActionsContext"; // ✅ use the shared context
 
 export default function CategoriesTable() {
   const [categories, setCategories] = useState([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [categoriesError, setCategoriesError] = useState(null);
   const [selectedCategory, setSelectedCategory] = useState(null);
-  const [editCategory, setEditCategory] = useState(null);
   const [deleteCategory, setDeleteCategory] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+
+  const { openCategoryEditor } = useAdminActions(); // ✅ get the opener
 
   const fetchCategories = async () => {
     try {
@@ -29,60 +31,16 @@ export default function CategoriesTable() {
     }
   };
 
-  // Fetch categories on mount
   useEffect(() => {
     fetchCategories();
   }, []);
 
-  // Handle Edit Category
-  const handleSaveEdit = async (e) => {
-    e.preventDefault();
-    const name = e.target.name.value.trim();
-    const image = e.target.image.files[0]; // Get the image file
-
-    if (!name) {
-      toast.error("Category name is required");
-      return;
-    }
-
-    try {
-      let imageUrl = editCategory.image || ''; // Use existing image URL if no new image is uploaded
-
-      // Handle image upload if a file is selected
-      if (image) {
-        const formData = new FormData();
-        formData.append('image', image);
-
-        const uploadResponse = await api.post('/api/upload/single', formData, {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
-            'Content-Type': 'multipart/form-data',
-          },
-        });
-
-        if (uploadResponse.status === 200 || uploadResponse.status === 201) {
-          imageUrl = uploadResponse.data.url; // Assuming the response contains the URL in data.url
-        } else {
-          throw new Error('Image upload failed');
-        }
-      }
-
-      // Prepare payload for category update
-      const payload = { name, image: imageUrl || undefined };
-
-      await api.put(`/api/category/${editCategory.categoryid}`, payload);
-      fetchCategories();
-      setEditCategory(null);
-      toast.success("Category updated successfully!");
-    } catch (err) {
-      toast.error(err?.response?.data?.message || "Failed to update category");
-    }
-  };
-
-  // Handle Delete
+  // Delete
   const confirmDelete = async () => {
     try {
-      await api.delete(`/api/category/${deleteCategory.categoryid}`);
+      await api.delete(`/api/category/${deleteCategory.categoryid}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+      });
       setCategories((prev) =>
         prev.filter((c) => c.categoryid !== deleteCategory.categoryid)
       );
@@ -94,11 +52,11 @@ export default function CategoriesTable() {
   };
 
   const filteredCategories = categories.filter((c) =>
-    c.name.toLowerCase().includes(searchQuery.toLowerCase())
+    (c.name || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
 
   const inputBase =
-    'w-full rounded-lg p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400';
+    "w-full rounded-lg p-3 border border-gray-300 focus:outline-none focus:ring-2 focus:ring-green-400";
 
   return (
     <div className="p-4 sm:p-6">
@@ -130,13 +88,13 @@ export default function CategoriesTable() {
           <thead className="bg-gray-50 sticky top-0 z-10 shadow-sm">
             <tr className="text-left border-b border-gray-200">
               <th className="px-4 py-3 text-gray-600 font-medium text-center">
-                ID
+                #
               </th>
-              <th className="px-4 py-3 text-gray-600 font-medium text-center">
+              <th className="px-4 py-3 text-gray-600 font-medium">
                 Category
               </th>
               <th className="px-4 py-3 text-gray-600 font-medium text-center">
-                Products Count
+                Products
               </th>
               <th className="px-4 py-3 text-gray-600 font-medium text-center">
                 Actions
@@ -160,15 +118,33 @@ export default function CategoriesTable() {
                     <td className="px-4 py-3 text-center align-middle">
                       {index + 1}
                     </td>
-                    <td className="px-4 py-5 flex items-center justify-center gap-3">
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
-                        {c.name[0]}
+
+                    {/* Category cell with avatar/thumbnail */}
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
+                          {c?.image ? (
+                            <img
+                              src={c.image}
+                              alt={c.name}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <span>{(c.name || "?")[0]}</span>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="font-medium text-gray-800">
+                            {c.name}
+                          </span>
+                        </div>
                       </div>
-                      <span className="font-medium">{c.name}</span>
                     </td>
+
                     <td className="px-4 py-3 text-center align-middle">
                       {c.products_count}
                     </td>
+
                     <td className="px-4 py-3 flex items-center justify-center gap-2">
                       <button
                         onClick={() => setSelectedCategory(c)}
@@ -177,13 +153,16 @@ export default function CategoriesTable() {
                       >
                         <Eye size={18} />
                       </button>
+
+                      {/* ✅ open AddCategory panel with this ID */}
                       <button
-                        onClick={() => setEditCategory(c)}
+                        onClick={() => openCategoryEditor(c.categoryid)}
                         className="p-2 rounded-full hover:bg-green-100 text-green-600"
                         title="Edit"
                       >
                         <Edit size={18} />
                       </button>
+
                       <button
                         onClick={() => setDeleteCategory(c)}
                         className="p-2 rounded-full hover:bg-red-100 text-red-600"
@@ -234,7 +213,15 @@ export default function CategoriesTable() {
               <h2 className="text-lg font-semibold mb-4">Category Details</h2>
               <div className="flex items-center justify-center gap-3 mb-3">
                 <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-200 flex items-center justify-center text-gray-500 font-semibold">
-                  {selectedCategory.name[0]}
+                  {selectedCategory?.image ? (
+                    <img
+                      src={selectedCategory.image}
+                      alt={selectedCategory.name}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span>{(selectedCategory.name || "?")[0]}</span>
+                  )}
                 </div>
                 <span className="font-medium text-lg">
                   {selectedCategory.name}
@@ -261,94 +248,6 @@ export default function CategoriesTable() {
                 </p>
               )}
             </motion.div>
-          </motion.div>
-        )}
-
-        {/* Edit Category Modal */}
-        {editCategory && (
-          <motion.div
-            className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            <motion.form
-              onSubmit={handleSaveEdit}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-md relative p-6 flex flex-col gap-5"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-            >
-              <div className="absolute -top-6 left-1/2 transform -translate-x-1/2 w-12 h-12 bg-green-600 rounded-full flex items-center justify-center shadow-lg text-white">
-                <Edit size={24} />
-              </div>
-              <button
-                onClick={() => setEditCategory(null)}
-                type="button"
-                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-              >
-                <X size={20} />
-              </button>
-              <h2 className="text-2xl font-semibold text-gray-800 text-center">
-                Edit Category
-              </h2>
-              <div className="flex flex-col gap-4">
-                <div className="relative">
-                  <label
-                    htmlFor="name"
-                    className="block text-sm font-medium text-gray-600 mb-1"
-                  >
-                    Category Name *
-                  </label>
-                  <input
-                    name="name"
-                    id="name"
-                    type="text"
-                    defaultValue={editCategory.name}
-                    placeholder="Category Name"
-                    className={`${inputBase} peer`}
-                    required
-                  />
-                </div>
-                <div className="relative">
-                  <label
-                    htmlFor="image"
-                    className="block text-sm font-medium text-gray-600 mb-1"
-                  >
-                    Category Image (optional)
-                  </label>
-                  <input
-                    name="image"
-                    id="image"
-                    type="file"
-                    accept="image/*"
-                    className={inputBase}
-                  />
-                  {editCategory.image && (
-                    <p className="text-xs text-gray-600 mt-1">
-                      Current image:{" "}
-                      <a
-                        href={editCategory.image}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-blue-600 hover:underline"
-                      >
-                        View
-                      </a>
-                    </p>
-                  )}
-                  <p className="text-xs text-gray-600 mt-1">
-                    Upload a new image to replace the current one.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="submit"
-                className="bg-green-600 text-white rounded-lg py-3 text-lg font-medium hover:bg-green-700 transition"
-              >
-                Save Changes
-              </button>
-            </motion.form>
           </motion.div>
         )}
 

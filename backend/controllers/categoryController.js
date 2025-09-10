@@ -119,6 +119,46 @@ exports.getAllCategories = async (req, res) => {
   }
 };
 
+// GET Category by ID — Public
+exports.getCategoryById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Fetch category with optional image + slug
+    const { data: category, error } = await supabase
+      .from("categories")
+      .select("categoryid, name, slug, image")
+      .eq("categoryid", id)
+      .single();
+
+    if (error || !category) {
+      return res.status(404).json({ message: "Category not found" });
+    }
+
+    // Count products in this category
+    const { count, error: countError } = await supabase
+      .from("products")
+      .select("*", { count: "exact", head: true })
+      .eq("categoryid", id);
+
+    if (countError) {
+      return res.status(400).json({
+        message: "Error fetching product count",
+        error: countError,
+      });
+    }
+
+    res.status(200).json({
+      ...category,
+      products_count: count || 0,
+    });
+  } catch (error) {
+    console.error("categories.getCategoryById error", error);
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+};
+
+
 // UPDATE Category — Admin Only
 exports.updateCategory = async (req, res) => {
   const { error: authError } = verifyAdmin(req);

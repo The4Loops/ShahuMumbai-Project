@@ -13,9 +13,14 @@ const slugify = (s) =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 
-const AddCollections = () => {
-  const { id } = useParams(); // edit if present
-  const isEdit = !!id;
+const AddCollections = ({ editId = null, onSaved }) => {
+  // If editId is passed via AdminPanel, use it; otherwise fall back to route param
+  const params = useParams();
+  const routedId = params?.id || null;
+  const effectiveId = editId ?? routedId;
+  const isEdit = !!effectiveId;
+
+  // Only use navigate when we’re actually on a routed page
   const navigate = useNavigate();
 
   const {
@@ -35,7 +40,7 @@ const AddCollections = () => {
       status: 'DRAFT',
       is_active: true,
       cover_image: null,
-      categoryids: [], // Changed from categoryid to categoryids array
+      categoryids: [],
     },
   });
 
@@ -45,17 +50,17 @@ const AddCollections = () => {
   const [categories, setCategories] = useState([]);
   const [categoriesError, setCategoriesError] = useState(null);
 
-  // Auto-slug from title
+  // Auto-slug from title (only when creating)
   const title = watch('title');
   useEffect(() => {
     if (!isEdit) setValue('slug', slugify(title || ''));
   }, [title, isEdit, setValue]);
 
-  // Preview cover image
+  // Preview cover image (live for new file or from existing)
   const coverFile = watch('cover_image');
   useEffect(() => {
     if (!coverFile || !coverFile[0]) {
-      setPreview(existingCover); // Fallback to existing cover during edit
+      setPreview(existingCover); // keep showing existing cover when editing
       return;
     }
     const url = URL.createObjectURL(coverFile[0]);
@@ -71,35 +76,36 @@ const AddCollections = () => {
         const categoriesData = Array.isArray(data) ? data : data?.categories || [];
         setCategories(categoriesData);
       } catch (err) {
-        setCategoriesError(err?.response?.data?.message || 'Failed to fetch categories');
-        toast.error(err?.response?.data?.message || 'Failed to fetch categories');
+        const msg = err?.response?.data?.message || 'Failed to fetch categories';
+        setCategoriesError(msg);
+        toast.error(msg);
       }
     };
     fetchCategories();
   }, []);
 
-  // Load for edit
+  // Load collection for edit
   useEffect(() => {
     if (!isEdit) return;
     (async () => {
       try {
-        const { data } = await api.get(`/api/collections/${id}`);
+        const { data } = await api.get(`/api/collections/${effectiveId}`);
         reset({
-          title: data.title,
-          slug: data.slug,
+          title: data.title || '',
+          slug: data.slug || '',
           description: data.description || '',
           status: data.status || 'DRAFT',
-          is_active: data.is_active,
-          cover_image: null,
-          categoryids: data.categoryids || [], // Changed to categoryids array
+          is_active: !!data.is_active,
+          cover_image: null, // keep file input empty
+          categoryids: Array.isArray(data.categoryids) ? data.categoryids : [],
         });
         setExistingCover(data.cover_image || null);
         setPreview(data.cover_image || null);
-      } catch {
+      } catch (e) {
         toast.error('Failed to load collection');
       }
     })();
-  }, [isEdit, id, reset]);
+  }, [isEdit, effectiveId, reset]);
 
   const onSubmit = async (form) => {
     setIsSubmitting(true);
@@ -107,7 +113,7 @@ const AddCollections = () => {
     try {
       let cover_url = existingCover || null;
 
-      // If a new file was chosen, upload it
+      // Upload new cover if chosen
       if (form.cover_image && form.cover_image[0]) {
         const file = form.cover_image[0];
         const validTypes = ['image/jpeg', 'image/png', 'image/webp'];
@@ -135,21 +141,25 @@ const AddCollections = () => {
 
       const payload = {
         title: form.title.trim(),
-        slug: form.slug.trim() || slugify(form.title),
+        slug: (form.slug || slugify(form.title)).trim(),
         description: form.description || null,
         cover_image: cover_url,
         status: form.status,
         is_active: !!form.is_active,
-        categoryids: form.categoryids || [], // Changed to categoryids array
+        categoryids: form.categoryids || [],
       };
 
       if (isEdit) {
-        await api.put(`/api/collections/${id}`, payload);
+        await api.put(`/api/collections/${effectiveId}`, payload);
         toast.success('Collection updated!');
-        navigate('/collections');
+        // Inline AdminPanel flow: call onSaved and stay
+        if (typeof onSaved === 'function') onSaved();
+        // Routed page flow: navigate back to listing
+        if (!editId && routedId) navigate('/collections');
       } else {
         await api.post('/api/collections', payload);
         toast.success('Collection created!');
+        // Reset only on create
         reset({
           title: '',
           slug: '',
@@ -223,7 +233,7 @@ const AddCollections = () => {
         <div className="mb-4 text-sm text-red-600">{categoriesError}</div>
       )}
 
-      <div className="grid grid-cols-1 gap-4">
+      <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-4">
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">Title *</label>
           <input
@@ -295,11 +305,7 @@ const AddCollections = () => {
 
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">Cover Image</label>
-          <input
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            {...register('cover_image')}
-          />
+          <input type="file" accept="image/jpeg,image/png,image/webp" {...register('cover_image')} />
           {(preview || existingCover) && (
             <div className="mt-3">
               <img
@@ -307,7 +313,7 @@ const AddCollections = () => {
                 alt="Cover preview"
                 className="w-full max-w-sm h-40 object-cover rounded-md border"
               />
-              {isEdit && (
+              {isEdit && existingCover && (
                 <button
                   type="button"
                   onClick={() => {
@@ -326,15 +332,14 @@ const AddCollections = () => {
 
         <div>
           <button
-            type="button"
-            onClick={handleSubmit(onSubmit)}
+            type="submit"
             disabled={isSubmitting}
             className="w-full bg-[#D4A5A5] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow disabled:opacity-50"
           >
             {isSubmitting ? (isEdit ? 'Updating…' : 'Creating…') : (isEdit ? 'Update Collection' : 'Create Collection')}
           </button>
         </div>
-      </div>
+      </form>
     </div>
   );
 };
