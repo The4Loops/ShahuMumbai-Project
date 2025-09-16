@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Helmet } from "react-helmet-async";
 import api from "../supabase/axios";
 import supabase from "../supabase/SupaBase";
 import { toast } from "react-toastify";
@@ -123,15 +124,13 @@ const AuthForm = () => {
 
         const { token } = res.data;
 
-        // Store token in localStorage
         try {
           localStorage.setItem("token", token);
         } catch (storageError) {
-          toast.error("Failed to store authentication token. Please try again."+storageError);
+          toast.error("Failed to store authentication token. Please try again." + storageError);
           return;
         }
 
-        // Decode token to get user role
         let decoded;
         try {
           decoded = jwtDecode(token);
@@ -143,11 +142,10 @@ const AuthForm = () => {
         toast.dismiss();
         toast.success(res.data.message || "Login successful!");
 
-        // Navigate based on role
         if (userRole === "Admin") {
           navigate("/admin");
         } else {
-           navigate("/profile");
+          navigate("/profile");
         }
       }
     } catch (error) {
@@ -176,8 +174,32 @@ const AuthForm = () => {
     }
   };
 
+  const url =
+    typeof window !== "undefined"
+      ? window.location.origin + "/account"
+      : "https://www.shahumumbai.com/account";
+
   return (
     <Layout>
+      <Helmet>
+        <title>{isRegistering ? "Create Account — Shahu Mumbai" : "Sign In — Shahu Mumbai"}</title>
+        <meta
+          name="description"
+          content={
+            isRegistering
+              ? "Create your Shahu Mumbai account to manage orders and wishlist."
+              : "Sign in to Shahu Mumbai to access your profile, orders, and wishlist."
+          }
+        />
+        <link rel="canonical" href={url} />
+        <meta name="robots" content="noindex,nofollow" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={isRegistering ? "Create Account — Shahu Mumbai" : "Sign In — Shahu Mumbai"} />
+        <meta property="og:description" content="Account access for Shahu Mumbai customers." />
+        <meta property="og:url" content={url} />
+        <meta name="twitter:card" content="summary" />
+      </Helmet>
+
       <div className="flex justify-center items-center py-12 px-4 sm:px-6 lg:px-8 min-h-36">
         <div className="bg-white p-6 sm:p-8 rounded-lg w-full max-w-sm shadow-md">
           <div className="flex justify-between items-center mb-6">

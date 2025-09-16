@@ -7,6 +7,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
+import { Helmet } from "react-helmet-async";
 
 const categoryColors = {
   Accessories: "bg-yellow-50",
@@ -34,16 +35,13 @@ function Cart() {
           quantity: item.quantity,
           inStock: item.product.stock > 0,
           discount: item.product.discountprice
-            ? Math.round(
-                (item.product.discountprice / item.product.price) * 100
-              )
+            ? Math.round((item.product.discountprice / item.product.price) * 100)
             : null,
-          image: item.product.product_images.find((img) => img.is_hero)
-            ?.image_url,
+          image: item.product.product_images.find((img) => img.is_hero)?.image_url,
         }));
         setCartItems(formattedItems);
 
-        // ✅ GA4: view_cart after items load
+        // GA4: view_cart
         try {
           if (formattedItems.length) {
             Ecom.viewCart(
@@ -75,7 +73,6 @@ function Cart() {
       const item = cartItems.find((item) => item.id === id);
       const newQuantity = Math.max(1, item.quantity + delta);
 
-      // Update quantity via API
       await api.put(`/api/cart/${id}`, { quantity: newQuantity });
 
       setCartItems((items) =>
@@ -108,19 +105,36 @@ function Cart() {
     }
   };
 
-  const subtotal = cartItems.reduce(
-    (acc, item) => acc + item.price * item.quantity,
-    0
-  );
+  const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
   const tax = 36.08;
   const total = subtotal + tax;
 
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
+  const pageUrl = `${baseUrl}/cart`;
+
   return (
     <Layout>
+      <Helmet>
+        <title>Shopping Cart — Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Review items in your Shahu Mumbai cart and proceed to secure checkout."
+        />
+        <link rel="canonical" href={pageUrl} />
+        <meta name="robots" content="noindex,nofollow,noarchive" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Shopping Cart — Shahu Mumbai" />
+        <meta property="og:description" content="Secure cart and checkout." />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:image" content={`${baseUrl}/og/cart.jpg`} />
+        <meta name="twitter:card" content="summary" />
+      </Helmet>
+
       <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto bg-[#f9f5f0] min-h-screen">
-        <h2 className="text-3xl font-bold mb-6 text-center">
-          🛒 Shopping Cart
-        </h2>
+        <h2 className="text-3xl font-bold mb-6 text-center">🛒 Shopping Cart</h2>
 
         {loading ? (
           <div className="text-center text-gray-500">Loading cart...</div>
@@ -229,7 +243,6 @@ function Cart() {
                   <button
                     className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm"
                     onClick={() => {
-                      // ✅ GA4: applying coupon (no validation logic changed)
                       try {
                         window.gtag?.("event", "apply_promotion", {
                           coupon: promoCode || undefined,
@@ -266,7 +279,6 @@ function Cart() {
 
               <button
                 onClick={() => {
-                  // ✅ GA4: begin_checkout
                   try {
                     const gaItems = cartItems.map((i) => ({
                       id: i.id,

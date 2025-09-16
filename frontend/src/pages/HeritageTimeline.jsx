@@ -6,6 +6,7 @@ import { MdOutlineDiamond } from "react-icons/md";
 import { IoMdClose } from "react-icons/io";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
 import { useTranslation } from "react-i18next";
+import { Helmet } from "react-helmet-async";
 
 // Images (keep your assets)
 import inspirationImg from "../assets/Heritage/inspiration.png";
@@ -45,8 +46,54 @@ export default function HeritageTimeline() {
     setActiveIndex((prev) => (prev === 0 ? milestones.length - 1 : prev - 1));
   };
 
+  // --- SEO (invisible only) ---
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/heritagetimeline`;
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Heritage Timeline", item: canonical },
+    ],
+  };
+
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: milestones.map((m, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: `${m.year} — ${m.title}`,
+      url: `${canonical}#${encodeURIComponent(m.title)}`,
+      description: m.description,
+    })),
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>Heritage Timeline — Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Explore Shahu Mumbai’s heritage timeline: inspirations, craftsmanship, and modern evolutions across the years."
+        />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Heritage Timeline — Shahu Mumbai" />
+        <meta
+          property="og:description"
+          content="A journey through our inspirations and craftsmanship milestones."
+        />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={`${baseUrl}/og/heritage.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+      </Helmet>
+
       <section className="bg-[#F1E7E5] py-16 px-6">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16 text-gray-800 tracking-wide">
@@ -168,9 +215,7 @@ export default function HeritageTimeline() {
             <time className="block text-sm text-gray-500 mb-1">
               {milestones[activeIndex].year}
             </time>
-            <h3
-              className={`text-2xl font-bold ${milestones[activeIndex].titleColor} mb-2`}
-            >
+            <h3 className={`text-2xl font-bold ${milestones[activeIndex].titleColor} mb-2`}>
               {milestones[activeIndex].title}
             </h3>
             <p className="text-gray-700 leading-relaxed">

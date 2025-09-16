@@ -1,17 +1,19 @@
-import { Routes, Route, } from "react-router-dom";
+import { Routes, Route } from "react-router-dom";
+import React from "react";
+import { Helmet, HelmetProvider } from "react-helmet-async";
 import "./App.css";
+
 import HomePage from "./pages/HomePage";
 import Account from "./pages/Account";
 import Products from "./pages/Products";
 import ProductDetails from "./pages/ProductDetails";
-import React from "react";
 import Cart from "./pages/Cart";
 import About from "./pages/About";
 import AdminPanel from "./admin/AdminPanel";
 import Callback from "./supabase/Callback";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
-import ContactUs from './pages/ContactUs';
+import ContactUs from "./pages/ContactUs";
 import ServicePage from "./pages/Service";
 import OurPhilosophy from "./pages/OurPhilosophy";
 import HeritageTimeline from "./pages/HeritageTimeline";
@@ -25,18 +27,47 @@ import useAutoLogout from "./AutoLogout";
 import Blog from "./pages/Blog";
 import Returns from "./pages/Returns";
 import NewsletterPopup from "./layout/NewsletterSection";
-import PageTracker from "./PageTracker"; 
+import PageTracker from "./PageTracker";
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
 import AddCollections from "./admin/AddCollections";
 
 function App() {
-  useAutoLogout(); // Initialize auto logout functionality
+  useAutoLogout();
+
+  const siteUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
 
   return (
-    <div>
-      {/* PageTracker uses router hooks; it's fine because App is wrapped in BrowserRouter in index.js */}
+    <HelmetProvider>
+      {/* Global, invisible defaults */}
+      <Helmet>
+        <html lang="en" />
+        <meta charSet="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="robots" content="index,follow" />
+        <meta name="theme-color" content="#ffffff" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <link rel="canonical" href={siteUrl} />
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Shahu Mumbai",
+            url: siteUrl,
+            logo: `${siteUrl}/logo.png`,
+            sameAs: [
+              "https://www.instagram.com/shahumumbai",
+              "https://www.linkedin.com/company/shahumumbai",
+            ],
+          })}
+        </script>
+      </Helmet>
+
+      {/* Router-aware analytics */}
       <PageTracker />
 
       <ToastContainer
@@ -78,7 +109,7 @@ function App() {
       </Routes>
 
       <NewsletterPopup />
-    </div>
+    </HelmetProvider>
   );
 }
 

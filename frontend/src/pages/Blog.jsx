@@ -17,6 +17,7 @@ import { jwtDecode } from "jwt-decode";
 import api from "../supabase/axios";
 import Layout from "../layout/Layout";
 import { Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 
 const Blog = () => {
   const [blogs, setBlogs] = useState([]);
@@ -77,7 +78,7 @@ const Blog = () => {
         const likesResponse = await api.get(
           `/api/user/likes?user_id=${userId}`
         );
-        setLikedBlogs(likesResponse.data.likedBlogIds || []);
+        setLikedBlogs(likesResponse.data?.likedBlogIds || []);
       } catch (error) {
         toast.dismiss();
         toast.error("Failed to load blogs or likes. Please try again.");
@@ -121,9 +122,7 @@ const Blog = () => {
       toast.dismiss();
       toast.success("Blog liked!");
     } catch (error) {
-      if (
-        error.response?.data?.message === "User has already liked this blog"
-      ) {
+      if (error.response?.data?.message === "User has already liked this blog") {
         toast.dismiss();
         toast.info("You have already liked this blog.");
       } else {
@@ -134,16 +133,80 @@ const Blog = () => {
   };
 
   const getShareUrls = (blog) => {
-  const url = `${window.location.origin}/blogs/${blog.id}`; // use id route
-  return {
-    twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(blog.title)}`,
-    facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-    linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(blog.excerpt)}`,
+    const url = `${window.location.origin}/blogs/${blog.id}`;
+    return {
+      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(blog.title)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(blog.excerpt)}`,
+    };
   };
-};
+
+  // SEO data
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
+  const pageUrl = `${baseUrl}/blog`;
+
+  const blogListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Blog",
+    "@id": pageUrl,
+    url: pageUrl,
+    name: "Shahu Mumbai Blog",
+    description:
+      "Stories & insights on heritage fashion, sustainable luxury, and the artisans behind every piece.",
+    blogPost: filteredBlogs.slice(0, 10).map((b, idx) => ({
+      "@type": "BlogPosting",
+      "@id": `${baseUrl}/blogs/${b.id}`,
+      headline: b.title,
+      image: b.cover_image ? [b.cover_image] : undefined,
+      datePublished: b.publish_at || b.created_at,
+      dateModified: b.updated_at || b.publish_at || b.created_at,
+      author: b.author ? { "@type": "Person", name: b.author } : undefined,
+      description: b.excerpt,
+      mainEntityOfPage: `${baseUrl}/blogs/${b.id}`,
+      position: idx + 1,
+    })),
+  };
+
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: filteredBlogs.slice(0, 10).map((b, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${baseUrl}/blogs/${b.id}`,
+      name: b.title,
+    })),
+  };
 
   return (
     <Layout>
+      <Helmet>
+        <title>Stories & Insights — Shahu Mumbai Blog</title>
+        <meta
+          name="description"
+          content="Discover stories & insights on heritage fashion, sustainable luxury, and artisan craftsmanship from Shahu Mumbai."
+        />
+        <link rel="canonical" href={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Stories & Insights — Shahu Mumbai Blog" />
+        <meta
+          property="og:description"
+          content="Heritage fashion, sustainable luxury, and artisan stories."
+        />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:image" content={`${baseUrl}/og/blog.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">
+          {JSON.stringify(blogListJsonLd)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(itemListJsonLd)}
+        </script>
+      </Helmet>
+
       <div className="max-w-6xl mx-auto px-4 py-8 font-sans bg-[#EDE1DF]">
         <motion.div
           initial={{ opacity: 0, y: -20 }}
@@ -185,7 +248,7 @@ const Blog = () => {
               className="bg-transparent outline-none text-sm text-gray-700 w-full"
             >
               <option value="">All Categories</option>
-              {categories.map((cat) => (
+              {["Announcements", "Guides", "Releases", "Behind the Scenes"].map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
@@ -240,9 +303,7 @@ const Blog = () => {
                   <div className="flex flex-wrap items-center text-sm text-gray-500 gap-2 mb-4">
                     <span>{blog.category}</span>
                     <span>•</span>
-                    <span>
-                      {new Date(blog.created_at).toLocaleDateString()}
-                    </span>
+                    <span>{new Date(blog.created_at).toLocaleDateString()}</span>
                     <span>•</span>
                     <span>8 min read</span>
                   </div>
@@ -258,13 +319,12 @@ const Blog = () => {
                   </div>
                   <p className="text-gray-700 mb-4">{blog.excerpt}</p>
                   <Link
-                      to={`/blogs/${blog.id}`}
-                      state={{ blog }} // optional: gives BlogView immediate data while it fetches
-                      className="text-[#6d4c41] hover:underline"
-                      >
-                      Read More
+                    to={`/blogs/${blog.id}`}
+                    state={{ blog }}
+                    className="text-[#6d4c41] hover:underline"
+                  >
+                    Read More
                   </Link>
-
 
                   {/* Blog footer */}
                   <div className="flex items-center gap-6 mt-4 text-gray-500 text-sm">
@@ -283,25 +343,13 @@ const Blog = () => {
                       {blog.likes || 0}
                     </div>
                     <div className="flex items-center gap-2">
-                      <a
-                        href={shareUrls.twitter}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={shareUrls.twitter} target="_blank" rel="noopener noreferrer">
                         <FaTwitter className="text-[#1DA1F2] hover:opacity-80" />
                       </a>
-                      <a
-                        href={shareUrls.facebook}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={shareUrls.facebook} target="_blank" rel="noopener noreferrer">
                         <FaFacebook className="text-[#3b5998] hover:opacity-80" />
                       </a>
-                      <a
-                        href={shareUrls.linkedin}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
+                      <a href={shareUrls.linkedin} target="_blank" rel="noopener noreferrer">
                         <FaLinkedin className="text-[#0077b5] hover:opacity-80" />
                       </a>
                     </div>

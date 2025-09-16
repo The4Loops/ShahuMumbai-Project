@@ -1,9 +1,11 @@
+// src/pages/ContemporaryArtisans.jsx (or TeamPage.jsx if you prefer)
 import { useState, useEffect, memo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Layout from "../layout/Layout";
-import api from "../supabase/axios"; // Assuming this is your axios instance
+import api from "../supabase/axios";
 import { toast } from "react-toastify";
+import { Helmet } from "react-helmet-async";
 
 // --- Components ---
 const TeamToggle = ({ view, setView }) => (
@@ -99,8 +101,8 @@ function TeamPage() {
         setTeamData(
           (data.members || []).map((member) => ({
             name: member.name,
-            specialty: member.role, // Map role to specialty
-            bio: member.description || "", // Map description to bio
+            specialty: member.role,
+            bio: member.description || "",
             color: member.color,
           }))
         );
@@ -115,8 +117,61 @@ function TeamPage() {
     fetchTeam();
   }, [view]);
 
+  // --- SEO (invisible only) ---
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/contemporaryartisans`; // keep canonical stable; ignore ?view=
+  const pageTitle = view === "artisans" ? "Contemporary Artisans — Shahu Mumbai" : "Technical Team — Shahu Mumbai";
+  const pageDesc =
+    view === "artisans"
+      ? "Meet the contemporary artisans crafting our heritage pieces at Shahu Mumbai."
+      : "Meet the technical team powering innovation and performance at Shahu Mumbai.";
+
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: teamData.map((m, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: {
+        "@type": "Person",
+        name: m.name,
+        description: m.bio || m.specialty,
+        jobTitle: m.specialty,
+      },
+    })),
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: view === "artisans" ? "Contemporary Artisans" : "Technical Team",
+        item: canonical,
+      },
+    ],
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDesc} />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDesc} />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={`${baseUrl}/og/team.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+      </Helmet>
+
       <div className="bg-[#F1E7E5] px-4 sm:px-10 py-16 min-h-screen text-[#2e2e2e]">
         {/* Toggle */}
         <TeamToggle view={view} setView={handleViewChange} />
@@ -139,9 +194,7 @@ function TeamPage() {
         </motion.div>
 
         {/* Error or Loading */}
-        {error && (
-          <div className="text-center text-red-600 mb-8">{error}</div>
-        )}
+        {error && <div className="text-center text-red-600 mb-8">{error}</div>}
         {loading ? (
           <div className="text-center text-gray-600">Loading...</div>
         ) : teamData.length === 0 ? (
@@ -151,12 +204,7 @@ function TeamPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-10 max-w-6xl mx-auto">
             {teamData.map((member, idx) => (
-              <TeamMemberCard
-                key={member.name}
-                member={member}
-                view={view}
-                delay={idx * 0.15}
-              />
+              <TeamMemberCard key={member.name} member={member} view={view} delay={idx * 0.15} />
             ))}
           </div>
         )}
@@ -164,4 +212,5 @@ function TeamPage() {
     </Layout>
   );
 }
+
 export default memo(TeamPage);

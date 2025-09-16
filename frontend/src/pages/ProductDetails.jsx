@@ -12,6 +12,7 @@ import api from "../supabase/axios";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
+import { Helmet } from "react-helmet-async";
 
 // ---------- helpers ----------
 const asBool = (v) => v === true || v === "true" || v === 1 || v === "1";
@@ -356,6 +357,25 @@ const ProductDetails = () => {
   if (isUpcoming) {
     return (
       <Layout>
+        {/* Basic SEO (indexable or not — you can choose to index) */}
+        <Helmet>
+          <title>{`${product.name} — Coming Soon | Shahu Mumbai`}</title>
+          <meta
+            name="description"
+            content={`Coming soon: ${product.name} from Shahu Mumbai.`}
+          />
+          <link
+            rel="canonical"
+            href={`${
+              typeof window !== "undefined"
+                ? window.location.origin
+                : "https://www.shahumumbai.com"
+            }/products/${id}`}
+          />
+          <meta property="og:title" content={`${product.name} — Coming Soon`} />
+          <meta property="og:description" content="Launching soon at Shahu Mumbai." />
+        </Helmet>
+
         <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5] font-serif">
           <div className="text-center">
             <h1 className="text-4xl font-bold text-[#6B4226] mb-4">
@@ -413,8 +433,74 @@ const ProductDetails = () => {
 
   const handleThumbClick = (idx) => sliderRef.current?.slickGoTo(idx);
 
+  // --- SEO: render once product is loaded ---
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/products/${id}`;
+  const descSource =
+    product.shortdescription || product.description || "Discover product details at Shahu Mumbai.";
+  const metaDescription =
+    (typeof descSource === "string" ? descSource : "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 300);
+
+  const productJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: product.name,
+    description: metaDescription,
+    image: images.length ? images : [hero],
+    sku: String(product.id),
+    category: categoryName(product),
+    brand: product.branddesigner ? { "@type": "Brand", name: product.branddesigner } : undefined,
+    offers: {
+      "@type": "Offer",
+      url: canonical,
+      priceCurrency: "INR",
+      price: Number(salePrice).toFixed(2),
+      availability:
+        Number(product.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+      itemCondition: "https://schema.org/NewCondition",
+    },
+    aggregateRating:
+      reviewCount > 0
+        ? {
+            "@type": "AggregateRating",
+            ratingValue: String(avgRating),
+            reviewCount: String(reviewCount),
+          }
+        : undefined,
+  };
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Products", item: `${baseUrl}/products` },
+      { "@type": "ListItem", position: 3, name: product.name, item: canonical },
+    ],
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>{`${product.name} — Shahu Mumbai`}</title>
+        <meta name="description" content={metaDescription} />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="product" />
+        <meta property="og:title" content={`${product.name} — Shahu Mumbai`} />
+        <meta property="og:description" content={metaDescription} />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={images[0] || hero} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="product:price:amount" content={String(salePrice)} />
+        <meta name="product:price:currency" content="INR" />
+        <script type="application/ld+json">{JSON.stringify(productJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+      </Helmet>
+
       <div className="min-h-screen px-4 md:px-6 py-16 pt-[60px] bg-[#F1E7E5] font-serif">
         {/* Breadcrumb */}
         <nav className="max-w-6xl mx-auto text-sm mb-4 text-[#6B4226]">

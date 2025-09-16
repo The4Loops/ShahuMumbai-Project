@@ -3,6 +3,7 @@ import { FaLock, FaCreditCard, FaUniversity, FaMobileAlt } from "react-icons/fa"
 import { MdEmail, MdPhone, MdPerson, MdHome } from "react-icons/md";
 import Layout from "../layout/Layout";
 import { Ecom } from "../analytics";
+import { Helmet } from "react-helmet-async";
 
 const API = process.env.REACT_APP_API_BASE_URL;
 
@@ -17,9 +18,8 @@ async function loadRazorpay() {
   });
 }
 
-
 const product = {
-  id: 42, 
+  id: 42,
   name: "Premium Vintage Silk Scarf",
   prices: { INR: 299, USD: 10 },
   currencyMeta: {
@@ -34,9 +34,13 @@ function Checkout() {
   const meta = product.currencyMeta[currency];
 
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", address: "" });
-  const [paymentMethod, setPaymentMethod] = useState(""); // for UI
+  const [paymentMethod, setPaymentMethod] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [token, setToken] = useState("");
+
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const pageUrl = `${baseUrl}/checkout`;
 
   const generateToken = () => {
     const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -75,7 +79,7 @@ function Checkout() {
     const newToken = generateToken();
     setToken(newToken);
 
-    // 1) Create pending order in your DB (server will recompute prices from products table)
+    // 1) Create pending order
     let orderNumber;
     try {
       const resp = await fetch(`${API}/api/checkout`, {
@@ -91,9 +95,9 @@ function Checkout() {
           },
           items: [
             {
-              product_id: product.id, // authoritative id
-              product_title: product.name, // optional (audit)
-              unit_price: selectedPrice,   // UI only; server ignores & uses DB price
+              product_id: product.id,
+              product_title: product.name,
+              unit_price: selectedPrice,
               qty: 1,
             },
           ],
@@ -122,7 +126,7 @@ function Checkout() {
       return;
     }
 
-    // 2) Ask backend to create a Razorpay Order for this order_number
+    // 2) Create Razorpay Order
     try {
       const r = await fetch(`${API}/api/payments/create-order`, {
         method: "POST",
@@ -204,6 +208,24 @@ function Checkout() {
 
   return (
     <Layout>
+      {/* SEO (no UI change) */}
+      <Helmet>
+        <title>Checkout — Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Complete your purchase securely on Shahu Mumbai."
+        />
+        <link rel="canonical" href={pageUrl} />
+        {/* Checkout should not be indexed */}
+        <meta name="robots" content="noindex,nofollow,noarchive" />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Checkout — Shahu Mumbai" />
+        <meta property="og:description" content="Secure checkout powered by Razorpay." />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:image" content={`${baseUrl}/og/checkout.jpg`} />
+        <meta name="twitter:card" content="summary" />
+      </Helmet>
+
       <div className="max-w-3xl mx-auto p-6 space-y-6">
         {/* Customer Information */}
         <div className="border rounded-xl p-4 space-y-4 bg-white shadow-md">
@@ -237,9 +259,7 @@ function Checkout() {
               <button
                 key={method}
                 onClick={() => setPaymentMethod(method)}
-                className={`border rounded px-3 py-2 hover:bg-gray-50 flex items-center gap-2 ${
-                  paymentMethod === method ? "bg-gray-200 font-bold" : ""
-                }`}
+                className={`border rounded px-3 py-2 hover:bg-gray-50 flex items-center gap-2 ${paymentMethod === method ? "bg-gray-200 font-bold" : ""}`}
               >
                 {paymentIcons[method]} {method}
               </button>

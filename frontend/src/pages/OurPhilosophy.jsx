@@ -1,5 +1,6 @@
 import React from "react";
 import Layout from "../layout/Layout";
+import { Helmet } from "react-helmet-async";
 
 function OurPhilosophy() {
   const beliefs = [
@@ -25,8 +26,50 @@ function OurPhilosophy() {
     },
   ];
 
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/ourphilosophy`;
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Our Philosophy", item: canonical },
+    ],
+  };
+
+  const webPageJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Our Philosophy — Shahu Mumbai",
+    url: canonical,
+    description:
+      "Heritage, craftsmanship, sustainability, and ethical pre-order production at Shahu Mumbai.",
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>Our Philosophy — Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Heritage, craftsmanship, sustainability, and ethical pre-order production at Shahu Mumbai."
+        />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Our Philosophy — Shahu Mumbai" />
+        <meta
+          property="og:description"
+          content="Discover the values that shape every Shahu creation: craftsmanship, sustainability, and timeless stories."
+        />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={`${baseUrl}/og/philosophy.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(webPageJsonLd)}</script>
+      </Helmet>
+
       <section className="bg-[#F1E7E5] py-16 px-6 md:px-20 lg:px-32">
         <div className="max-w-6xl mx-auto">
           {/* Heading */}

@@ -5,10 +5,53 @@ import mother from "../assets/OurStudios/mother.png";
 import father from "../assets/OurStudios/Father.png";
 import widow from "../assets/OurStudios/widow.png";
 import mini from "../assets/OurStudios/bgmini.png";
+import { Helmet } from "react-helmet-async";
 
 function OurStudios() {
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/ourstudios`;
+
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Our Studio", item: canonical },
+    ],
+  };
+
+  const webPageJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    name: "Our Studio — Shahu Mumbai",
+    url: canonical,
+    description:
+      "Inside Shahu Mumbai’s studio where heritage meets modernity and every piece is crafted with care.",
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>Our Studio — Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Step into Shahu Mumbai’s studio: a global fashion house rooted in Indian craftsmanship, shaped in Mumbai."
+        />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Our Studio — Shahu Mumbai" />
+        <meta
+          property="og:description"
+          content="Where heritage meets modernity — handmade pieces and human stories behind every creation."
+        />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={`${baseUrl}/og/studio.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(webPageJsonLd)}</script>
+      </Helmet>
+
       <div className="bg-[#F1E7E5] text-[#2e2e2e]">
         {/* Hero Section */}
         <section

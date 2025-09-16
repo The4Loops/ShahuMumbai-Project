@@ -9,6 +9,7 @@ import {
 import Layout from "../layout/Layout";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
+import { Helmet } from "react-helmet-async";
 
 function ContactPage() {
   const token = localStorage.getItem("token");
@@ -72,8 +73,50 @@ function ContactPage() {
     { icon: FaLinkedinIn, label: "LinkedIn" },
   ];
 
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const pageUrl = `${baseUrl}/contactus`;
+
+  // JSON-LD
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+      { "@type": "ListItem", position: 2, name: "Contact", item: pageUrl },
+    ],
+  };
+
+  const contactPageJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ContactPage",
+    name: "Contact Shahu Mumbai",
+    url: pageUrl,
+    description: "Contact Shahu Mumbai for inquiries, collaborations, or support.",
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>Contact Us — Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Get in touch with Shahu Mumbai. We’re here to help with inquiries, bespoke requests, and collaborations."
+        />
+        <link rel="canonical" href={pageUrl} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content="Contact Us — Shahu Mumbai" />
+        <meta
+          property="og:description"
+          content="Reach out to the Shahu Mumbai team for any assistance."
+        />
+        <meta property="og:url" content={pageUrl} />
+        <meta property="og:image" content={`${baseUrl}/og/contact.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(contactPageJsonLd)}</script>
+      </Helmet>
+
       <div className="bg-[#F1E7E5] px-6 md:px-16 lg:px-24 py-16 text-[#2e2e2e]">
         {/* Header */}
         <div className="text-center mb-16">
