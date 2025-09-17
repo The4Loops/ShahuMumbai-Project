@@ -1,3 +1,4 @@
+// src/pages/Wishlist.jsx
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { AiOutlineShoppingCart, AiOutlineDelete } from "react-icons/ai";
@@ -6,6 +7,7 @@ import { Ecom, UX } from "../analytics";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
+import { Helmet } from "react-helmet-async";
 
 // Animation variants
 const fadeUpVariant = {
@@ -74,9 +76,7 @@ const Wishlist = () => {
           id: item.product_id,
           title: item.products.name,
           category: item.products.categories?.name || "N/A",
-          price:
-            item.products.price -
-            (Number(item.products.discountprice) || 0),
+          price: item.products.price - (Number(item.products.discountprice) || 0),
           quantity: 1,
         });
       } catch {}
@@ -100,9 +100,7 @@ const Wishlist = () => {
           item_id: item.product_id,
           item_name: item.products.name,
           category: item.products.categories?.name || "N/A",
-          price:
-            item.products.price -
-            (Number(item.products.discountprice) || 0),
+          price: item.products.price - (Number(item.products.discountprice) || 0),
         });
       } catch {}
     } catch (err) {
@@ -127,9 +125,7 @@ const Wishlist = () => {
             item_id: item.product_id,
             item_name: item.products.name,
             category: item.products.categories?.name || "N/A",
-            price:
-              item.products.price -
-              (Number(item.products.discountprice) || 0),
+            price: item.products.price - (Number(item.products.discountprice) || 0),
           })
         );
       } catch {}
@@ -143,35 +139,45 @@ const Wishlist = () => {
   const inStockItems = wishlistItems.filter((item) => item.products.stock > 0);
   const totalValue = wishlistItems
     .reduce(
-      (total, item) =>
-        total +
-        (item.products.price - (Number(item.products.discountprice) || 0)),
+      (total, item) => total + (item.products.price - (Number(item.products.discountprice) || 0)),
       0
     )
     .toFixed(2);
 
-  if (loading)
-    return <p className="p-6 text-center text-gray-800">Loading...</p>;
-  if (error)
-    return <p className="p-6 text-center text-red-500">{error}</p>;
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${origin}/wishlist`;
+
+  if (loading) return <p className="p-6 text-center text-gray-800">Loading...</p>;
+  if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
 
   return (
     <Layout>
+      <Helmet>
+        <title>Wishlist | Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="View and manage items you’ve saved for later at Shahu Mumbai."
+        />
+        {/* Utility/personalized page – keep out of index */}
+        <meta name="robots" content="noindex,follow" />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:title" content="Wishlist | Shahu Mumbai" />
+        <meta property="og:description" content="Your saved items in one place." />
+        <meta property="og:url" content={canonical} />
+      </Helmet>
+
       <div className="p-6">
         {/* Header Row */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold">Your Favorite Items</h1>
-            <p className="text-gray-500 text-sm">
-              {wishlistItems.length} items saved for later
-            </p>
+            <p className="text-gray-500 text-sm">{wishlistItems.length} items saved for later</p>
           </div>
           <div className="flex gap-3 mt-4 sm:mt-0">
             <button
               className={`flex items-center gap-2 border border-red-500 text-red-500 px-4 py-2 rounded hover:bg-red-50 text-sm font-medium ${
-                clearSubmitting || !wishlistItems.length
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
+                clearSubmitting || !wishlistItems.length ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={handleClearWishlist}
               disabled={clearSubmitting || !wishlistItems.length}
@@ -180,9 +186,7 @@ const Wishlist = () => {
             </button>
             <button
               className={`flex items-center gap-2 bg-black text-white px-4 py-2 rounded hover:bg-gray-800 text-sm font-medium ${
-                cartSubmitting || !inStockItems.length
-                  ? "opacity-50 cursor-not-allowed"
-                  : ""
+                cartSubmitting || !inStockItems.length ? "opacity-50 cursor-not-allowed" : ""
               }`}
               onClick={() => {
                 if (cartSubmitting || !inStockItems.length) return;
@@ -190,8 +194,7 @@ const Wishlist = () => {
               }}
               disabled={cartSubmitting || !inStockItems.length}
             >
-              <AiOutlineShoppingCart size={16} /> Add All to Cart (
-              {inStockItems.length})
+              <AiOutlineShoppingCart size={16} /> Add All to Cart ({inStockItems.length})
             </button>
           </div>
         </div>
@@ -222,9 +225,7 @@ const Wishlist = () => {
           {wishlistItems.map((item, index) => {
             const discountPrice = Number(item.products.discountprice) || 0;
             const hasDiscount = discountPrice > 0 && discountPrice < item.products.price;
-            const salePrice = hasDiscount
-              ? item.products.price - discountPrice
-              : item.products.price;
+            const salePrice = hasDiscount ? item.products.price - discountPrice : item.products.price;
             const discountPercentage = hasDiscount
               ? Math.round(((item.products.price - salePrice) / item.products.price) * 100)
               : 0;
@@ -259,13 +260,9 @@ const Wishlist = () => {
                   <div className="text-xs text-gray-500 uppercase mb-1">
                     {item.products.categories?.name || "N/A"}
                   </div>
-                  <div className="font-semibold text-sm mb-2 line-clamp-2">
-                    {item.products.name}
-                  </div>
+                  <div className="font-semibold text-sm mb-2 line-clamp-2">{item.products.name}</div>
                   <div className="mb-2">
-                    <span className="text-lg font-bold text-gray-800">
-                      ${salePrice.toFixed(2)}
-                    </span>
+                    <span className="text-lg font-bold text-gray-800">${salePrice.toFixed(2)}</span>
                     {hasDiscount && (
                       <span className="line-through text-sm text-gray-400 ml-2">
                         ${item.products.price.toFixed(2)}
@@ -293,11 +290,7 @@ const Wishlist = () => {
                       disabled={item.products.stock <= 0 || cartSubmitting}
                       onClick={() => handleAddToCart(item)}
                     >
-                      {item.products.stock > 0 ? (
-                        <AiOutlineShoppingCart size={14} />
-                      ) : (
-                        "Out of Stock"
-                      )}
+                      {item.products.stock > 0 ? <AiOutlineShoppingCart size={14} /> : "Out of Stock"}
                       {item.products.stock > 0 && "Add to Cart"}
                     </button>
                   </div>

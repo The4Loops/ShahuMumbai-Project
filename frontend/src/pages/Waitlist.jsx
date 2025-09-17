@@ -1,6 +1,7 @@
-// src/components/Waitlist.jsx
+// src/pages/Waitlist.jsx
 import React, { useState, useEffect } from "react";
 import Layout from "../layout/Layout";
+import { Helmet } from "react-helmet-async";
 
 // Tailwind background colors for placeholders
 const colors = [
@@ -14,16 +15,13 @@ const colors = [
   "bg-teal-400",
 ];
 
-const getRandomColor = () =>
-  colors[Math.floor(Math.random() * colors.length)];
+const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
 
 const fakeTimes = ["Just now", "2m ago", "5m ago", "10m ago", "30m ago"];
-const getRandomTime = () =>
-  fakeTimes[Math.floor(Math.random() * fakeTimes.length)];
+const getRandomTime = () => fakeTimes[Math.floor(Math.random() * fakeTimes.length)];
 
 const statuses = ["Available", "Out of Stock", "Upcoming"];
-const getRandomStatus = () =>
-  statuses[Math.floor(Math.random() * statuses.length)];
+const getRandomStatus = () => statuses[Math.floor(Math.random() * statuses.length)];
 
 const getStatusBadgeStyle = (status) => {
   switch (status) {
@@ -101,8 +99,7 @@ const Waitlist = () => {
           // Remove products that have been "Available" for over 24 hours
           .filter((p) => {
             if (p.status === "Available" && p.availableSince) {
-              const hoursSinceAvailable =
-                (Date.now() - p.availableSince) / (1000 * 60 * 60);
+              const hoursSinceAvailable = (Date.now() - p.availableSince) / (1000 * 60 * 60);
               return hoursSinceAvailable < 24;
             }
             return true;
@@ -111,27 +108,40 @@ const Waitlist = () => {
 
       // remove flash after animation
       setTimeout(() => {
-        setProducts((prev) =>
-          prev.map((product) => ({ ...product, flash: false }))
-        );
+        setProducts((prev) => prev.map((product) => ({ ...product, flash: false })));
       }, 800);
     }, 300000); // 5 minutes
 
     return () => clearInterval(interval);
   }, []);
 
+  const origin =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${origin}/waitlist`;
+
   return (
     <Layout>
+      <Helmet>
+        <title>Waitlist | Shahu Mumbai</title>
+        <meta
+          name="description"
+          content="Track availability of items you’re watching. Get notified when products are back in stock at Shahu Mumbai."
+        />
+        {/* Utility/personalized page – keep out of index */}
+        <meta name="robots" content="noindex,follow" />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:title" content="Waitlist | Shahu Mumbai" />
+        <meta property="og:description" content="Track availability of items you’re watching." />
+        <meta property="og:url" content={canonical} />
+      </Helmet>
+
       <div className="max-w-6xl mx-auto p-6 relative">
         <h1 className="text-3xl font-bold mb-8 text-center">My Waitlist</h1>
 
         {/* Toast Notification Stack */}
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-50">
           {toasts.map((toast) => (
-            <div
-              key={toast.id}
-              className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeInOut"
-            >
+            <div key={toast.id} className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeInOut">
               {toast.message}
             </div>
           ))}
@@ -156,39 +166,25 @@ const Waitlist = () => {
               </span>
 
               {/* Image Placeholder */}
-              <div
-                className={`h-40 flex items-center justify-center ${product.color}`}
-              >
-                <span className="text-white text-2xl font-bold">
-                  {product.name.charAt(0)}
-                </span>
+              <div className={`h-40 flex items-center justify-center ${product.color}`}>
+                <span className="text-white text-2xl font-bold">{product.name.charAt(0)}</span>
               </div>
 
               {/* Card Body */}
               <div className="p-4">
-                <h2 className="text-lg font-semibold text-gray-800">
-                  {product.name}
-                </h2>
+                <h2 className="text-lg font-semibold text-gray-800">{product.name}</h2>
 
                 {product.status === "Available" ? (
-                  <p className="mt-2 text-sm text-gray-600">
-                    ✅ This product is available now — no waitlist needed.
-                  </p>
+                  <p className="mt-2 text-sm text-gray-600">✅ This product is available now — no waitlist needed.</p>
                 ) : (
                   <div className="mt-3 p-3 bg-indigo-50 border rounded-md">
-                    <p className="text-sm text-gray-700">
-                      You are on the waitlist for:
-                    </p>
+                    <p className="text-sm text-gray-700">You are on the waitlist for:</p>
                     <p className="font-bold text-indigo-700">{product.name}</p>
-                    <p className="text-xs text-gray-500">
-                      Status: {product.status}
-                    </p>
+                    <p className="text-xs text-gray-500">Status: {product.status}</p>
                   </div>
                 )}
 
-                <p className="mt-3 text-xs text-gray-400">
-                  ⏱ Last updated: {product.updated}
-                </p>
+                <p className="mt-3 text-xs text-gray-400">⏱ Last updated: {product.updated}</p>
               </div>
             </div>
           ))}

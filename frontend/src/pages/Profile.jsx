@@ -6,6 +6,7 @@ import { useNavigate, Link } from "react-router-dom";
 import api from "../supabase/axios";
 import Layout from "../layout/Layout";
 import { toast } from "react-toastify";
+import { Helmet } from "react-helmet-async";
 
 // Moved outside to avoid useEffect dependency warning
 const emptyProfile = {
@@ -75,15 +76,15 @@ function Profile() {
           country: user.country || "",
           role: user.role || "",
           preferences: {
-            newsletter: user.preferences.newsletter || false,
-            emailNotifications: user.preferences.emailNotifications || false,
-            publicProfile: user.preferences.publicProfile || false,
+            newsletter: user.preferences?.newsletter || false,
+            emailNotifications: user.preferences?.emailNotifications || false,
+            publicProfile: user.preferences?.publicProfile || false,
           },
           socialLinks: {
-            twitter: user.socialLinks.twitter || "",
-            facebook: user.socialLinks.facebook || "",
-            instagram: user.socialLinks.instagram || "",
-            linkedin: user.socialLinks.linkedin || "",
+            twitter: user.socialLinks?.twitter || "",
+            facebook: user.socialLinks?.facebook || "",
+            instagram: user.socialLinks?.instagram || "",
+            linkedin: user.socialLinks?.linkedin || "",
           },
           image: user.image || null,
         });
@@ -139,6 +140,10 @@ function Profile() {
             instagram_url: profile.socialLinks.instagram,
             linkedin_url: profile.socialLinks.linkedin,
             profile_image: profile.image,
+          },
+          {
+            // ✅ FIX: add auth header for saving
+            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
           }
         );
         const { user } = response.data;
@@ -150,15 +155,15 @@ function Profile() {
           country: user.country || "",
           role: user.role || "",
           preferences: {
-            newsletter: user.preferences.newsletter || false,
-            emailNotifications: user.preferences.emailNotifications || false,
-            publicProfile: user.preferences.publicProfile || false,
+            newsletter: user.preferences?.newsletter || false,
+            emailNotifications: user.preferences?.emailNotifications || false,
+            publicProfile: user.preferences?.publicProfile || false,
           },
           socialLinks: {
-            twitter: user.socialLinks.twitter || "",
-            facebook: user.socialLinks.facebook || "",
-            instagram: user.socialLinks.instagram || "",
-            linkedin: user.socialLinks.linkedin || "",
+            twitter: user.socialLinks?.twitter || "",
+            facebook: user.socialLinks?.facebook || "",
+            instagram: user.socialLinks?.instagram || "",
+            linkedin: user.socialLinks?.linkedin || "",
           },
           image: user.image || null,
         });
@@ -186,8 +191,20 @@ function Profile() {
       .toUpperCase()
       .slice(0, 3);
 
+  // ---------- SEO ----------
+  // User profile pages are typically private — mark as noindex.
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/profile`;
+
   return (
     <Layout>
+      <Helmet>
+        <title>My Profile — Shahu Mumbai</title>
+        <meta name="robots" content="noindex,nofollow" />
+        <link rel="canonical" href={canonical} />
+      </Helmet>
+
       <motion.div
         className="max-w-6xl mx-auto p-4 sm:p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         initial={{ opacity: 0 }}
@@ -195,7 +212,7 @@ function Profile() {
         transition={{ duration: 0.5 }}
       >
         {/* Profile Summary */}
-        <div className="col-span-1 text-center bg-#F1E7E5 rounded-2xl shadow p-6 sm:col-span-1">
+        <div className="col-span-1 text-center bg-[#F1E7E5] rounded-2xl shadow p-6 sm:col-span-1">
           <div className="relative w-20 h-20 sm:w-24 sm:h-24 mx-auto mb-4">
             {profile.image ? (
               <img
@@ -357,7 +374,7 @@ function Profile() {
                         socialLinks: { ...prev.socialLinks, [key]: e.target.value },
                       }))
                     }
-                    className="border px-2 py-1 rounded w-full"
+                    className="border px-2 py-1 rounded w/full"
                   />
                 ) : profile.socialLinks[key] ? (
                   <a

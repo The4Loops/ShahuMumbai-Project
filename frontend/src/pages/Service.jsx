@@ -1,4 +1,5 @@
 import Layout from "../layout/Layout";
+import { Helmet } from "react-helmet-async";
 
 const services = [
   {
@@ -40,8 +41,55 @@ const services = [
 ];
 
 function ServicePage() {
+  const origin =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
+  const canonical = `${origin}/Services`; // matches your <Route path="/Services" ...>
+
+  // Build Services as an ItemList
+  const servicesJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Shahu Services",
+    itemListElement: services.map((s, idx) => ({
+      "@type": "ListItem",
+      position: idx + 1,
+      item: {
+        "@type": "Service",
+        name: s.title,
+        description: s.description,
+        provider: {
+          "@type": "Organization",
+          name: "Shahu Mumbai",
+        },
+        areaServed: "Worldwide",
+        serviceType: s.title,
+      },
+    })),
+  };
+
+  const title = "Our Services — Personal Styling, Curation & Restoration | Shahu Mumbai";
+  const desc =
+    "Explore Shahu’s services: personal styling, custom sourcing, vintage curation, restoration, home decor styling, and event styling. Crafted with heritage and care.";
+
   return (
     <Layout>
+      <Helmet>
+        <title>{title}</title>
+        <meta name="description" content={desc} />
+        <link rel="canonical" href={canonical} />
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={title} />
+        <meta property="og:description" content={desc} />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={`${origin}/og/services.jpg`} />
+        {/* Twitter */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(servicesJsonLd)}</script>
+      </Helmet>
+
       <div className="bg-[#F1E7E5] px-4 sm:px-8 md:px-16 lg:px-24 py-16 text-[#2e2e2e] min-h-screen">
         {/* Header */}
         <div className="text-center mb-16">
@@ -57,7 +105,10 @@ function ServicePage() {
           {services.map((service, idx) => (
             <div key={idx} className="relative">
               {/* Dot with icon */}
-              <div className="absolute -left-5 top-1.5 w-10 h-10 flex items-center justify-center bg-white border-2 border-[#d4b8a5] rounded-full text-xl sm:-left-6 sm:w-12 sm:h-12">
+              <div
+                className="absolute -left-5 top-1.5 w-10 h-10 flex items-center justify-center bg-white border-2 border-[#d4b8a5] rounded-full text-xl sm:-left-6 sm:w-12 sm:h-12"
+                aria-hidden="true"
+              >
                 {service.icon}
               </div>
 
@@ -77,9 +128,9 @@ function ServicePage() {
           {services.map((service, idx) => (
             <div
               key={idx}
-              className="p-8 text-center border border-gray-300/40 rounded-xl bg-white/50 hover:shadow-md transition"
+              className="p-8 text-center border border-gray-300/40 rounded-xl bg:white/50 hover:shadow-md transition"
             >
-              <div className="text-5xl mb-4 transition-transform hover:scale-110">
+              <div className="text-5xl mb-4 transition-transform hover:scale-110" aria-hidden="true">
                 {service.icon}
               </div>
               <h3 className="text-xl font-semibold mb-2">{service.title}</h3>

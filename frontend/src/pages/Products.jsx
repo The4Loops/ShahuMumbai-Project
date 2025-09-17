@@ -5,6 +5,7 @@ import ProductCard from "../components/ProductCard";
 import Layout from "../layout/Layout";
 import { toast } from "react-toastify";
 import { FiFilter, FiChevronDown, FiX, FiSearch } from "react-icons/fi";
+import { Helmet } from "react-helmet-async";
 
 const ITEMS_PER_PAGE = 30;
 const FALLBACK_CATEGORIES = ["Men", "Women", "Accessories"];
@@ -189,8 +190,44 @@ const Products = () => {
     (selectedCategories.size > 0 ? 1 : 0) +
     (sort !== "relevance" ? 1 : 0);
 
+  // ---------- SEO ----------
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/products`;
+  const pageTitle = "Discover Handpicked Styles — Shahu Mumbai";
+  const pageDesc =
+    "Explore curated fashion in earthy tones and timeless silhouettes. Filter by category, search, and sort to find your perfect piece at Shahu Mumbai.";
+
+  // Build ItemList JSON-LD for the current page slice
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name: "Products",
+    url: `${canonical}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`,
+    numberOfItems: paged.length,
+    itemListElement: paged.map((p, idx) => ({
+      "@type": "ListItem",
+      position: start + idx + 1,
+      url: `${baseUrl}/products/${p.id}`,
+      name: p.name,
+    })),
+  };
+
   return (
     <Layout>
+      <Helmet>
+        <title>{pageTitle}</title>
+        <meta name="description" content={pageDesc} />
+        <link rel="canonical" href={canonical} />
+        <meta property="og:type" content="website" />
+        <meta property="og:title" content={pageTitle} />
+        <meta property="og:description" content={pageDesc} />
+        <meta property="og:url" content={canonical} />
+        <meta property="og:image" content={`${baseUrl}/og/products.jpg`} />
+        <meta name="twitter:card" content="summary_large_image" />
+        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+      </Helmet>
+
       <div className="pt-[130px] pb-12 px-4 bg-[#EDE1DF] min-h-screen font-serif">
         {/* Banner */}
         <div className="max-w-7xl mx-auto">
