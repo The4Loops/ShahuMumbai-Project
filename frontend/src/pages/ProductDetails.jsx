@@ -694,7 +694,7 @@ const ProductDetails = () => {
 
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
-                    className={`bg-[#D4A5A5] hover:bg-[#C39898] text-white px-6 py-3 rounded-md transition font-semibold shadow ${
+                    className={`bg-black hover:bg-slate-600 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
                       Number(product.stock) === 0 || cartSubmitting
                         ? "opacity-50 cursor-not-allowed"
                         : ""
@@ -706,7 +706,7 @@ const ProductDetails = () => {
                     {cartSubmitting ? "Adding..." : "Add to Cart"}
                   </button>
                   <button
-                    className={`bg-[#6B4226] hover:opacity-90 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
+                    className={`bg-black hover:bg-slate-600 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
                       Number(product.stock) === 0
                         ? "opacity-50 cursor-not-allowed"
                         : ""
@@ -724,10 +724,10 @@ const ProductDetails = () => {
                     {/* Watchlist Icon Button */}
                     <button
                       type="button"
-                      className={`flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
+                      className={` flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
                         isInWishlist
                           ? 'bg-[#D4A5A5] text-white'
-                          : 'bg-white hover:bg-[#F1E7E5] text-[#D4A5A5]'
+                          : 'bg-black hover:bg-slate-600 text-[#D4A5A5]'
                       } ${wishlistSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                       aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
                       onClick={handleToggleWishlist}
@@ -739,7 +739,7 @@ const ProductDetails = () => {
                     {/* Waitlist Button */}
                     <button
                       type="button"
-                      className="flex-1 bg-[#A3B18A] hover:bg-[#87986A] text-white px-4 py-3 rounded-md font-semibold shadow transition"
+                      className="flex-1 bg-black hover:bg-slate-600 text-white px-4 py-3 rounded-md font-semibold shadow transition"
                       aria-label="Join waitlist"
                       onClick={() => console.log("Add to Waitlist", product.id)}
                     >
