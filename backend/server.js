@@ -1,13 +1,19 @@
 // server.js
+require('dotenv').config();
+
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const cookieParser = require('cookie-parser');
 
 // Cron jobs
 require('./cron/autounlock')();
 require('./cron/reminderMailOfCartItem')();
+
+// Middlewares
+const guestSession = require('./middleware/guestSession');
+const { optional } = require('./middleware/auth'); // optional JWT attach
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -33,7 +39,7 @@ const teamMembersRoutes = require('./routes/teamMembersRoutes');
 const collectionsRoutes = require('./routes/collectionsRoutes');
 const subscriberRoutes = require('./routes/subscriberRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
-const paymentsRoutes = require('./routes/paymentsRoutes'); // ✅ keep name consistent
+const paymentsRoutes = require('./routes/paymentsRoutes'); // Razorpay routes
 const heritageRoutes = require('./routes/heritageRoutes');
 
 const app = express();
@@ -42,18 +48,23 @@ app.set('trust proxy', 1);
 // --- Security headers (Helmet defaults) ---
 app.use(helmet());
 
-// --- CORS (frontend origin) ---
+// --- CORS (use FRONTEND origin; allow auth header & credentials) ---
 app.use(
   cors({
-    origin: process.env.REACT_APP_API_BASE_URL, // e.g. http://localhost:3000
+    origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 
-// --- JSON parser (safe; webhook route uses express.raw locally) ---
+// --- Cookies (MUST come before guestSession) ---
+app.use(cookieParser(process.env.COOKIE_SECRET));
+
+// --- JSON parser ---
 app.use(express.json());
 
-// --- Content Security Policy (allow Razorpay assets) ---
+// --- Content Security Policy (allow Razorpay assets & your origins) ---
 app.use(
   helmet.contentSecurityPolicy({
     directives: {
@@ -64,7 +75,8 @@ app.use(
       imgSrc: ["'self'", "data:", "https://*.razorpay.com"],
       connectSrc: [
         "'self'",
-        process.env.REACT_APP_API_BASE_URL,
+        process.env.FRONTEND_ORIGIN || "http://localhost:3000",
+        process.env.API_ORIGIN || "http://localhost:5000",
         "https://api.razorpay.com",
         "https://*.razorpay.com",
       ],
@@ -77,11 +89,18 @@ app.use(
 app.disable('x-powered-by');
 
 // --- Rate limiting (put BEFORE routes) ---
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-});
-app.use(limiter);
+app.use(
+  rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 100,
+  })
+);
+
+// --- Guest session (assigns req.guestId like "guest:<sid>") ---
+app.use(guestSession);
+
+// --- Optional auth (attaches req.user if a valid JWT is present) ---
+app.use(optional);
 
 // --- Health check ---
 app.get('/health', (_req, res) => res.json({ ok: true }));
