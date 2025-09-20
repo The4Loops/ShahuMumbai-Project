@@ -120,7 +120,7 @@ function TeamPage() {
   // --- SEO (invisible only) ---
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
-  const canonical = `${baseUrl}/contemporaryartisans`; // keep canonical stable; ignore ?view=
+  const canonical = `${baseUrl}/contemporaryartisans`; 
   const pageTitle = view === "artisans" ? "Contemporary Artisans — Shahu Mumbai" : "Technical Team — Shahu Mumbai";
   const pageDesc =
     view === "artisans"
@@ -159,18 +159,77 @@ function TeamPage() {
   return (
     <Layout>
       <Helmet>
+        {/* Core SEO */}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
+        <meta name="robots" content="index,follow,max-image-preview:large" />
+        <meta
+          name="keywords"
+          content={
+            view === "artisans"
+              ? "Shahu Mumbai artisans, Indian artisans, contemporary artisans, designer profiles, heritage craftsmanship, handmade fashion India, artisan directory"
+              : "Shahu Mumbai technical team, engineering team, technology team, product engineering, ecommerce performance, technical profiles"
+          }
+        />
+
+        {/* Canonical + hreflang */}
         <link rel="canonical" href={canonical} />
+        <link rel="alternate" hrefLang="en-IN" href={canonical} />
+        <link rel="alternate" hrefLang="x-default" href={canonical} />
+
+        {/* Open Graph */}
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDesc} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/team.jpg`} />
+        <meta
+          property="og:image:alt"
+          content={view === "artisans" ? "Shahu Mumbai — Contemporary Artisans" : "Shahu Mumbai — Technical Team"}
+        />
+
+        {/* Twitter
         <meta name="twitter:card" content="summary_large_image" />
-        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+        <meta name="twitter:site" content="@yourhandle" /> 
+        <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDesc} />
+        <meta name="twitter:image" content={`${baseUrl}/og/team.jpg`} /> */}
+
+        {/* Breadcrumbs (kept) */}
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+
+        {/* CollectionPage wrapper + your ItemList of Persons */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: pageTitle,
+            url: canonical,
+            description: pageDesc,
+            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
+            about:
+              view === "artisans"
+                ? "Contemporary Indian artisans and designers featured by Shahu Mumbai"
+                : "Shahu Mumbai technical team profiles",
+            mainEntity: itemListJsonLd, // your ItemList of Person entries
+          })}
+        </script>
+
+        {/* (Optional) Organization — include if you haven't set it sitewide */}
+        {/* <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Shahu Mumbai",
+            url: baseUrl,
+            logo: `${baseUrl}/static/logo-300.png`,
+            // sameAs: ["https://www.instagram.com/...", "https://www.linkedin.com/company/...", "https://www.youtube.com/@..."]
+          })}
+        </script> */}
       </Helmet>
+
 
       <div className="bg-[#F1E7E5] px-4 sm:px-10 py-16 min-h-screen text-[#2e2e2e]">
         {/* Toggle */}

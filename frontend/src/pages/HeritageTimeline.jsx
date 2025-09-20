@@ -60,39 +60,78 @@ export default function HeritageTimeline() {
     ],
   };
 
-  const itemListJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ItemList",
-    itemListElement: milestones.map((m, i) => ({
-      "@type": "ListItem",
-      position: i + 1,
+const itemListJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  numberOfItems: milestones.length,
+  itemListElement: milestones.map((m, i) => ({
+    "@type": "ListItem",
+    position: i + 1,
+    item: {
+      "@type": "Event", // or "CreativeWork" if you prefer
       name: `${m.year} — ${m.title}`,
       url: `${canonical}#${encodeURIComponent(m.title)}`,
       description: m.description,
-    })),
-  };
+      startDate: m.year,
+      image: m.image ? `${baseUrl}${m.image}` : undefined
+    }
+  }))
+};
 
   return (
     <Layout>
       <Helmet>
+        {/* Core SEO */}
         <title>Heritage Timeline — Shahu Mumbai</title>
         <meta
           name="description"
-          content="Explore Shahu Mumbai’s heritage timeline: inspirations, craftsmanship, and modern evolutions across the years."
+          content="Explore Shahu Mumbai’s heritage timeline—key inspirations, craftsmanship milestones, and modern evolutions across the years."
         />
-        <link rel="canonical" href={canonical} />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Heritage Timeline — Shahu Mumbai" />
+        <meta name="robots" content={ (Array.isArray(milestones) && milestones.length === 0) ? "noindex,follow" : "index,follow,max-image-preview:large" } />
         <meta
-          property="og:description"
-          content="A journey through our inspirations and craftsmanship milestones."
+          name="keywords"
+          content="Shahu Mumbai heritage, heritage timeline, Indian craftsmanship history, artisanal fashion, brand story, sustainable luxury India"
         />
+
+        {/* Canonical + hreflang */}
+        <link rel="canonical" href={canonical} />
+        <link rel="alternate" hrefLang="en-IN" href={canonical} />
+        <link rel="alternate" hrefLang="x-default" href={canonical} />
+
+        {/* Open Graph */}
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
+        <meta property="og:title" content="Heritage Timeline — Shahu Mumbai" />
+        <meta property="og:description" content="A journey through our inspirations and craftsmanship milestones." />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/heritage.jpg`} />
+        <meta property="og:image:alt" content="Shahu Mumbai — Heritage Timeline milestones" />
+
+        {/* Twitter
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@yourhandle" />
+        <meta name="twitter:title" content="Heritage Timeline — Shahu Mumbai" />
+        <meta name="twitter:description" content="Key inspirations and craftsmanship milestones from Shahu Mumbai." />
+        <meta name="twitter:image" content={`${baseUrl}/og/heritage.jpg`} /> */}
+
+        {/* Structured Data */}
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
         <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "Heritage Timeline — Shahu Mumbai",
+            url: canonical,
+            description:
+              "Explore Shahu Mumbai’s heritage timeline—key inspirations, craftsmanship milestones, and modern evolutions across the years.",
+            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
+            mainEntity: itemListJsonLd, // your ItemList of milestones
+          })}
+        </script>
       </Helmet>
+
 
       <section className="bg-[#F1E7E5] py-16 px-6">
         <div className="max-w-6xl mx-auto">

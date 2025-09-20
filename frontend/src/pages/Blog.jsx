@@ -184,13 +184,27 @@ const Blog = () => {
   return (
     <Layout>
       <Helmet>
+        {/* Core SEO */}
         <title>Stories & Insights — Shahu Mumbai Blog</title>
         <meta
           name="description"
           content="Discover stories & insights on heritage fashion, sustainable luxury, and artisan craftsmanship from Shahu Mumbai."
         />
+        <meta name="robots" content="index,follow,max-image-preview:large" />
+        <meta
+          name="keywords"
+          content="Shahu Mumbai blog, sustainable fashion India, artisan craftsmanship, heritage fashion, ethical luxury, handcrafted sarees, Mumbai fashion house"
+        />
+
+        {/* Canonical + hreflang */}
         <link rel="canonical" href={pageUrl} />
+        <link rel="alternate" hrefLang="en-IN" href={pageUrl} />
+        <link rel="alternate" hrefLang="x-default" href={pageUrl} />
+
+        {/* Open Graph */}
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content="Stories & Insights — Shahu Mumbai Blog" />
         <meta
           property="og:description"
@@ -198,14 +212,40 @@ const Blog = () => {
         />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:image" content={`${baseUrl}/og/blog.jpg`} />
+        <meta property="og:image:alt" content="Shahu Mumbai Blog — heritage fashion & artisan stories" />
+
+        {/* Twitter
         <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:site" content="@yourhandle" />
+        <meta name="twitter:title" content="Stories & Insights — Shahu Mumbai Blog" />
+        <meta
+          name="twitter:description"
+          content="Discover heritage fashion, sustainable luxury, and artisan stories from Shahu Mumbai."
+        />
+        <meta name="twitter:image" content={`${baseUrl}/og/blog.jpg`} /> */}
+
+        {/* Breadcrumbs for Blog listing */}
         <script type="application/ld+json">
-          {JSON.stringify(blogListJsonLd)}
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            "itemListElement": [
+              { "@type": "ListItem", "position": 1, "name": "Home", "item": `${baseUrl}/` },
+              { "@type": "ListItem", "position": 2, "name": "Blog", "item": pageUrl }
+            ]
+          })}
         </script>
-        <script type="application/ld+json">
-          {JSON.stringify(itemListJsonLd)}
-        </script>
+
+        {/* Your existing structured data (kept, slightly hardened via slice(0,10) upstream) */}
+        <script type="application/ld+json">{JSON.stringify(blogListJsonLd)}</script>
+        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+
+        {/* Optional: if you later add paginated routes like /blog?page=2, consider:
+        <link rel="prev" href={`${pageUrl}?page=${currentPage-1}`} />
+        <link rel="next" href={`${pageUrl}?page=${currentPage+1}`} />
+        */}
       </Helmet>
+
 
       <div className="max-w-6xl mx-auto px-4 py-8 font-sans bg-[#EDE1DF]">
         <motion.div

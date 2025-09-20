@@ -39,24 +39,97 @@ function About() {
   return (
     <Layout>
       <Helmet>
-        <title>About — Shahu Mumbai</title>
+        {/* Basic SEO */}
+        <title>About Shahu Mumbai — Heritage, Craftsmanship & Sustainable Luxury</title>
         <meta
           name="description"
-          content="Discover the Shahu Mumbai story: heritage, craftsmanship, sustainable luxury, and the artisans behind every piece."
+          content="Discover the Shahu Mumbai story—heritage craft, ethical production, and slow, sustainable luxury created by contemporary Indian artisans in Mumbai."
         />
+        <meta name="robots" content="index,follow,max-image-preview:large" />
+        <meta
+          name="keywords"
+          content="Shahu Mumbai, about Shahu, Indian luxury fashion, artisan-made, sustainable fashion India, handcrafted sarees, ethical fashion brand, Mumbai fashion house"
+        />
+
+        {/* Canonical + hreflang (adjust locales if needed) */}
         <link rel="canonical" href={url} />
+        <link rel="alternate" hrefLang="en-IN" href={url} />
+        <link rel="alternate" hrefLang="x-default" href={url} />
+
+        {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:title" content="About — Shahu Mumbai" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
+        <meta property="og:title" content="About Shahu Mumbai — Heritage, Craftsmanship & Sustainable Luxury" />
         <meta
           property="og:description"
-          content="Heritage, craftsmanship & timeless luxury. Learn about our sustainable philosophy and artisan stories."
+          content="Heritage, craftsmanship & timeless luxury. Learn about our sustainable philosophy and artisan-first approach."
         />
         <meta property="og:url" content={url} />
         <meta property="og:image" content={`${base}/og/about.jpg`} />
-        <meta name="twitter:card" content="summary_large_image" />
+        <meta property="og:image:alt" content="Shahu Mumbai — artisan-led sustainable luxury fashion from India" />
 
-        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(aboutPageJsonLd)}</script>
+        {/* Twitter */}
+        {/* <meta name="twitter:card" content="summary_large_image" /> */}
+        {/* If you have a handle, set it here: */}
+        {/* <meta name="twitter:site" content="@yourhandle" /> */}
+        {/* <meta name="twitter:title" content="About Shahu Mumbai — Heritage, Craftsmanship & Sustainable Luxury" /> */}
+        {/* <meta */}
+          {/* name="twitter:description" */}
+          {/* content="Discover the Shahu Mumbai story—heritage craft and sustainable luxury made to order by Indian artisans." */}
+        {/* /> */}
+        {/* <meta name="twitter:image" content={`${base}/og/about.jpg`} /> */}
+
+        {/* Structured Data */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Home", item: `${base}/` },
+              { "@type": "ListItem", position: 2, name: "About", item: url },
+            ],
+          })}
+        </script>
+
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "AboutPage",
+            name: "About Shahu Mumbai",
+            url,
+            description:
+              "Shahu is a luxury fashion house rooted in India’s heritage and crafted sustainably by contemporary artisans.",
+            mainEntityOfPage: url,
+            isPartOf: {
+              "@type": "WebSite",
+              name: "Shahu Mumbai",
+              url: base,
+            },
+          })}
+        </script>
+
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            name: "Shahu Mumbai",
+            url: base,
+            logo: `${base}/static/logo-300.png`,
+            // Add your real profiles if available:
+            // sameAs: [
+            //   "https://www.instagram.com/shahumumbai",
+            //   "https://www.linkedin.com/company/yourhandle",
+            //   "https://youtube.com/@bhumishahu"
+            // ],
+            address: {
+              "@type": "PostalAddress",
+              addressCountry: "IN",
+              addressLocality: "Mumbai",
+            },
+            brand: "Shahu",
+          })}
+        </script>
       </Helmet>
 
       <div className="bg-[#F1E7E5] text-[#3B2E1E]">

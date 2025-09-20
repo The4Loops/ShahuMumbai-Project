@@ -216,17 +216,111 @@ const Products = () => {
   return (
     <Layout>
       <Helmet>
+        {/* Core SEO */}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
+        <meta
+          name="robots"
+          content={paged.length === 0 ? "noindex,follow" : "index,follow,max-image-preview:large"}
+        />
+        <meta
+          name="keywords"
+          content={[
+            "Shahu Mumbai",
+            "handwoven sarees",
+            "artisan-made",
+            "sustainable luxury",
+            "Indian fashion",
+            "designer sarees",
+            ...Array.from(selectedCategories || [])
+          ].filter(Boolean).join(", ")}
+        />
+
+        {/* Canonical + hreflang */}
         <link rel="canonical" href={canonical} />
+        <link rel="alternate" hrefLang="en-IN" href={canonical} />
+        <link rel="alternate" hrefLang="x-default" href={canonical} />
+
+        {/* Open Graph */}
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content={pageTitle} />
         <meta property="og:description" content={pageDesc} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/products.jpg`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+        <meta property="og:image:alt" content="Shahu Mumbai — product collection" />
+
+        {/* Twitter */}
+        {/* <meta name="twitter:card" content="summary_large_image" /> */}
+        {/* If you have a handle, you can add: */}
+        {/* <meta name="twitter:site" content="@yourhandle" /> */}
+        {/* <meta name="twitter:title" content={pageTitle} />
+        <meta name="twitter:description" content={pageDesc} />
+        <meta name="twitter:image" content={`${baseUrl}/og/products.jpg`} /> */}
+
+        {/* Breadcrumbs */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "BreadcrumbList",
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+              { "@type": "ListItem", position: 2, name: "Products", item: canonical }
+            ]
+          })}
+        </script>
+
+        {/* Page type: CollectionPage (browse) or SearchResultsPage (search) */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": debouncedSearch ? "SearchResultsPage" : "CollectionPage",
+            name: pageTitle,
+            url: canonical,
+            description: pageDesc,
+            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
+            ...(debouncedSearch ? { query: debouncedSearch } : {})
+          })}
+        </script>
+
+        {/* ItemList: make each entry a Product with an Offer */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ItemList",
+            name: "Products",
+            url: `${canonical}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`,
+            numberOfItems: paged.length,
+            itemListElement: paged.map((p, idx) => ({
+              "@type": "ListItem",
+              position: start + idx + 1,
+              item: {
+                "@type": "Product",
+                name: p.name,
+                url: `${baseUrl}/products/${p.id}`,
+                image: p.image ? [p.image] : undefined,
+                description: p.description,
+                category: p.category,
+                offers: {
+                  "@type": "Offer",
+                  url: `${baseUrl}/products/${p.id}`,
+                  priceCurrency: "INR",
+                  price: typeof p.price === "number" ? p.price.toFixed(2) : String(p.price),
+                  availability: "https://schema.org/InStock"
+                }
+              }
+            }))
+          })}
+        </script>
+
+        {/* Optional pagination rels – only if you later add `?page=` in the URL */}
+        {/*
+        <link rel="prev" href={`${canonical}?page=${page-1}`} />
+        <link rel="next" href={`${canonical}?page=${page+1}`} />
+        */}
       </Helmet>
+
 
       <div className="pt-[130px] pb-12 px-4 bg-[#EDE1DF] min-h-screen font-serif">
         {/* Banner */}

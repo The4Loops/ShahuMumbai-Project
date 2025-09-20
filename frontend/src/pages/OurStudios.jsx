@@ -33,13 +33,27 @@ function OurStudios() {
   return (
     <Layout>
       <Helmet>
+        {/* Core SEO */}
         <title>Our Studio — Shahu Mumbai</title>
         <meta
           name="description"
           content="Step into Shahu Mumbai’s studio: a global fashion house rooted in Indian craftsmanship, shaped in Mumbai."
         />
+        <meta name="robots" content="index,follow,max-image-preview:large" />
+        <meta
+          name="keywords"
+          content="Shahu Mumbai studio, fashion studio Mumbai, artisan studio India, handcrafted sarees studio, sustainable fashion house"
+        />
+
+        {/* Canonical + hreflang */}
         <link rel="canonical" href={canonical} />
+        <link rel="alternate" hrefLang="en-IN" href={canonical} />
+        <link rel="alternate" hrefLang="x-default" href={canonical} />
+
+        {/* Open Graph */}
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content="Our Studio — Shahu Mumbai" />
         <meta
           property="og:description"
@@ -47,10 +61,71 @@ function OurStudios() {
         />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/studio.jpg`} />
-        <meta name="twitter:card" content="summary_large_image" />
+        <meta property="og:image:alt" content="Shahu Mumbai — inside our Mumbai studio" />
+
+        {/* Twitter */}
+        {/* <meta name="twitter:card" content="summary_large_image" /> */}
+        {/* If you have a handle, you can add: */}
+        {/* <meta name="twitter:site" content="@yourhandle" /> */}
+        {/* <meta name="twitter:title" content="Our Studio — Shahu Mumbai" />
+        <meta
+          name="twitter:description"
+          content="A global fashion house rooted in Indian craftsmanship and shaped in Mumbai."
+        />
+        <meta name="twitter:image" content={`${baseUrl}/og/studio.jpg`} /> */}
+
+        {/* Structured Data: Breadcrumbs (kept) */}
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(webPageJsonLd)}</script>
+
+        {/* Structured Data: WebPage (kept, lightly enriched) */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            ...webPageJsonLd,
+            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl }
+          })}
+        </script>
+
+        {/* Structured Data: ImageGallery of studio stories */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "ImageGallery",
+            name: "Shahu Mumbai — Our Studio Stories",
+            url: canonical,
+            image: [
+              {
+                "@type": "ImageObject",
+                contentUrl: typeof mother === "string" ? mother : `${baseUrl}/og/studio.jpg`,
+                caption: "A Mother’s Dream — funding her children’s education with each stitch"
+              },
+              {
+                "@type": "ImageObject",
+                contentUrl: typeof father === "string" ? father : `${baseUrl}/og/studio.jpg`,
+                caption: "A Father’s Legacy — preserving traditions while supporting his family"
+              },
+              {
+                "@type": "ImageObject",
+                contentUrl: typeof widow === "string" ? widow : `${baseUrl}/og/studio.jpg`,
+                caption: "A Widow’s Passion — continuing her late husband’s vision through fashion"
+              }
+            ]
+          })}
+        </script>
+
+        {/* Structured Data: CollectionPage wrapper */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "CollectionPage",
+            name: "Our Studio — Shahu Mumbai",
+            url: canonical,
+            description:
+              "Inside Shahu Mumbai’s studio where heritage meets modernity and every piece is crafted with care.",
+            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl }
+          })}
+        </script>
       </Helmet>
+
 
       <div className="bg-[#F1E7E5] text-[#2e2e2e]">
         {/* Hero Section */}

@@ -51,24 +51,77 @@ function OurPhilosophy() {
   return (
     <Layout>
       <Helmet>
-        <title>Our Philosophy — Shahu Mumbai</title>
-        <meta
-          name="description"
-          content="Heritage, craftsmanship, sustainability, and ethical pre-order production at Shahu Mumbai."
-        />
-        <link rel="canonical" href={canonical} />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Our Philosophy — Shahu Mumbai" />
-        <meta
-          property="og:description"
-          content="Discover the values that shape every Shahu creation: craftsmanship, sustainability, and timeless stories."
-        />
-        <meta property="og:url" content={canonical} />
-        <meta property="og:image" content={`${baseUrl}/og/philosophy.jpg`} />
-        <meta name="twitter:card" content="summary_large_image" />
-        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(webPageJsonLd)}</script>
-      </Helmet>
+  {/* Core SEO */}
+  <title>Our Philosophy — Shahu Mumbai</title>
+  <meta
+    name="description"
+    content="Heritage, craftsmanship, sustainability, and ethical pre-order production at Shahu Mumbai."
+  />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta
+    name="keywords"
+    content="Shahu Mumbai philosophy, brand values, craftsmanship, sustainable luxury, ethical fashion, pre-order model, artisan-made sarees"
+  />
+
+  {/* Canonical + hreflang */}
+  <link rel="canonical" href={canonical} />
+  <link rel="alternate" hrefLang="en-IN" href={canonical} />
+  <link rel="alternate" hrefLang="x-default" href={canonical} />
+
+  {/* Open Graph */}
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Shahu Mumbai" />
+  <meta property="og:locale" content="en_IN" />
+  <meta property="og:title" content="Our Philosophy — Shahu Mumbai" />
+  <meta
+    property="og:description"
+    content="Discover the values that shape every Shahu creation: craftsmanship, sustainability, and timeless stories."
+  />
+  <meta property="og:url" content={canonical} />
+  <meta property="og:image" content={`${baseUrl}/og/philosophy.jpg`} />
+  <meta property="og:image:alt" content="Shahu Mumbai — Our Philosophy" />
+
+  {/* Twitter */}
+  {/* <meta name="twitter:card" content="summary_large_image" />
+  If you have a handle, you can add it:
+  <meta name="twitter:site" content="@yourhandle" />
+  <meta name="twitter:title" content="Our Philosophy — Shahu Mumbai" />
+  <meta
+    name="twitter:description"
+    content="Craftsmanship, sustainability, and ethical pre-order production at Shahu Mumbai."
+  />
+  <meta name="twitter:image" content={`${baseUrl}/og/philosophy.jpg`} /> */}
+
+  {/* Structured Data: Breadcrumbs (kept) */}
+  <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+
+  {/* Structured Data: WebPage (kept) */}
+  <script type="application/ld+json">{JSON.stringify({
+    ...webPageJsonLd,
+    isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl }
+  })}</script>
+
+  {/* Structured Data: ItemList of brand values as DefinedTerms */}
+  <script type="application/ld+json">
+    {JSON.stringify({
+      "@context": "https://schema.org",
+      "@type": "ItemList",
+      "name": "Shahu Mumbai Brand Values",
+      "numberOfItems": beliefs.length,
+      "itemListElement": beliefs.map((b, i) => ({
+        "@type": "ListItem",
+        "position": i + 1,
+        "item": {
+          "@type": "DefinedTerm",
+          "name": b.title,
+          "description": b.desc,
+          "inDefinedTermSet": canonical
+        }
+      }))
+    })}
+  </script>
+</Helmet>
+
 
       <section className="bg-[#F1E7E5] py-16 px-6 md:px-20 lg:px-32">
         <div className="max-w-6xl mx-auto">

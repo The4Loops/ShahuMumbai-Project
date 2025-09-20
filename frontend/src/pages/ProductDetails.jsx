@@ -486,20 +486,127 @@ const ProductDetails = () => {
   return (
     <Layout>
       <Helmet>
+        {/* Core SEO */}
         <title>{`${product.name} — Shahu Mumbai`}</title>
         <meta name="description" content={metaDescription} />
+        <meta name="robots" content="index,follow,max-image-preview:large" />
+        <meta
+          name="keywords"
+          content={[
+            product.name,
+            categoryName(product),
+            "Shahu Mumbai",
+            "handwoven sarees",
+            "artisan-made",
+            "sustainable luxury",
+          ].filter(Boolean).join(", ")}
+        />
+
+        {/* Canonical + hreflang */}
         <link rel="canonical" href={canonical} />
+        <link rel="alternate" hrefLang="en-IN" href={canonical} />
+        <link rel="alternate" hrefLang="x-default" href={canonical} />
+
+        {/* Open Graph */}
         <meta property="og:type" content="product" />
+        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content={`${product.name} — Shahu Mumbai`} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={images[0] || hero} />
-        <meta name="twitter:card" content="summary_large_image" />
+        <meta property="og:image:alt" content={`${product.name} — product image`} />
+
+        {/* Twitter */}
+        {/* <meta name="twitter:card" content="summary_large_image" /> */}
+        {/* If you have a handle, uncomment: */}
+        {/* <meta name="twitter:site" content="@yourhandle" /> */}
+        {/* <meta name="twitter:title" content={`${product.name} — Shahu Mumbai`} />
+        <meta name="twitter:description" content={metaDescription} />
+        <meta name="twitter:image" content={images[0] || hero} /> */}
+
+        {/* Price meta (kept) */}
         <meta name="product:price:amount" content={String(salePrice)} />
         <meta name="product:price:currency" content="INR" />
-        <script type="application/ld+json">{JSON.stringify(productJsonLd)}</script>
+
+        {/* Structured Data: Product (enriched) */}
+        <script type="application/ld+json">
+          {JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Product",
+            name: product.name,
+            description: metaDescription,
+            image: images.length ? images : [hero],
+            sku: String(product.id),
+            ...(product.gtin ? { gtin: String(product.gtin) } : {}),
+            category: categoryName(product),
+            ...(product.branddesigner && {
+              brand: { "@type": "Brand", name: product.branddesigner }
+            }),
+            ...(Array.isArray(product.colors) && product.colors.length
+              ? { color: product.colors.join(", ") }
+              : {}),
+            additionalProperty: [
+              ...(Array.isArray(product.colors) && product.colors.length
+                ? [{
+                    "@type": "PropertyValue",
+                    name: "Color options",
+                    value: product.colors.join(", ")
+                  }]
+                : []),
+              {
+                "@type": "PropertyValue",
+                name: "Category",
+                value: categoryName(product)
+              }
+            ],
+            offers: {
+              "@type": "Offer",
+              url: canonical,
+              priceCurrency: "INR",
+              price: Number(salePrice).toFixed(2),
+              availability:
+                Number(product.stock) > 0
+                  ? "https://schema.org/InStock"
+                  : "https://schema.org/OutOfStock",
+              itemCondition: "https://schema.org/NewCondition",
+              ...(product.stock != null ? { inventoryLevel: { "@type": "QuantitativeValue", value: Number(product.stock) } } : {})
+            },
+            ...(reviewCount > 0
+              ? {
+                  aggregateRating: {
+                    "@type": "AggregateRating",
+                    ratingValue: String(avgRating),
+                    reviewCount: String(reviewCount)
+                  }
+                }
+              : {}),
+            ...(Array.isArray(reviews) && reviews.length
+              ? {
+                  review: reviews.slice(0, 3).map(r => ({
+                    "@type": "Review",
+                    author: {
+                      "@type": "Person",
+                      name: r?.users?.full_name || "Anonymous"
+                    },
+                    datePublished: r?.created_at || undefined,
+                    reviewBody: r?.comment || "",
+                    reviewRating: {
+                      "@type": "Rating",
+                      ratingValue: String(r?.rating || 0),
+                      bestRating: "5",
+                      worstRating: "1"
+                    }
+                  }))
+                }
+              : {})
+          })}
+        </script>
+
+        {/* Structured Data: Breadcrumbs (kept) */}
         <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-      </Helmet>
+    </Helmet>
+
 
       <div className="min-h-screen px-4 md:px-6 py-16 pt-[60px] bg-[#F1E7E5] font-serif">
         {/* Breadcrumb */}
