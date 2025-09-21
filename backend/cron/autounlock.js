@@ -1,8 +1,12 @@
+// backend/cron/autounlock.js
 const cron = require('node-cron');
 const supabase = require('../config/supabaseClient');
 
 const unlockAfterMinutes = 5;
-let running = false; // prevent overlap
+let running = false;
+
+// small util
+const asBool = (v) => v === true || v === 'true' || v === 1 || v === '1';
 
 async function autoUnlockUsers() {
   if (running) {
@@ -11,89 +15,135 @@ async function autoUnlockUsers() {
   }
   running = true;
 
-  const startTs = new Date().toISOString();
-  const threshold = new Date(Date.now() - unlockAfterMinutes * 60 * 1000).toISOString();
+  const startedAt = new Date().toISOString();
 
-  // Fast sanity checks so "fetch failed" doesn’t hide obvious config issues
+  // Compute threshold once per run
+  const nowMs = Date.now();
+  const thresholdIso = new Date(nowMs - unlockAfterMinutes * 60 * 1000).toISOString();
+  // For DATE columns we must compare 'YYYY-MM-DD'
+  const thresholdDateOnly = thresholdIso.slice(0, 10);
+  const useDateCompare = asBool(process.env.LOCKEDDATE_IS_DATE);
+
+  // Basic sanity checks: URL + some key present
   if (!process.env.SUPABASE_URL || !/^https?:\/\//i.test(process.env.SUPABASE_URL)) {
     console.error('[autoUnlockUsers] Invalid SUPABASE_URL:', process.env.SUPABASE_URL);
-    running = false; return;
+    running = false;
+    return;
   }
-  if (!process.env.SUPABASE_KEY) {
-    console.error('[autoUnlockUsers] Missing Supabase key env (SERVICE_ROLE_KEY or ANON_KEY).');
-    running = false; return;
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
+    console.error('[autoUnlockUsers] Missing Supabase key env (prefer SUPABASE_SERVICE_ROLE_KEY).');
+    running = false;
+    return;
   }
 
+  const ctx = {
+    function: 'autoUnlockUsers',
+    threshold: useDateCompare ? thresholdDateOnly : thresholdIso,
+    compareMode: useDateCompare ? 'DATE' : 'TIMESTAMP',
+    startedAt
+  };
+
   try {
-    // 1) (Optional) Read which users would be unlocked — helps verify select works.
-    const { data: lockedUsers, error: selectErr } = await supabase
+    // 1) Who is currently eligible to unlock?
+    const { data: lockedUsers } = await supabase
       .from('users')
       .select('id,email,lockeddate,userlocked')
       .eq('userlocked', 'Y')
-      .lte('lockeddate', threshold);
+      .lte('lockeddate', useDateCompare ? thresholdDateOnly : thresholdIso)
+      .throwOnError();
 
-    if (selectErr) {
-      logUndiciError('Locked Users Fetch', selectErr, {
-        function: 'autoUnlockUsers',
-        phase: 'select_locked_users',
-        threshold,
-      });
+    if (!lockedUsers || lockedUsers.length === 0) {
+      console.info(`[autoUnlockUsers] No locked users <= ${ctx.threshold} (${ctx.compareMode}).`);
       return;
     }
 
-    // 2) Single-shot update (no per-user loop) + return affected rows for logging
-    const { data: updated, error: updateErr } = await supabase
+    // 2) Bulk update
+    const { data: updated } = await supabase
       .from('users')
       .update({ userlocked: 'N', lockeddate: null, invalidattempt: 0 })
       .eq('userlocked', 'Y')
-      .lte('lockeddate', threshold)
-      .select('id,email'); // return changed rows
+      .lte('lockeddate', useDateCompare ? thresholdDateOnly : thresholdIso)
+      .select('id,email')
+      .throwOnError();
 
-    if (updateErr) {
-      logUndiciError('Unlock Update', updateErr, {
-        function: 'autoUnlockUsers',
-        phase: 'bulk_update',
-        threshold,
-        candidates: lockedUsers?.length ?? 0,
-      });
-      return;
+    const updatedCount = updated?.length || 0;
+    const candidateCount = lockedUsers.length;
+
+    console.info(
+      `[autoUnlockUsers] Unlocked ${updatedCount} of ${candidateCount} eligible users (<= ${ctx.threshold}, ${ctx.compareMode}).`
+    );
+
+    if (updatedCount > 0) {
+      // Keep log concise but useful
+      const emails = updated
+        .map((u) => u.email)
+        .filter(Boolean)
+        .slice(0, 20); // cap to avoid huge logs
+      console.info(`[autoUnlockUsers] Sample unlocked emails (${emails.length} shown):`, emails);
     }
-
   } catch (err) {
-    // This catches truly thrown errors (e.g., AbortError/timeouts if you add them)
-    logUndiciError('Unexpected', err, { function: 'autoUnlockUsers', phase: 'unexpected', when: startTs });
+    logUndiciError('Locked Users Fetch/Update', err, ctx);
   } finally {
     running = false;
   }
 }
 
+/**
+ * Better error logger for Supabase/PostgREST/undici/Node errors.
+ * - Preserves object fields (code, details, hint, status)
+ * - Keeps a (safe) raw snapshot for debugging
+ */
 function logUndiciError(title, err, ctx = {}) {
-  const e = err instanceof Error ? err : new Error(String(err));
-  const cause = e && typeof e === 'object' ? e.cause : null;
+  const toPlain = (v) => {
+    try {
+      return JSON.parse(JSON.stringify(v));
+    } catch {
+      // last resort
+      return typeof v === 'string' ? v : String(v);
+    }
+  };
+
+  const eObj = (err && typeof err === 'object') ? err : {};
+  const cause = 'cause' in eObj ? eObj.cause : null;
 
   const diag = {
     timestamp: new Date().toISOString(),
     title,
     ...ctx,
-    errorName: e.name,
-    errorMessage: e.message,
-    causeName: cause?.name,
-    causeMessage: cause?.message,
-    code: cause?.code || err?.code || '',      // e.g. ECONNREFUSED/ENOTFOUND/ETIMEDOUT
-    syscall: cause?.syscall || '',
-    address: cause?.address || '',
-    port: cause?.port || '',
-    stack: e.stack,
-    supabaseUrl: process.env.SUPABASE_URL,      // safe to print; avoid printing keys
+
+    // High-level
+    errorName: eObj.name || (err instanceof Error ? err.name : 'Error'),
+    errorMessage: eObj.message || (err instanceof Error ? err.message : String(err)),
+
+    // Supabase/PostgREST fields
+    code: eObj.code || eObj.status || '',
+    details: eObj.details || '',
+    hint: eObj.hint || '',
+    statusText: eObj.statusText || '',
+
+    // Network/undici style hints
+    syscall: eObj.syscall || cause?.syscall || '',
+    address: eObj.address || cause?.address || '',
+    port: eObj.port || cause?.port || '',
+
+    // Stack (when available)
+    stack: (err instanceof Error && err.stack) ? err.stack : undefined,
+
+    // Safe env context
+    supabaseUrl: process.env.SUPABASE_URL,
     nodeEnv: process.env.NODE_ENV,
+
+    // Raw snapshot (safe-stringified)
+    raw: toPlain(err)
   };
 
+  console.error('s================================');
   console.error('=== Locked Users Fetch Error ===');
   console.error(JSON.stringify(diag, null, 2));
   console.error('================================');
 }
 
+// Export: schedule every minute (Asia/Kolkata)
 module.exports = () => {
-  // Every minute, India time
   cron.schedule('* * * * *', autoUnlockUsers, { timezone: 'Asia/Kolkata' });
 };
