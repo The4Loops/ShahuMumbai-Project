@@ -48,6 +48,15 @@ const AuthForm = () => {
   const [errors, setErrors] = useState({});
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetData, setResetData] = useState({
+    email: "",
+    otp: "",
+    newPassword: "",
+    confirmNewPassword: "",
+  });
+  const [resetErrors, setResetErrors] = useState({});
+  const [resetOtpSent, setResetOtpSent] = useState(false);
   const navigate = useNavigate();
 
   const resetForm = () => {
@@ -56,9 +65,20 @@ const AuthForm = () => {
     setOtp("");
   };
 
+  const resetPasswordForm = () => {
+    setResetData({ email: "", otp: "", newPassword: "", confirmNewPassword: "" });
+    setResetErrors({});
+    setResetOtpSent(false);
+  };
+
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
     setErrors((prev) => ({ ...prev, [e.target.name]: "" }));
+  };
+
+  const handleResetChange = (e) => {
+    setResetData({ ...resetData, [e.target.name]: e.target.value });
+    setResetErrors((prev) => ({ ...prev, [e.target.name]: "" }));
   };
 
   const validate = () => {
@@ -83,6 +103,30 @@ const AuthForm = () => {
       newErrors.otp = "OTP is required";
     }
     setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const validateReset = () => {
+    const newErrors = {};
+    if (!resetData.email.trim()) {
+      newErrors.email = "Email is required";
+    } else if (!/\S+@\S+\.\S+/.test(resetData.email)) {
+      newErrors.email = "Email is invalid";
+    }
+    if (resetOtpSent) {
+      if (!resetData.otp.trim()) {
+        newErrors.otp = "OTP is required";
+      }
+      if (!resetData.newPassword) {
+        newErrors.newPassword = "New password is required";
+      } else if (resetData.newPassword.length < 6) {
+        newErrors.newPassword = "New password must be at least 6 characters";
+      }
+      if (resetData.newPassword !== resetData.confirmNewPassword) {
+        newErrors.confirmNewPassword = "Passwords do not match";
+      }
+    }
+    setResetErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
@@ -127,7 +171,7 @@ const AuthForm = () => {
         try {
           localStorage.setItem("token", token);
         } catch (storageError) {
-          toast.error("Failed to store authentication token. Please try again." + storageError);
+          toast.error("Failed to store authentication token. Please try again.");
           return;
         }
 
@@ -171,6 +215,50 @@ const AuthForm = () => {
     } catch (error) {
       toast.dismiss();
       toast.error(error.message || "An error occurred during SSO login.");
+    }
+  };
+
+  const handleForgotPasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateReset()) return;
+
+    setIsSubmitting(true);
+
+    try {
+      if (!resetOtpSent) {
+        const res = await api.post(`/api/auth/reset-password/send-otp`, {
+          email: resetData.email,
+        });
+        if (res.status === 200) {
+          setResetOtpSent(true);
+          toast.dismiss();
+          toast.success(res.data.message || "OTP sent to your email.");
+        }
+      } else {
+        const res = await api.post(`/api/auth/reset-password/verify`, {
+          email: resetData.email,
+          otp: resetData.otp,
+          new_password: resetData.newPassword,
+        });
+        toast.dismiss();
+        toast.success(res.data.message || "Password reset successful. You can now login.");
+        setShowForgotPassword(false);
+        resetPasswordForm();
+      }
+    } catch (error) {
+      toast.dismiss();
+      const errorMessage = error.response?.data?.error || error.message || "An error occurred.";
+      if (errorMessage === "Email not found") {
+        setResetErrors((prev) => ({ ...prev, email: "Email not found" }));
+      } else if (errorMessage === "Invalid or expired OTP") {
+        setResetErrors((prev) => ({ ...prev, otp: "Invalid or expired OTP" }));
+      } else if (errorMessage === "New password must be at least 6 characters") {
+        setResetErrors((prev) => ({ ...prev, newPassword: "New password must be at least 6 characters" }));
+      } else {
+        toast.error(errorMessage);
+      }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -287,6 +375,22 @@ const AuthForm = () => {
               />
             )}
 
+            {!isRegistering && (
+              <div className="flex justify-between items-center">
+                <label className="text-sm text-gray-700 flex items-center">
+                  <input type="checkbox" className="mr-2" />
+                  Remember me
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                >
+                  Forgot Password?
+                </button>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={isSubmitting}
@@ -303,15 +407,81 @@ const AuthForm = () => {
                 : "Login"}
             </button>
           </form>
-
-          {!isRegistering && (
-            <label className="text-sm text-gray-700 mt-2 flex items-center">
-              <input type="checkbox" className="mr-2" />
-              Remember me
-            </label>
-          )}
         </div>
       </div>
+
+      {showForgotPassword && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-full max-w-sm shadow-lg">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Reset Password</h2>
+              <button
+                onClick={() => {
+                  setShowForgotPassword(false);
+                  resetPasswordForm();
+                }}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                ✕
+              </button>
+            </div>
+            <form className="flex flex-col gap-3" onSubmit={handleForgotPasswordSubmit}>
+              <TextInput
+                type="email"
+                name="email"
+                placeholder="Email"
+                value={resetData.email}
+                onChange={handleResetChange}
+                error={resetErrors.email}
+                autoComplete="email"
+              />
+              {resetOtpSent && (
+                <>
+                  <TextInput
+                    name="otp"
+                    placeholder="Enter OTP"
+                    value={resetData.otp}
+                    onChange={handleResetChange}
+                    error={resetErrors.otp}
+                    autoComplete="off"
+                  />
+                  <TextInput
+                    type="password"
+                    name="newPassword"
+                    placeholder="New Password"
+                    value={resetData.newPassword}
+                    onChange={handleResetChange}
+                    error={resetErrors.newPassword}
+                    autoComplete="new-password"
+                  />
+                  <TextInput
+                    type="password"
+                    name="confirmNewPassword"
+                    placeholder="Confirm New Password"
+                    value={resetData.confirmNewPassword}
+                    onChange={handleResetChange}
+                    error={resetErrors.confirmNewPassword}
+                    autoComplete="new-password"
+                  />
+                </>
+              )}
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`bg-gray-900 text-white font-semibold py-2 rounded-md transition-colors ${
+                  isSubmitting ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-800"
+                }`}
+              >
+                {isSubmitting
+                  ? "Submitting..."
+                  : resetOtpSent
+                  ? "Reset Password"
+                  : "Send OTP"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </Layout>
   );
 };

@@ -292,3 +292,135 @@ exports.ssoLogin = async (req, res) => {
     return res.status(500).json({ error: err.message });
   }
 };
+
+//Send OTP for Reset Password
+exports.sendResetPasswordOtp = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    // Validate email presence
+    if (!email) {
+      return res.status(400).json({ error: "Email is required" });
+    }
+
+    // Check if user exists
+    const { data: existingUser } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (!existingUser) {
+      return res.status(400).json({ error: "Email not found" });
+    }
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res
+        .status(500)
+        .json({ error: "Email credentials not configured" });
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const { error } = await supabase
+      .from("shortmessage")
+      .insert([{ email, otp }]);
+
+    if (error) {
+      console.error("Insert OTP Error:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    // Send OTP via email
+    const transporter = nodemailer.createTransport({
+      service: "gmail",
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    await transporter.sendMail({
+      from: process.env.EMAIL_USER,
+      to: email,
+      subject: "Your OTP for Password Reset",
+      text: `Hi, your OTP for resetting your password is: ${otp}`,
+    });
+
+    res.status(200).json({ message: "OTP sent successfully to email" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
+
+// Verify OTP and Reset Password
+exports.verifyResetPasswordOtp = async (req, res) => {
+  try {
+    const { email, otp, new_password } = req.body;
+
+    // Validate inputs
+    if (!email || !otp || !new_password) {
+      return res.status(400).json({ error: "Email, OTP, and new password are required" });
+    }
+
+    if (new_password.length < 6) {
+      return res.status(400).json({ error: "New password must be at least 6 characters" });
+    }
+
+    // Check if user exists
+    const { data: user } = await supabase
+      .from("users")
+      .select("*")
+      .eq("email", email)
+      .single();
+
+    if (!user) {
+      return res.status(400).json({ error: "Email not found" });
+    }
+
+    // Verify OTP
+    const { data: otpRecord } = await supabase
+      .from("shortmessage")
+      .select("*")
+      .eq("email", email)
+      .eq("otp", otp)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .single();
+
+    if (!otpRecord) {
+      return res.status(400).json({ error: "Invalid or expired OTP" });
+    }
+
+    // Hash the new password
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(new_password, saltRounds);
+
+    // Update user's password
+    const { error: updateError } = await supabase
+      .from("users")
+      .update({ password: hashedPassword })
+      .eq("email", email);
+
+    if (updateError) {
+      console.error("Update Password Error:", updateError);
+      return res.status(500).json({ error: updateError.message });
+    }
+
+    // Delete the used OTP from shortmessage table
+    const { error: deleteError } = await supabase
+      .from("shortmessage")
+      .delete()
+      .eq("email", email)
+      .eq("otp", otp);
+
+    if (deleteError) {
+      console.error("Delete OTP Error:", deleteError);
+      // Don't fail the request, but log the error
+    }
+
+    res.status(200).json({ message: "Password reset successful" });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+};
