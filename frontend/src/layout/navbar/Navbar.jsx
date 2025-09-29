@@ -20,14 +20,14 @@ export const DropdownSection = ({ title, links, onLinkClick }) => {
         </h3>
       )}
       <ul className="space-y-1">
-        {links?.map(({ label, href }) => (
-          <li key={label}>
+        {links?.map(({ Label, Href }) => (
+          <li key={Label}>
             <Link
-              to={href}
+              to={Href}
               className="text-gray-700 hover:text-[#D4A5A5]"
               onClick={onLinkClick}
             >
-              {label} {/* Backend translates; no client-side t() needed */}
+              {Label} {/* Backend translates; no client-side t() needed */}
             </Link>
           </li>
         ))}
@@ -118,6 +118,7 @@ export default function Navbar() {
       userRole = decoded.role || null;
     } catch {
       localStorage.removeItem("token");
+      console.error('Invalid JWT token');
     }
   }
 
@@ -125,32 +126,41 @@ export default function Navbar() {
   const fetchMenuData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`/api/navbar/menus?lang=${i18n.language}`);
-      let sorted = res.data.menus.sort((a, b) => a.order_index - b.order_index);
+      console.log('Fetching menus with language:', i18n.language);
+      const res = await api.get(`/api/navbar/menus?lang=${i18n.language}`, {
+        headers: {
+          Authorization: token ? `Bearer ${token}` : undefined,
+        },
+      });
+      console.log('Menu API response:', res.data);
+
+      let sorted = res.data.menus.sort((a, b) => a.OrderIndex - b.OrderIndex);
 
       sorted = sorted.map((menu) => ({
         ...menu,
-        dropdown_items: userRole
-          ? menu.dropdown_items.filter(
-              (item) => item.roles.length === 0 || item.roles.includes(userRole)
+        DropdownItems: userRole
+          ? menu.DropdownItems.filter(
+              (item) => item.Roles.length === 0 || item.Roles.split(',').includes(userRole)
             )
-          : menu.dropdown_items,
+          : menu.DropdownItems,
       }));
 
       if (userRole !== "Admin") {
-        sorted = sorted.filter((m) => m.label.toLowerCase() !== t("navbar.menus.admin").toLowerCase());
+        sorted = sorted.filter((m) => m.Label.toLowerCase() !== t("navbar.menus.admin").toLowerCase());
       }
 
+      console.log('Processed menus:', sorted);
       setMenus(sorted);
       const initDrop = {};
-      sorted.forEach((m) => (initDrop[m.id] = false));
+      sorted.forEach((m) => (initDrop[m.Id] = false));
       setDropdown({ ...initDrop, account: false, lang: false });
     } catch (err) {
+      console.error('Error fetching menus:', err.response?.data || err.message);
       toast.error(err.response?.data?.message || t("navbar.errors.fetchMenus"));
     } finally {
       setIsLoading(false);
     }
-  }, [userRole, i18n.language, t]);
+  }, [userRole, i18n.language, t, token]);
 
   const fetchCartItemCount = useCallback(async () => {
     if (!token) {
@@ -159,8 +169,10 @@ export default function Navbar() {
     }
     try {
       const response = await api.get("/api/cartById");
+      console.log('Cart API response:', response.data);
       setCartItemCount(response.data.length || 0);
     } catch (err) {
+      console.error('Error fetching cart:', err.response?.data || err.message);
       toast.error(err.response?.data?.error || t("navbar.errors.fetchCart"));
       setCartItemCount(0);
     }
@@ -168,9 +180,12 @@ export default function Navbar() {
 
   useEffect(() => {
     fetchMenuData();
-    setLang(i18n.language);
     fetchCartItemCount();
-  }, [fetchMenuData, fetchCartItemCount,i18n.language]);
+  }, [fetchMenuData, fetchCartItemCount]);
+
+  useEffect(() => {
+    setLang(i18n.language);
+  }, [i18n.language]);
 
   const handleClickOutside = useCallback((e) => {
     Object.keys(refs.current).forEach((key) => {
@@ -179,6 +194,7 @@ export default function Navbar() {
       }
     });
   }, []);
+
   useEffect(() => {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -205,6 +221,8 @@ export default function Navbar() {
 
   return (
     <nav className="fixed top-0 w-full z-50 bg-transparent backdrop-blur-lg shadow-md font-serif">
+      {isLoading && <div>Loading menus...</div>}
+      {menus.length === 0 && !isLoading && <div>No menus available</div>}
       {/* Top Bar */}
       <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
         <Link
@@ -243,66 +261,49 @@ export default function Navbar() {
         {/* Menus */}
         <ul className="flex items-center gap-8 flex-[1]">
           {menus.map((menu) => {
-            const hasDropdown =
-              menu.dropdown_items && menu.dropdown_items.length > 0;
+            const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
 
             if (hasDropdown) {
-              const sortedItems = [...menu.dropdown_items].sort(
-                (a, b) => a.order_index - b.order_index
+              const sortedItems = [...menu.DropdownItems].sort(
+                (a, b) => a.OrderIndex - b.OrderIndex
               );
 
               return (
                 <DesktopDropdown
-                  key={menu.id}
-                  label={menu.label}
-                  isOpen={dropdown[menu.id]}
+                  key={menu.Id}
+                  label={menu.Label}
+                  isOpen={dropdown[menu.Id]}
                   setOpen={(state) => {
                     const closedAll = Object.keys(dropdown).reduce(
                       (acc, id) => ({ ...acc, [id]: false }),
                       {}
                     );
-                    setDropdown({ ...closedAll, [menu.id]: state });
+                    setDropdown({ ...closedAll, [menu.Id]: state });
                   }}
-                  refEl={(el) => (refs.current[menu.id] = el)}
+                  refEl={(el) => (refs.current[menu.Id] = el)}
                   content={
-                    !sortedItems[0].links ? (
-                      <DropdownSection
-                        title={menu.label}
-                        links={sortedItems.map((item) => ({
-                          label: item.label,
-                          href: item.href,
-                        }))}
-                        onLinkClick={() =>
-                          setDropdown((prev) => ({ ...prev, [menu.id]: false }))
-                        }
-                      />
-                    ) : (
-                      sortedItems.map((section) => (
-                        <DropdownSection
-                          key={section.title}
-                          title={section.title}
-                          links={section.links}
-                          onLinkClick={() =>
-                            setDropdown((prev) => ({
-                              ...prev,
-                              [menu.id]: false,
-                            }))
-                          }
-                        />
-                      ))
-                    )
+                    <DropdownSection
+                      title={menu.Label}
+                      links={sortedItems.map((item) => ({
+                        Label: item.Label,
+                        Href: item.Href,
+                      }))}
+                      onLinkClick={() =>
+                        setDropdown((prev) => ({ ...prev, [menu.Id]: false }))
+                      }
+                    />
                   }
                 />
               );
             }
 
             return (
-              <li key={menu.id}>
+              <li key={menu.Id}>
                 <Link
-                  to={menu.href || "#"}
+                  to={menu.Href || "#"}
                   className="hover:text-[#D4A5A5] text-[#6B4226] font-normal"
                 >
-                  {menu.label}
+                  {menu.Label}
                 </Link>
               </li>
             );
@@ -509,27 +510,26 @@ export default function Navbar() {
 
             {/* Mobile Menus */}
             {menus.map((menu) => {
-              const hasDropdown =
-                menu.dropdown_items && menu.dropdown_items.length > 0;
+              const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
               if (hasDropdown) {
-                const sortedItems = [...menu.dropdown_items].sort(
-                  (a, b) => a.order_index - b.order_index
+                const sortedItems = [...menu.DropdownItems].sort(
+                  (a, b) => a.OrderIndex - b.OrderIndex
                 );
                 return (
-                  <div key={menu.id} className="border-b border-[#d4c4b6] pb-2">
+                  <div key={menu.Id} className="border-b border-[#d4c4b6] pb-2">
                     <button
                       className="w-full flex justify-between items-center py-2"
                       onClick={() =>
                         setMobileDropdownOpen((prev) =>
-                          prev === menu.id ? null : menu.id
+                          prev === menu.Id ? null : menu.Id
                         )
                       }
                     >
-                      <span>{menu.label}</span>
-                      <span>{mobileDropdownOpen === menu.id ? "−" : "+"}</span>
+                      <span>{menu.Label}</span>
+                      <span>{mobileDropdownOpen === menu.Id ? "−" : "+"}</span>
                     </button>
                     <AnimatePresence>
-                      {mobileDropdownOpen === menu.id && (
+                      {mobileDropdownOpen === menu.Id && (
                         <motion.div
                           initial={{ height: 0, opacity: 0 }}
                           animate={{ height: "auto", opacity: 1 }}
@@ -537,36 +537,16 @@ export default function Navbar() {
                           transition={{ duration: 0.25 }}
                           className="pl-4 pt-1 space-y-2 overflow-hidden"
                         >
-                          {!sortedItems[0].links
-                            ? sortedItems.map(({ label, href }) => (
-                                <Link
-                                  key={label}
-                                  to={href}
-                                  onClick={() => setMobileMenuOpen(false)}
-                                  className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                                >
-                                  {label}
-                                </Link>
-                              ))
-                            : sortedItems.map((section) => (
-                                <div key={section.title}>
-                                  {section.title && (
-                                    <p className="text-sm font-semibold text-[#6B4226] mt-2">
-                                      {t(`navbar.dropdown.${section.title.toLowerCase().replace(/\s+/g, '_')}`, section.title)}
-                                    </p>
-                                  )}
-                                  {section.links.map(({ label, href }) => (
-                                    <Link
-                                      key={label}
-                                      to={href}
-                                      onClick={() => setMobileMenuOpen(false)}
-                                      className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                                    >
-                                      {label}
-                                    </Link>
-                                  ))}
-                                </div>
-                              ))}
+                          {sortedItems.map(({ Label, Href }) => (
+                            <Link
+                              key={Label}
+                              to={Href}
+                              onClick={() => setMobileMenuOpen(false)}
+                              className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
+                            >
+                              {Label}
+                            </Link>
+                          ))}
                         </motion.div>
                       )}
                     </AnimatePresence>
@@ -575,12 +555,12 @@ export default function Navbar() {
               }
               return (
                 <Link
-                  key={menu.id}
-                  to={menu.href || "#"}
+                  key={menu.Id}
+                  to={menu.Href || "#"}
                   onClick={() => setMobileMenuOpen(false)}
                   className="block py-2 border-b border-[#d4c4b6]"
                 >
-                  {menu.label}
+                  {menu.Label}
                 </Link>
               );
             })}

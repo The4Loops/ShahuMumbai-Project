@@ -1,19 +1,33 @@
 import axios from 'axios';
 
-const instance = axios.create({
-  baseURL: process.env.REACT_Server_API_BASE_URL || 'http://localhost:5000',
-  withCredentials: true // If you need cookies/JWT via HttpOnly
+const api = axios.create({
+  baseURL: process.env.REACT_Server_API_BASE_URL || 'http://localhost:5000', // Match server.js PORT
+  headers: {
+    'Content-Type': 'application/json',
+  },
 });
 
-// Add JWT token to every request
-instance.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token"); // Retrieve token from localStorage
-    if (token) {
-      config.headers["Authorization"] = `Bearer ${token}`;
-    }
-    return config;
+// Add Authorization header with token if present
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+}, (error) => {
+  return Promise.reject(error);
+});
+
+// Log responses for debugging
+api.interceptors.response.use(
+  (response) => {
+    console.log('API Response:', response.data);
+    return response;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    console.error('API Error:', error.response?.data || error.message);
+    return Promise.reject(error);
+  }
 );
-export default instance;
+
+export default api;

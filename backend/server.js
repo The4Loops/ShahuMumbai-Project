@@ -1,11 +1,11 @@
-// server.js
 require('dotenv').config();
-
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
+const sql = require('mssql');
+const sqlConfig = require('./config/db');
 
 // Cron jobs
 require('./cron/autounlock')();
@@ -13,7 +13,7 @@ require('./cron/reminderMailOfCartItem')();
 
 // Middlewares
 const guestSession = require('./middleware/guestSession');
-const { optional } = require('./middleware/auth'); // optional JWT attach
+const { optional } = require('./middleware/auth');
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
@@ -39,73 +39,94 @@ const teamMembersRoutes = require('./routes/teamMembersRoutes');
 const collectionsRoutes = require('./routes/collectionsRoutes');
 const subscriberRoutes = require('./routes/subscriberRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
-const paymentsRoutes = require('./routes/paymentsRoutes'); // Razorpay routes
+const paymentsRoutes = require('./routes/paymentsRoutes');
 const heritageRoutes = require('./routes/heritageRoutes');
 
 const app = express();
 app.set('trust proxy', 1);
 
-// --- Security headers (Helmet defaults) ---
+// Initialize MSSQL connection pool
+let pool;
+async function initDatabasePool() {
+    try {
+        pool = await sql.connect(sqlConfig);
+        console.log('✅ Connected to MSSQL database');
+    } catch (err) {
+        console.error('❌ Database connection failed:', err);
+        process.exit(1); // Exit if DB connection fails
+    }
+}
+
+// Call the function to initialize the pool
+initDatabasePool();
+
+// Make the pool available to routes via middleware
+app.use((req, res, next) => {
+    req.dbPool = pool;
+    next();
+});
+
+// Security headers (Helmet defaults)
 app.use(helmet());
 
-// --- CORS (use FRONTEND origin; allow auth header & credentials) ---
+// CORS
 app.use(
-  cors({
-    origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-  })
+    cors({
+        origin: process.env.FRONTEND_ORIGIN || 'http://localhost:3000',
+        credentials: true,
+        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+        allowedHeaders: ['Content-Type', 'Authorization'],
+    })
 );
 
-// --- Cookies (MUST come before guestSession) ---
+// Cookies (before guestSession)
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-// --- JSON parser ---
+// JSON parser
 app.use(express.json());
 
-// --- Content Security Policy (allow Razorpay assets & your origins) ---
+// Content Security Policy
 app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://checkout.razorpay.com"],
-      styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      fontSrc: ["https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://*.razorpay.com"],
-      connectSrc: [
-        "'self'",
-        process.env.FRONTEND_ORIGIN || "http://localhost:3000",
-        process.env.API_ORIGIN || "http://localhost:5000",
-        "https://api.razorpay.com",
-        "https://*.razorpay.com",
-      ],
-      frameSrc: ["'self'", "https://*.razorpay.com"],
-      objectSrc: ["'none'"],
-    },
-  })
+    helmet.contentSecurityPolicy({
+        directives: {
+            defaultSrc: ["'self'"],
+            scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://checkout.razorpay.com"],
+            styleSrc: ["'self'", "https://fonts.googleapis.com"],
+            fontSrc: ["https://fonts.gstatic.com"],
+            imgSrc: ["'self'", "data:", "https://*.razorpay.com"],
+            connectSrc: [
+                "'self'",
+                process.env.FRONTEND_ORIGIN || "http://localhost:3000",
+                process.env.API_ORIGIN || "http://localhost:5000",
+                "https://api.razorpay.com",
+                "https://*.razorpay.com",
+            ],
+            frameSrc: ["'self'", "https://*.razorpay.com"],
+            objectSrc: ["'none'"],
+        },
+    })
 );
 
 app.disable('x-powered-by');
 
-// --- Rate limiting (put BEFORE routes) ---
+// Rate limiting
 app.use(
-  rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 100,
-  })
+    rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 100,
+    })
 );
 
-// --- Guest session (assigns req.guestId like "guest:<sid>") ---
+// Guest session
 app.use(guestSession);
 
-// --- Optional auth (attaches req.user if a valid JWT is present) ---
+// Optional auth
 app.use(optional);
 
-// --- Health check ---
+// Health check
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-// --- Mount routes ---
+// Mount routes
 app.use('/api/auth', authRoutes);
 app.use('/api', productRoutes);
 app.use('/api', categoryRoutes);
@@ -129,11 +150,21 @@ app.use('/api', teamMembersRoutes);
 app.use('/api', collectionsRoutes);
 app.use('/api', subscriberRoutes);
 app.use('/api', wishlistRoutes);
-app.use('/api/payments', paymentsRoutes); // Razorpay routes
+app.use('/api/payments', paymentsRoutes);
 app.use('/api', heritageRoutes);
 
-// --- Start server ---
+// Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+    console.log(`✅ Server running on http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+    console.log('Shutting down server...');
+    if (pool) {
+        await pool.close();
+        console.log('Database pool closed');
+    }
+    process.exit(0);
 });
