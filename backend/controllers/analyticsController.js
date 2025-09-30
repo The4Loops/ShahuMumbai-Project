@@ -1,8 +1,12 @@
-const supabase = require("../config/supabaseClient");
+// controllers/analytics.controller.js
+const sql = require('mssql');
 
-// Helpers for date parsing (YYYY-MM-DD from query)
-const toStart = (d) => (d ? `${d} 00:00:00+00` : null);
-const toEnd   = (d) => (d ? `${d} 23:59:59.999+00` : null);
+// Helpers: YYYY-MM-DD → UTC day bounds (store/report in UTC)
+const toStart = (d) => (d ? `${d}T00:00:00.000Z` : null);
+const toEnd   = (d) => (d ? `${d}T23:59:59.999Z` : null);
+
+// Safely stringify JSON for MSSQL NVARCHAR(MAX)
+const jsonOrNull = (v) => (v == null ? null : JSON.stringify(v));
 
 // POST /api/track
 exports.trackEvent = async (req, res) => {
@@ -18,29 +22,37 @@ exports.trackEvent = async (req, res) => {
     } = req.body || {};
 
     if (!name || !anon_id) {
-      return res.status(400).json({ error: "name and anon_id are required" });
+      return res.status(400).json({ error: 'name and anon_id are required' });
     }
 
-    const user_agent = req.headers["user-agent"] || null;
-    const ip = (req.headers["x-forwarded-for"] || "").split(",")[0] || req.ip || null;
+    const user_agent = req.headers['user-agent'] || null;
+    const ip =
+      (req.headers['x-forwarded-for'] || '').split(',')[0]?.trim() ||
+      req.ip ||
+      null;
 
-    const { error } = await supabase.from("analytics_events").insert([{
-      name: String(name),
-      anon_id: String(anon_id),
-      user_id: user_id ?? null,
-      url: url || null,
-      referrer: referrer || null,
-      utm,
-      props: properties,
-      user_agent,
-      ip
-    }]);
+    const r = await req.dbPool
+      .request()
+      .input('name', sql.NVarChar(100), String(name))
+      .input('anon_id', sql.NVarChar(64), String(anon_id))
+      .input('user_id', user_id == null ? sql.Int : sql.Int, user_id ?? null)
+      .input('url', sql.NVarChar(sql.MAX), url || null)
+      .input('referrer', sql.NVarChar(sql.MAX), referrer || null)
+      .input('utm', sql.NVarChar(sql.MAX), jsonOrNull(utm))
+      .input('props', sql.NVarChar(sql.MAX), jsonOrNull(properties))
+      .input('user_agent', sql.NVarChar(512), user_agent)
+      .input('ip', sql.NVarChar(64), ip)
+      .query(`
+        INSERT INTO analytics_events
+          (name, anon_id, user_id, url, referrer, utm, props, user_agent, ip, occurred_at)
+        VALUES
+          (@name, @anon_id, @user_id, @url, @referrer, @utm, @props, @user_agent, @ip, SYSUTCDATETIME());
+      `);
 
-    if (error) throw error;
     return res.json({ ok: true });
   } catch (e) {
-    console.error("trackEvent error", e);
-    return res.status(500).json({ error: "internal_error" });
+    console.error('trackEvent error', e);
+    return res.status(500).json({ error: 'internal_error' });
   }
 };
 
@@ -51,86 +63,71 @@ exports.getSummary = async (req, res) => {
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    let kpis = null;
-    try {
-      const k = await supabase.rpc("analytics_kpis", { p_from, p_to });
-      if (!k.error && Array.isArray(k.data) && k.data.length) {
-        kpis = k.data[0];
-      }
-    } catch (_) {}
+    // If you’ve created a proc similar to supabase.rpc('analytics_kpis')
+    // EXEC analytics_kpis @p_from, @p_to
+    // Fallback: compute KPIs in SQL inline to avoid fetching 5000 rows
 
-    // ---- Fallback: compute KPIs in Node by fetching a reasonable window
-    if (!kpis) {
-      let q = supabase
-        .from("analytics_events")
-        .select("id, name, anon_id, user_id, props, occurred_at", { count: "exact" })
-        .order("occurred_at", { ascending: false })
-        .limit(5000); // cap
+    const kpiReq = req.dbPool.request();
+    if (p_from) kpiReq.input('from', sql.DateTime2, new Date(p_from));
+    if (p_to)   kpiReq.input('to', sql.DateTime2, new Date(p_to));
 
-      if (p_from) q = q.gte("occurred_at", p_from);
-      if (p_to)   q = q.lte("occurred_at", p_to);
+    const where = [];
+    if (p_from) where.push('occurred_at >= @from');
+    if (p_to)   where.push('occurred_at <= @to');
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-      const { data: rows, error } = await q;
-      if (error) throw error;
+    const kpiSql = `
+      ;WITH base AS (
+        SELECT name, anon_id, user_id
+        FROM analytics_events
+        ${whereSql}
+      )
+      SELECT
+        (SELECT COUNT(*) FROM base) AS total_events,
+        (SELECT COUNT(DISTINCT anon_id) FROM base WHERE anon_id IS NOT NULL) AS unique_sessions,
+        (SELECT COUNT(DISTINCT user_id) FROM base WHERE user_id IS NOT NULL)  AS unique_users,
+        (SELECT COUNT(*) FROM base WHERE name = 'view_item')       AS view_item,
+        (SELECT COUNT(*) FROM base WHERE name = 'add_to_cart')     AS add_to_cart,
+        (SELECT COUNT(*) FROM base WHERE name = 'begin_checkout')  AS begin_checkout,
+        (SELECT COUNT(*) FROM base WHERE name = 'purchase')        AS purchase;
+    `;
 
-      const seenAnon = new Set();
-      const seenUsers = new Set();
-      const counts = { view_item: 0, add_to_cart: 0, begin_checkout: 0, purchase: 0 };
+    const kpiRes = await kpiReq.query(kpiSql);
+    const kpis = kpiRes.recordset?.[0] || {
+      total_events: 0, unique_sessions: 0, unique_users: 0,
+      view_item: 0, add_to_cart: 0, begin_checkout: 0, purchase: 0
+    };
 
-      rows.forEach(r => {
-        if (r.anon_id) seenAnon.add(r.anon_id);
-        if (r.user_id) seenUsers.add(r.user_id);
-        if (counts[r.name] !== undefined) counts[r.name] += 1;
-      });
+    // Top products: try proc equivalent to analytics_top_products; else do quick tally from add_to_cart
+    const tpReq = req.dbPool.request();
+    if (p_from) tpReq.input('from', sql.DateTime2, new Date(p_from));
+    if (p_to)   tpReq.input('to', sql.DateTime2, new Date(p_to));
 
-      kpis = {
-        total_events: rows.length,
-        unique_sessions: seenAnon.size,
-        unique_users: seenUsers.size,
-        view_item: counts.view_item,
-        add_to_cart: counts.add_to_cart,
-        begin_checkout: counts.begin_checkout,
-        purchase: counts.purchase,
-      };
-    }
-
-    // ---- Top products
-    let topProducts = [];
-    let tp = null;
-    try {
-      tp = await supabase.rpc("analytics_top_products", { p_from, p_to, p_limit: 10 });
-      if (!tp.error && Array.isArray(tp.data)) topProducts = tp.data;
-    } catch (_) {}
-
-    if (!topProducts.length) {
-      let q = supabase
-        .from("analytics_events")
-        .select("props, occurred_at")
-        .eq("name", "add_to_cart")
-        .order("occurred_at", { ascending: false })
-        .limit(5000);
-
-      if (p_from) q = q.gte("occurred_at", p_from);
-      if (p_to)   q = q.lte("occurred_at", p_to);
-
-      const { data: rows, error } = await q;
-      if (error) throw error;
-
-      const tally = new Map();
-      rows.forEach(r => {
-        const title = (r.props && (r.props.title || r.props.item_name)) || "Unknown";
-        tally.set(title, (tally.get(title) || 0) + 1);
-      });
-      topProducts = Array.from(tally.entries())
-        .map(([product_title, add_to_cart_count]) => ({ product_title, add_to_cart_count }))
-        .sort((a, b) => b.add_to_cart_count - a.add_to_cart_count)
-        .slice(0, 10);
-    }
+    const topProductsSql = `
+      ;WITH addc AS (
+        SELECT
+          CASE
+            WHEN JSON_VALUE(props, '$.title') IS NOT NULL THEN JSON_VALUE(props, '$.title')
+            WHEN JSON_VALUE(props, '$.item_name') IS NOT NULL THEN JSON_VALUE(props, '$.item_name')
+            ELSE 'Unknown'
+          END AS product_title
+        FROM analytics_events
+        WHERE name = 'add_to_cart'
+          ${p_from ? 'AND occurred_at >= @from' : ''}
+          ${p_to   ? 'AND occurred_at <= @to'   : ''}
+      )
+      SELECT TOP 10 product_title, COUNT(*) AS add_to_cart_count
+      FROM addc
+      GROUP BY product_title
+      ORDER BY add_to_cart_count DESC;
+    `;
+    const tpRes = await tpReq.query(topProductsSql);
+    const topProducts = tpRes.recordset || [];
 
     return res.json({ kpis, topProducts });
   } catch (e) {
-    console.error("getSummary error", e);
-    return res.status(500).json({ error: "internal_error" });
+    console.error('getSummary error', e);
+    return res.status(500).json({ error: 'internal_error' });
   }
 };
 
@@ -141,132 +138,181 @@ exports.getDailyCounts = async (req, res) => {
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    let q = supabase
-      .from("analytics_daily_event_counts")
-      .select("day, name, count")
-      .order("day", { ascending: true });
+    const r = req.dbPool.request();
+    if (name)   r.input('name', sql.NVarChar(100), name);
+    if (p_from) r.input('from', sql.DateTime2, new Date(p_from));
+    if (p_to)   r.input('to', sql.DateTime2, new Date(p_to));
 
-    if (name)   q = q.eq("name", name);
-    if (p_from) q = q.gte("day", p_from);
-    if (p_to)   q = q.lte("day", p_to);
+    const where = [];
+    if (name)   where.push('name = @name');
+    if (p_from) where.push('occurred_at >= @from');
+    if (p_to)   where.push('occurred_at <= @to');
+    const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
-    const { data, error } = await q;
-    if (error) throw error;
+    const q = await r.query(`
+      SELECT
+        CAST(occurred_at AS date) AS day,
+        name,
+        COUNT(*) AS count
+      FROM analytics_events
+      ${whereSql}
+      GROUP BY CAST(occurred_at AS date), name
+      ORDER BY day ASC;
+    `);
 
-    return res.json({ data: data || [] });
+    return res.json({ data: q.recordset || [] });
   } catch (e) {
-    console.error("getDailyCounts error", e);
-    return res.status(500).json({ error: "internal_error" });
+    console.error('getDailyCounts error', e);
+    return res.status(500).json({ error: 'internal_error' });
   }
 };
 
 // GET /api/analytics/events?limit=100&offset=0&name=add_to_cart
 exports.getEvents = async (req, res) => {
   try {
-    const limit = Math.min(Number(req.query.limit || 100), 500);
-    const offset = Number(req.query.offset || 0);
-    const name = req.query.name || null;
+    const limit  = Math.min(Number(req.query.limit || 100), 500);
+    const offset = Math.max(Number(req.query.offset || 0), 0);
+    const name   = req.query.name || null;
 
-    let q = supabase
-      .from("analytics_events")
-      .select("id, occurred_at, name, anon_id, user_id, url, referrer, utm, props")
-      .order("occurred_at", { ascending: false })
-      .range(offset, offset + limit - 1);
+    const r = req.dbPool.request()
+      .input('limit', sql.Int, limit)
+      .input('offset', sql.Int, offset);
 
-    if (name) q = q.eq("name", name);
+    if (name) r.input('name', sql.NVarChar(100), name);
 
-    const { data, error } = await q;
-    if (error) throw error;
+    const q = await r.query(`
+      SELECT
+        id,
+        occurred_at,
+        name,
+        anon_id,
+        user_id,
+        url,
+        referrer,
+        utm,
+        props
+      FROM analytics_events
+      ${name ? 'WHERE name = @name' : ''}
+      ORDER BY occurred_at DESC
+      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
+    `);
 
-    return res.json({ events: data || [] });
+    return res.json({ events: q.recordset || [] });
   } catch (e) {
-    console.error("getEvents error", e);
-    return res.status(500).json({ error: "internal_error" });
+    console.error('getEvents error', e);
+    return res.status(500).json({ error: 'internal_error' });
   }
 };
 
+// GET /api/analytics/sales-report
 exports.getSalesReport = async (req, res) => {
   try {
     const now = new Date();
-    const last24hISO = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    const last30dISO = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const last30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const PAID_PAYMENT_STATUSES = ["PAID", "SUCCESS", "CAPTURED"];
-    const PAID_ORDER_STATUSES   = ["PAID", "COMPLETED", "SUCCESS", "FULFILLED"];
+    // If your schema matches Supabase tables:
+    // orders(id, placed_at, payment_status, status), order_items(order_id, product_id, product_title, qty)
+    const paidPaymentStatuses = ['PAID', 'SUCCESS', 'CAPTURED'];
+    const paidOrderStatuses   = ['PAID', 'COMPLETED', 'SUCCESS', 'FULFILLED'];
 
+    const reqBase = req.dbPool.request()
+      .input('d24', sql.DateTime2, last24h)
+      .input('d30', sql.DateTime2, last30d);
 
-    const fetchPaidOrderIds = async (fromISO = null) => {
-      let q1 = supabase
-        .from("orders")
-        .select("id", { count: "exact" })
-        .in("payment_status", PAID_PAYMENT_STATUSES);
-      if (fromISO) q1 = q1.gte("placed_at", fromISO);
-      const { data: p1rows, error: p1err, count: p1count } = await q1;
-      if (p1err) throw p1err;
+    // Count paid orders (payment_status) with fallback to status, across three windows
+    const salesSql = `
+      ;WITH paid AS (
+        SELECT id, placed_at
+        FROM orders
+        WHERE payment_status IN (${paidPaymentStatuses.map((_, i) => `'${paidPaymentStatuses[i]}'`).join(', ')})
+        UNION
+        SELECT id, placed_at
+        FROM orders
+        WHERE payment_status IS NULL
+          AND status IN (${paidOrderStatuses.map((_, i) => `'${paidOrderStatuses[i]}'`).join(', ')})
+      )
+      SELECT
+        (SELECT COUNT(*) FROM paid WHERE placed_at >= @d24) AS c24,
+        (SELECT COUNT(*) FROM paid WHERE placed_at >= @d30) AS c30,
+        (SELECT COUNT(*) FROM paid)                        AS call;
+    `;
+    const sRes = await reqBase.query(salesSql);
+    const sRow = sRes.recordset?.[0] || { c24: 0, c30: 0, call: 0 };
 
-      // 2) Fallback: status if payment_status not used
-      let q2 = supabase
-        .from("orders")
-        .select("id", { count: "exact" })
-        .is("payment_status", null)
-        .in("status", PAID_ORDER_STATUSES);
-      if (fromISO) q2 = q2.gte("placed_at", fromISO);
-      const { data: p2rows, error: p2err, count: p2count } = await q2;
-      if (p2err) throw p2err;
-
-      const ids = new Set();
-      (p1rows || []).forEach(r => ids.add(r.id));
-      (p2rows || []).forEach(r => ids.add(r.id));
-
-      return { ids: Array.from(ids), count: (p1count || 0) + (p2count || 0) };
-    };
-
-    const [s24, s30, sAll] = await Promise.all([
-      fetchPaidOrderIds(last24hISO),
-      fetchPaidOrderIds(last30dISO),
-      fetchPaidOrderIds(null),
-    ]);
+    // Top products from ALL paid orders
+    const paidIdsRes = await req.dbPool.request().query(`
+      ;WITH paid AS (
+        SELECT id
+        FROM orders
+        WHERE payment_status IN (${paidPaymentStatuses.map(s => `'${s}'`).join(', ')})
+        UNION
+        SELECT id
+        FROM orders
+        WHERE payment_status IS NULL
+          AND status IN (${paidOrderStatuses.map(s => `'${s}'`).join(', ')})
+      )
+      SELECT id FROM paid;
+    `);
+    const paidIds = paidIdsRes.recordset?.map(r => r.id) || [];
 
     let topProducts = [];
-    if (sAll.ids.length > 0) {
-      const { data: items, error: itemsErr } = await supabase
-        .from("order_items")
-        .select("product_id, product_title, qty, order_id")
-        .in("order_id", sAll.ids);
-      if (itemsErr) throw itemsErr;
-
-      const byProduct = new Map();
-      for (const row of items || []) {
-        const pid = row.product_id || null;
-        const name = row.product_title || "Untitled";
-        const qty = Number(row.qty || 0);
-        const key = pid || `title:${name}`; 
-
-        const prev = byProduct.get(key) || {
-          id: pid,            
-          name,               
-          image: null,        
-          sales: 0,
-        };
-        prev.sales += qty;
-        byProduct.set(key, prev);
-      }
-
-      topProducts = Array.from(byProduct.values())
-        .sort((a, b) => b.sales - a.sales)
-        .slice(0, 6);
+    if (paidIds.length) {
+      // chunk IN() to avoid parameter limits if needed; assuming small here
+      const r = await req.dbPool.request().query(`
+        SELECT
+          COALESCE(CAST(product_id AS NVARCHAR(64)), CONCAT('title:', COALESCE(product_title, 'Untitled'))) AS key,
+          MAX(product_id) AS id,
+          MAX(product_title) AS name,
+          SUM(TRY_CONVERT(int, qty)) AS sales
+        FROM order_items
+        WHERE order_id IN (${paidIds.map(id => `'${id}'`).join(',')})
+        GROUP BY COALESCE(CAST(product_id AS NVARCHAR(64)), CONCAT('title:', COALESCE(product_title, 'Untitled')))
+        ORDER BY sales DESC
+        OFFSET 0 ROWS FETCH NEXT 6 ROWS ONLY;
+      `);
+      topProducts = (r.recordset || []).map(x => ({
+        id: x.id,
+        name: x.name || 'Untitled',
+        image: null, // populate later if you join to a products table
+        sales: Number(x.sales || 0),
+      }));
     }
 
     return res.json({
       summary: [
-        { name: "Last 24h", sales: s24.count ?? 0 },
-        { name: "30 Days",  sales: s30.count ?? 0 },
-        { name: "All Time", sales: sAll.count ?? 0 },
+        { name: 'Last 24h', sales: sRow.c24 || 0 },
+        { name: '30 Days',  sales: sRow.c30 || 0 },
+        { name: 'All Time', sales: sRow.call || 0 },
       ],
       topProducts,
     });
   } catch (e) {
-    console.error("getSalesReport error", e);
-    return res.status(500).json({ error: "internal_error", details: e.message });
+    console.error('getSalesReport error', e);
+    return res.status(500).json({ error: 'internal_error', details: e.message });
   }
 };
+
+
+
+// -- analytics_events
+// CREATE TABLE dbo.analytics_events (
+//   id           BIGINT IDENTITY(1,1) PRIMARY KEY,
+//   occurred_at  DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
+//   name         NVARCHAR(100) NOT NULL,
+//   anon_id      NVARCHAR(64)  NULL,
+//   user_id      INT           NULL,
+//   url          NVARCHAR(MAX) NULL,
+//   referrer     NVARCHAR(MAX) NULL,
+//   utm          NVARCHAR(MAX) NULL, -- JSON string
+//   props        NVARCHAR(MAX) NULL, -- JSON string
+//   user_agent   NVARCHAR(512) NULL,
+//   ip           NVARCHAR(64)  NULL
+// );
+
+// CREATE INDEX IX_ae_occurred_at ON dbo.analytics_events(occurred_at DESC);
+// CREATE INDEX IX_ae_name_date   ON dbo.analytics_events(name, occurred_at DESC);
+// CREATE INDEX IX_ae_anon        ON dbo.analytics_events(anon_id);
+// CREATE INDEX IX_ae_user        ON dbo.analytics_events(user_id);
+
+// -- orders / order_items are assumed to already exist

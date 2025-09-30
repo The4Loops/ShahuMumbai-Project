@@ -1,17 +1,15 @@
-// routes/analyticsRoutes.js
+// routes/analytics.routes.js
 const express = require('express');
+const ctrl = require('../controllers/analytics.controller');
+const { attachDb } = require('../middleware/db');
 const router = express.Router();
-const analyticsController = require('../controllers/analyticsController');
 
-// ingest events from the frontend
-router.post('/track', analyticsController.trackEvent);
+router.use(attachDb); 
 
-// admin reads
-router.get('/analytics/summary', analyticsController.getSummary);
-router.get('/analytics/daily', analyticsController.getDailyCounts);
-router.get('/analytics/events', analyticsController.getEvents);
-
-// NEW: sales report
-router.get('/analytics/sales-report', analyticsController.getSalesReport);
+router.post('/track', ctrl.trackEvent);
+router.get('/analytics/summary', ctrl.getSummary);
+router.get('/analytics/daily', ctrl.getDailyCounts);
+router.get('/analytics/events', ctrl.getEvents);
+router.get('/analytics/sales-report', ctrl.getSalesReport);
 
 module.exports = router;
