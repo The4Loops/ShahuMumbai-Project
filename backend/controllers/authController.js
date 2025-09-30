@@ -2,6 +2,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const sql = require('mssql');
+const { OAuth2Client } = require('google-auth-library');
 
 // SEND OTP
 exports.sendOtp = async (req, res) => {
@@ -215,8 +216,16 @@ exports.login = async (req, res) => {
 // SSO LOGIN
 exports.ssoLogin = async (req, res) => {
   try {
+
+    // Extract token from Authorization header
     const token = req.headers.authorization?.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Missing token' });
+    if (!token) {
+      console.error('No token provided in Authorization header');
+      return res.status(401).json({ error: 'Missing token' });
+    }
+
+    // Initialize Google OAuth client
+    const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
     // Verify Google ID token
     let payload;
@@ -227,10 +236,11 @@ exports.ssoLogin = async (req, res) => {
       });
       payload = ticket.getPayload();
       if (!payload.email) {
+        console.error('Google token missing email');
         return res.status(401).json({ error: 'Invalid Google token: No email found' });
       }
     } catch (err) {
-      console.error('Google Token Verification Error:', err);
+      console.error('Google Token Verification Error:', err.message);
       return res.status(401).json({ error: 'Invalid Google token' });
     }
 
@@ -244,6 +254,7 @@ exports.ssoLogin = async (req, res) => {
       .input('Label', sql.NVarChar, 'Users')
       .query('SELECT RoleId, Label FROM roles WHERE Label = @Label');
     if (!roleResult.recordset[0]) {
+      console.error('Default user role not found');
       return res.status(500).json({ error: 'Default user role not found' });
     }
     const { RoleId, Label: userRoleLabel } = roleResult.recordset[0];
@@ -285,6 +296,7 @@ exports.ssoLogin = async (req, res) => {
       userId = insertResult.recordset[0].UserId;
     } else {
       if (existingUser.SSOLogin !== 'Y') {
+        console.error('SSO login not allowed for user:', user.email);
         return res.status(403).json({ error: 'SSO login is not allowed for this user.' });
       }
       userId = existingUser.UserId;
@@ -301,6 +313,7 @@ exports.ssoLogin = async (req, res) => {
         `);
     }
 
+    // Generate JWT
     const appToken = jwt.sign(
       { id: userId, fullname: user.user_metadata.full_name || user.email, email: user.email, role: roleLabel },
       process.env.JWT_SECRET,
@@ -309,7 +322,7 @@ exports.ssoLogin = async (req, res) => {
 
     return res.status(200).json({ token: appToken });
   } catch (err) {
-    console.error('Error in ssoLogin:', err);
+    console.error('Error in ssoLogin:', err.message, err.stack);
     return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
