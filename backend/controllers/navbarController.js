@@ -34,7 +34,7 @@ exports.getMenusWithItems = async (req, res) => {
   try {
     const { error: authError, decoded } = verifyUser(req);
     let result;
-
+    
     const language = req.query.lang || 'en-US';
     const targetLang = language.split('-')[0].toLowerCase(); // e.g., 'hi' for hi-IN
 
@@ -43,11 +43,11 @@ exports.getMenusWithItems = async (req, res) => {
       result = await req.dbPool.request()
         .execute('SP_GetMenuUnAuthenticated');
     } else {
-      if (!decoded.UserId) {
+      if (!decoded.id) {
         return res.status(400).json({ error: 'Invalid JWT: Missing user ID' });
       }
       result = await req.dbPool.request()
-        .input('UserId', sql.Int, parseInt(decoded.UserId))
+        .input('UserId', sql.Int, parseInt(decoded.id))
         .execute('get_menus_authenticated');
     }
 

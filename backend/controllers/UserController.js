@@ -1,165 +1,175 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
-const supabase = require("../config/supabaseClient");
+const express = require('express');
+const sql = require('mssql');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
+const nodemailer = require('nodemailer');
 
 // VERIFY ADMIN
 const verifyAdmin = (req) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return { error: "Unauthorized: Token missing" };
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return { error: 'Unauthorized: Token missing' };
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "Admin") return { error: "Forbidden: Admins only" };
+    if (decoded.role !== 'Admin') return { error: 'Forbidden: Admins only' };
     return { decoded };
   } catch (err) {
-    return { error: "Invalid Token" };
+    return { error: 'Invalid Token' };
   }
 };
 
 // Verify User
 const verifyUser = (req) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return { error: "Unauthorized: Token missing" };
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return { error: 'Unauthorized: Token missing' };
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     return { decoded };
   } catch (err) {
-    return { error: "Invalid Token" };
+    return { error: 'Invalid Token' };
   }
 };
 
 // ADMIN API: Create User
 exports.adminCreateUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError)
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
   try {
-    const { full_name, email, password, role, active } = req.body;
+    const { FullName, Email, Password, role, Active } = req.body;
 
-    if (!full_name || !email) {
-      return res.status(400).json({ error: "Name and Email are required" });
+    if (!FullName || !Email) {
+      return res.status(400).json({ error: 'Name and Email are required' });
     }
 
-    // Fetch the role ID from roles table
-    const { data: roleData } = await supabase
-      .from("roles")
-      .select("id")
-      .eq("label", role || "user")
-      .single();
+    // Fetch the RoleId from roles table
+    const roleResult = await req.dbPool.request()
+      .input('Label', sql.NVarChar, role || 'user')
+      .query('SELECT RoleId FROM roles WHERE Label = @Label');
+    if (!roleResult.recordset[0]) {
+      return res.status(400).json({ error: `Role '${role || 'user'}' not found` });
+    }
+    const RoleId = roleResult.recordset[0].RoleId;
 
-    if (!roleData) {
-      return res
-        .status(400)
-        .json({ error: `Role '${role || "user"}' not found` });
+    const hashedPassword = Password ? await bcrypt.hash(Password, 10) : null;
+
+    const result = await req.dbPool.request()
+      .input('FullName', sql.NVarChar, FullName)
+      .input('Email', sql.NVarChar, Email)
+      .input('Password', sql.NVarChar, hashedPassword)
+      .input('RoleId', sql.Int, RoleId)
+      .input('Active', sql.Char(1), Active ? 'Y' : 'N')
+      .input('Joined', sql.DateTime, new Date())
+      .input('UpdatedAt', sql.DateTime, new Date())
+      .query(`
+        INSERT INTO users (FullName, Email, Password, RoleId, Active, Joined, UpdatedAt)
+        OUTPUT 
+          INSERTED.UserId, 
+          INSERTED.FullName, 
+          INSERTED.Email, 
+          INSERTED.Password, 
+          INSERTED.RoleId, 
+          INSERTED.Active, 
+          INSERTED.Joined, 
+          r.Label
+        FROM users u
+        INNER JOIN roles r ON u.RoleId = r.RoleId
+        WHERE u.UserId = INSERTED.UserId
+      `);
+
+    if (!result.recordset[0]) {
+      return res.status(400).json({ error: 'Failed to create user' });
     }
 
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+    const data = result.recordset[0];
+    data.Active = data.Active === 'Y';
+    data.roles = { Label: data.Label };
+    delete data.Label;
 
-    const { data, error } = await supabase
-      .from("users")
-      .insert([
-        {
-          full_name,
-          email,
-          password: hashedPassword,
-          role_id: roleData.id,
-          active: active ? "Y" : "N",
-          joined: new Date().toISOString(),
-        },
-      ])
-      .select("*, roles(label)")
-      .single();
-
-    if (error) {
-      return res.status(400).json({ error: error.message });
-    }
-
-    res.status(201).json({ message: "User created successfully", user: data });
+    res.status(201).json({ message: 'User created successfully', user: data });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in adminCreateUser:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
 // Get all users
 exports.getAllUsers = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError)
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
   try {
     const { search, role, status, excludeRole } = req.query;
-    let query = supabase
-      .from("users")
-      .select(
-        "id, full_name, email, roles!role_id(label), active, joined, last_login"
-      );
 
-    // Search by name or email
+    let query = `
+      SELECT 
+        u.UserId, 
+        u.FullName, 
+        u.Email, 
+        r.Label, 
+        u.Active, 
+        u.Joined, 
+        u.LastLogin
+      FROM users u
+      INNER JOIN roles r ON u.RoleId = r.RoleId
+    `;
+    const parameters = [];
+
+    // Search by FullName or Email
     if (search) {
-      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%`);
+      query += ` WHERE (u.FullName LIKE @search OR u.Email LIKE @search)`;
+      parameters.push({ name: 'search', type: sql.NVarChar, value: `%${search}%` });
     }
 
     // Filter by role
-    if (role && role !== "All") {
-      const { data: roleData, error: roleError } = await supabase
-        .from("roles")
-        .select("id")
-        .eq("label", role)
-        .single();
-
-      if (roleError || !roleData) {
+    if (role && role !== 'All') {
+      const roleResult = await req.dbPool.request()
+        .input('Label', sql.NVarChar, role)
+        .query('SELECT RoleId FROM roles WHERE Label = @Label');
+      if (!roleResult.recordset[0]) {
         return res.status(400).json({ error: `Role '${role}' not found` });
       }
-      query = query.eq("role_id", roleData.id);
+      query += (search ? ' AND' : ' WHERE') + ' u.RoleId = @RoleId';
+      parameters.push({ name: 'RoleId', type: sql.Int, value: roleResult.recordset[0].RoleId });
     }
 
     // Filter by status
-    if (status && status !== "All") {
-      query = query.eq("active", status === "active" ? "Y" : "N");
+    if (status && status !== 'All') {
+      query += (search || (role && role !== 'All') ? ' AND' : ' WHERE') + ' u.Active = @Active';
+      parameters.push({ name: 'Active', type: sql.Char(1), value: status === 'active' ? 'Y' : 'N' });
     }
 
-    // Exclude specific role (e.g., Users)
+    // Exclude specific role
     if (excludeRole) {
-      const { data: excludeRoleData, error: excludeRoleError } = await supabase
-        .from("roles")
-        .select("id")
-        .eq("label", excludeRole)
-        .single();
-
-      if (excludeRoleError || !excludeRoleData) {
-        return res
-          .status(400)
-          .json({ error: `Exclude role '${excludeRole}' not found` });
+      const excludeRoleResult = await req.dbPool.request()
+        .input('exclude_Label', sql.NVarChar, excludeRole)
+        .query('SELECT RoleId FROM roles WHERE Label = @exclude_Label');
+      if (!excludeRoleResult.recordset[0]) {
+        return res.status(400).json({ error: `Exclude role '${excludeRole}' not found` });
       }
-      query = query.neq("role_id", excludeRoleData.id); // Use neq to exclude the role
+      query += ((search || (role && role !== 'All') || (status && status !== 'All')) ? ' AND' : ' WHERE') + ' u.RoleId != @excludeRoleId';
+      parameters.push({ name: 'excludeRoleId', type: sql.Int, value: excludeRoleResult.recordset[0].RoleId });
     }
 
-    const { data, error } = await query;
-    if (error) {
-      return res
-        .status(400)
-        .json({ error: `Database query failed: ${error.message}` });
-    }
+    const request = req.dbPool.request();
+    parameters.forEach(param => {
+      request.input(param.name, param.type, param.value);
+    });
 
-    const transformedData = data.map((user) => ({
+    const result = await request.query(query);
+    const transformedData = result.recordset.map(user => ({
       ...user,
-      role: user.roles.label, // Transform roles.label to role for response
-      active: user.active === "Y",
-      joined: user.joined ? new Date(user.joined).toLocaleDateString() : "N/A",
-      last_login: user.last_login
-        ? new Date(user.last_login).toLocaleDateString()
-        : "Never",
+      role: user.Label,
+      Active: user.Active === 'Y',
+      Joined: user.Joined ? new Date(user.Joined).toLocaleDateString() : 'N/A',
+      LastLogin: user.LastLogin ? new Date(user.LastLogin).toLocaleDateString() : 'Never',
+      roles: { Label: user.Label }
     }));
 
     res.status(200).json({ users: transformedData });
   } catch (err) {
+    console.error('Error in getAllUsers:', err);
     res.status(500).json({ error: `Server error: ${err.message}` });
   }
 };
@@ -167,81 +177,112 @@ exports.getAllUsers = async (req, res) => {
 // Update user
 exports.updateUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError)
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
   try {
-    const { id } = req.params;
-    const { full_name, email, password, role, active } = req.body;
+    const { UserId } = req.params;
+    const { FullName, Email, Password, role, Active } = req.body;
 
-    if (!full_name || !email) {
-      return res.status(400).json({ error: "Name and Email are required" });
+    if (!FullName || !Email) {
+      return res.status(400).json({ error: 'Name and Email are required' });
     }
 
-    // Fetch the role ID from roles table
-    const { data: roleData } = await supabase
-      .from("roles")
-      .select("id")
-      .eq("label", role || "Users")
-      .single();
-
-    if (!roleData) {
-      return res
-        .status(400)
-        .json({ error: `Role '${role || "Users"}' not found` });
+    // Fetch the RoleId from roles table
+    const roleResult = await req.dbPool.request()
+      .input('Label', sql.NVarChar, role || 'Users')
+      .query('SELECT RoleId FROM roles WHERE Label = @Label');
+    if (!roleResult.recordset[0]) {
+      return res.status(400).json({ error: `Role '${role || 'Users'}' not found` });
     }
+    const RoleId = roleResult.recordset[0].RoleId;
 
     const updates = {
-      full_name,
-      email,
-      role_id: roleData.id,
-      active: active ? "Y" : "N",
-      updated_at: new Date().toISOString(),
+      FullName,
+      Email,
+      RoleId,
+      Active: Active ? 'Y' : 'N',
+      UpdatedAt: new Date()
     };
 
-    if (password) {
-      updates.password = await bcrypt.hash(password, 10);
+    if (Password) {
+      updates.Password = await bcrypt.hash(Password, 10);
     }
 
-    const { data, error } = await supabase
-      .from("users")
-      .update(updates)
-      .eq("id", id)
-      .select("*, roles!role_id(label)")
-      .single();
+    const request = req.dbPool.request()
+      .input('UserId', sql.Int, UserId)
+      .input('FullName', sql.NVarChar, updates.FullName)
+      .input('Email', sql.NVarChar, updates.Email)
+      .input('RoleId', sql.Int, updates.RoleId)
+      .input('Active', sql.Char(1), updates.Active)
+      .input('UpdatedAt', sql.DateTime, updates.UpdatedAt);
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (updates.Password) {
+      request.input('Password', sql.NVarChar, updates.Password);
     }
 
-    res.status(200).json({ message: "User updated successfully", user: data });
+    const result = await request.query(`
+      UPDATE users
+      SET 
+        FullName = @FullName,
+        Email = @Email,
+        RoleId = @RoleId,
+        Active = @Active,
+        UpdatedAt = @UpdatedAt
+        ${updates.Password ? ', Password = @Password' : ''}
+      OUTPUT 
+        INSERTED.UserId, 
+        INSERTED.FullName, 
+        INSERTED.Email, 
+        INSERTED.Password, 
+        INSERTED.RoleId, 
+        INSERTED.Active, 
+        INSERTED.Joined, 
+        INSERTED.LastLogin,
+        r.Label
+      FROM users u
+      INNER JOIN roles r ON u.RoleId = r.RoleId
+      WHERE u.UserId = @UserId
+    `);
+
+    if (!result.recordset[0]) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const data = result.recordset[0];
+    data.Active = data.Active === 'Y';
+    data.roles = { Label: data.Label };
+    delete data.Label;
+
+    res.status(200).json({ message: 'User updated successfully', user: data });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in updateUser:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
 // Delete user
 exports.deleteUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError)
-    return res
-      .status(403)
-      .json({ error: "Unauthorized: Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Unauthorized: Admin access required' });
 
   try {
-    const { id } = req.params;
+    const { UserId } = req.params;
 
-    const { error } = await supabase.from("users").delete().eq("id", id);
+    const result = await req.dbPool.request()
+      .input('UserId', sql.Int, UserId)
+      .query(`
+        DELETE FROM users
+        WHERE UserId = @UserId
+      `);
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (result.rowsAffected[0] === 0) {
+      return res.status(400).json({ error: 'User not found' });
     }
 
-    res.status(200).json({ message: "User deleted successfully" });
+    res.status(200).json({ message: 'User deleted successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in deleteUser:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
@@ -249,92 +290,86 @@ exports.deleteUser = async (req, res) => {
 exports.updateUserProfile = async (req, res) => {
   const { error: authError, decoded } = verifyUser(req);
   if (authError) return res.status(401).json({ error: authError });
-  console.log(decoded.id);
+
   try {
     const {
-      full_name,
-      email,
-      password,
-      phone,
-      about,
-      country,
-      newsletter_subscription,
-      email_notifications,
-      public_profile,
-      twitter_url,
-      facebook_url,
-      instagram_url,
-      linkedin_url,
-      profile_image,
+      FullName,
+      Email,
+      Password,
+      Phone,
+      About,
+      Country,
+      NewsLetterSubscription,
+      EmailNotifications,
+      PublicProfile,
+      TwitterUrl,
+      FacebookUrl,
+      InstagramUrl,
+      LinkedInUrl,
+      ProfileImage,
     } = req.body;
 
-    // Validate email is provided
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+    // Validate Email is provided
+    if (!Email) {
+      return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Fetch current user data to check newsletter_subscription status
-    const { data: currentUser, error: fetchError } = await supabase
-      .from("users")
-      .select("newsletter_subscription")
-      .eq("id", decoded.id)
-      .single();
-
-    if (fetchError || !currentUser) {
-      return res.status(404).json({ error: "User not found" });
+    // Fetch current user data to check NewsLetterSubscription status
+    const currentUserResult = await req.dbPool.request()
+      .input('UserId', sql.Int, decoded.id)
+      .query('SELECT NewsLetterSubscription FROM users WHERE UserId = @UserId');
+    if (!currentUserResult.recordset[0]) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
     const updates = {
-      full_name: full_name || null,
-      email,
-      phone: phone || null,
-      about: about || null,
-      country: country || null,
-      newsletter_subscription: newsletter_subscription ?? false,
-      email_notifications: email_notifications ?? false,
-      public_profile: public_profile ?? false,
-      twitter_url: twitter_url || null,
-      facebook_url: facebook_url || null,
-      instagram_url: instagram_url || null,
-      linkedin_url: linkedin_url || null,
-      profile_image: profile_image || null,
-      updated_at: new Date().toISOString(),
+      FullName: FullName || null,
+      Email,
+      Phone: Phone || null,
+      About: About || null,
+      Country: Country || null,
+      NewsLetterSubscription: NewsLetterSubscription ?? false,
+      EmailNotifications: EmailNotifications ?? false,
+      PublicProfile: PublicProfile ?? false,
+      TwitterUrl: TwitterUrl || null,
+      FacebookUrl: FacebookUrl || null,
+      InstagramUrl: InstagramUrl || null,
+      LinkedInUrl: LinkedInUrl || null,
+      ProfileImage: ProfileImage || null,
+      UpdatedAt: new Date(),
     };
 
-    // Hash password if provided
-    if (password) {
-      updates.password = await bcrypt.hash(password, 10);
+    // Hash Password if provided
+    if (Password) {
+      updates.Password = await bcrypt.hash(Password, 10);
     }
 
-    // Check if newsletter_subscription is changing from false to true
+    // Check if NewsLetterSubscription is changing from false to true
     const isFirstTimeSubscription =
-      currentUser.newsletter_subscription === false &&
-      updates.newsletter_subscription === true;
+      currentUserResult.recordset[0].NewsLetterSubscription === 0 &&
+      updates.NewsLetterSubscription === true;
 
     // Send newsletter email if it's the first time subscription
     if (isFirstTimeSubscription) {
       // Fetch email content from module table
-      const { data: module, error: moduleError } = await supabase
-        .from("module")
-        .select("mailsubject, maildescription")
-        .eq("mailtype", "Subscriber")
-        .single();
-
-      if (moduleError || !module) {
-        return res
-          .status(400)
-          .json({ error: "Subscriber email template not found" });
+      const moduleResult = await req.dbPool.request()
+        .input('mailtype', sql.NVarChar, 'Subscriber')
+        .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
+      if (!moduleResult.recordset[0]) {
+        return res.status(400).json({ error: 'Subscriber email template not found' });
       }
 
-      // Replace #username with email in maildescription
-      const mailContent = module.maildescription.replace("#username", email);
+      const { mailsubject, maildescription } = moduleResult.recordset[0];
+
+      // Replace #username with Email in maildescription
+      const mailContent = maildescription.replace('#username', Email);
       const plainTextContent = mailContent
-        .replace(/<[^>]+>/g, "")
-        .replace(/\s+/g, " ")
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
         .trim();
 
       const transporter = nodemailer.createTransport({
-        service: "gmail",
+        service: 'gmail',
         auth: {
           user: process.env.EMAIL_USER,
           pass: process.env.EMAIL_PASS,
@@ -344,8 +379,8 @@ exports.updateUserProfile = async (req, res) => {
       // Send email
       const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: email,
-        subject: module.mailsubject,
+        to: Email,
+        subject: mailsubject,
         html: mailContent,
         text: plainTextContent,
       };
@@ -353,54 +388,105 @@ exports.updateUserProfile = async (req, res) => {
       await transporter.sendMail(mailOptions);
     }
 
-    // Update user in Supabase
-    const { data, error } = await supabase
-      .from("users")
-      .update(updates)
-      .eq("id", decoded.id)
-      .select(
-        "id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login"
-      )
-      .single();
+    // Update user in MSSQL
+    const request = req.dbPool.request()
+      .input('UserId', sql.Int, decoded.id)
+      .input('FullName', sql.NVarChar, updates.FullName)
+      .input('Email', sql.NVarChar, updates.Email)
+      .input('Phone', sql.NVarChar, updates.Phone)
+      .input('About', sql.NVarChar, updates.About)
+      .input('Country', sql.NVarChar, updates.Country)
+      .input('NewsLetterSubscription', sql.Char, updates.NewsLetterSubscription)
+      .input('EmailNotifications', sql.Char, updates.EmailNotifications)
+      .input('PublicProfile', sql.Char, updates.PublicProfile)
+      .input('TwitterUrl', sql.NVarChar, updates.TwitterUrl)
+      .input('FacebookUrl', sql.NVarChar, updates.FacebookUrl)
+      .input('InstagramUrl', sql.NVarChar, updates.InstagramUrl)
+      .input('LinkedInUrl', sql.NVarChar, updates.LinkedInUrl)
+      .input('ProfileImage', sql.NVarChar, updates.ProfileImage)
+      .input('UpdatedAt', sql.DateTime, updates.UpdatedAt);
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (updates.Password) {
+      request.input('Password', sql.NVarChar, updates.Password);
     }
 
-    // Transform response to match frontend expectations
+    const result = await request.query(`
+      UPDATE users
+      SET 
+        FullName = @FullName,
+        Email = @Email,
+        Phone = @Phone,
+        About = @About,
+        Country = @Country,
+        NewsLetterSubscription = @NewsLetterSubscription,
+        EmailNotifications = @EmailNotifications,
+        PublicProfile = @PublicProfile,
+        TwitterUrl = @TwitterUrl,
+        FacebookUrl = @FacebookUrl,
+        InstagramUrl = @InstagramUrl,
+        LinkedInUrl = @LinkedInUrl,
+        ProfileImage = @ProfileImage,
+        UpdatedAt = @UpdatedAt
+        ${updates.Password ? ', Password = @Password' : ''}
+      OUTPUT 
+        INSERTED.UserId, 
+        INSERTED.FullName, 
+        INSERTED.Email, 
+        INSERTED.Phone, 
+        INSERTED.About, 
+        INSERTED.Country, 
+        INSERTED.NewsLetterSubscription, 
+        INSERTED.EmailNotifications, 
+        INSERTED.PublicProfile, 
+        INSERTED.TwitterUrl, 
+        INSERTED.FacebookUrl, 
+        INSERTED.InstagramUrl, 
+        INSERTED.LinkedInUrl, 
+        INSERTED.ProfileImage, 
+        INSERTED.RoleId, 
+        INSERTED.Active, 
+        INSERTED.Joined, 
+        INSERTED.LastLogin,
+        r.Label
+      FROM users u
+      INNER JOIN roles r ON u.RoleId = r.RoleId
+      WHERE u.UserId = @UserId
+    `);
+
+    if (!result.recordset[0]) {
+      return res.status(400).json({ error: 'User not found' });
+    }
+
+    const data = result.recordset[0];
     const transformedData = {
-      id: data.id,
-      full_name: data.full_name,
-      email: data.email,
-      phone: data.phone,
-      about: data.about,
-      country: data.country,
+      UserId: data.UserId,
+      FullName: data.FullName,
+      Email: data.Email,
+      Phone: data.Phone,
+      About: data.About,
+      Country: data.Country,
       preferences: {
-        newsletter: data.newsletter_subscription,
-        emailNotifications: data.email_notifications,
-        publicProfile: data.public_profile,
+        newsletter: data.NewsLetterSubscription,
+        emailNotifications: data.EmailNotifications,
+        publicProfile: data.PublicProfile,
       },
       socialLinks: {
-        twitter: data.twitter_url,
-        facebook: data.facebook_url,
-        instagram: data.instagram_url,
-        linkedin: data.linkedin_url,
+        twitter: data.TwitterUrl || '',
+        facebook: data.FacebookUrl || '',
+        instagram: data.InstagramUrl || '',
+        linkedin: data.LinkedInUrl || '',
       },
-      image: data.profile_image,
-      role: data.roles.label,
-      active: data.active === "Y",
-      joined: data.joined ? new Date(data.joined).toLocaleDateString() : "N/A",
-      last_login: data.last_login
-        ? new Date(data.last_login).toLocaleDateString()
-        : "Never",
+      image: data.ProfileImage || null,
+      role: data.Label,
+      Active: data.Active === 'Y',
+      Joined: data.Joined ? new Date(data.Joined).toLocaleDateString() : 'N/A',
+      LastLogin: data.LastLogin ? new Date(data.LastLogin).toLocaleDateString() : 'Never',
     };
 
-    res
-      .status(200)
-      .json({ message: "Profile updated successfully", user: transformedData });
+    res.status(200).json({ message: 'Profile updated successfully', user: transformedData });
   } catch (err) {
-    console.error("updateUserProfile error:", err);
-    res.status(500).json({ error: err.message });
+    console.error('Error in updateUserProfile:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
@@ -410,52 +496,69 @@ exports.getUserProfile = async (req, res) => {
   if (authError) return res.status(401).json({ error: authError });
 
   try {
-    const { data, error } = await supabase
-      .from("users")
-      .select(
-        "id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login"
-      )
-      .eq("id", decoded.id)
-      .single();
+    const result = await req.dbPool.request()
+      .input('UserId', sql.Int, decoded.id)
+      .query(`
+        SELECT 
+          u.UserId, 
+          u.FullName, 
+          u.Email, 
+          u.Phone, 
+          u.About, 
+          u.Country, 
+          u.NewsLetterSubscription, 
+          u.EmailNotifications, 
+          u.PublicProfile, 
+          u.TwitterUrl, 
+          u.FacebookUrl, 
+          u.InstagramUrl, 
+          u.LinkedInUrl, 
+          u.ProfileImage, 
+          u.RoleId, 
+          u.Active, 
+          u.Joined, 
+          u.LastLogin,
+          r.Label
+        FROM users u
+        INNER JOIN roles r ON u.RoleId = r.RoleId
+        WHERE u.UserId = @UserId
+      `);
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    if (!result.recordset[0]) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    if (!data) {
-      return res.status(404).json({ error: "User not found" });
-    }
-
-    // Transform response to match frontend expectations
+    const data = result.recordset[0];
     const transformedData = {
-      id: data.id,
-      full_name: data.full_name,
-      email: data.email,
-      phone: data.phone,
-      about: data.about,
-      country: data.country,
+      UserId: data.UserId,
+      FullName: data.FullName,
+      Email: data.Email,
+      Phone: data.Phone,
+      About: data.About,
+      Country: data.Country,
       preferences: {
-        newsletter: data.newsletter_subscription || false,
-        emailNotifications: data.email_notifications || false,
-        publicProfile: data.public_profile || false,
+        newsletter: data.NewsLetterSubscription || false,
+        emailNotifications: data.EmailNotifications || false,
+        publicProfile: data.PublicProfile || false,
       },
       socialLinks: {
-        twitter: data.twitter_url || "",
-        facebook: data.facebook_url || "",
-        instagram: data.instagram_url || "",
-        linkedin: data.linkedin_url || "",
+        twitter: data.TwitterUrl || '',
+        facebook: data.FacebookUrl || '',
+        instagram: data.InstagramUrl || '',
+        linkedin: data.LinkedInUrl || '',
       },
-      image: data.profile_image || null,
-      role: data.roles.label,
-      active: data.active === "Y",
-      joined: data.joined ? new Date(data.joined).toLocaleDateString() : "N/A",
-      last_login: data.last_login
-        ? new Date(data.last_login).toLocaleDateString()
-        : "Never",
+      image: data.ProfileImage || null,
+      role: data.Label,
+      Active: data.Active === 'Y',
+      Joined: data.Joined ? new Date(data.Joined).toLocaleDateString() : 'N/A',
+      LastLogin: data.LastLogin ? new Date(data.LastLogin).toLocaleDateString() : 'Never',
     };
 
     res.status(200).json({ user: transformedData });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in getUserProfile:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
+
+module.exports = exports;

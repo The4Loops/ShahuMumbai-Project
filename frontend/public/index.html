@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
    <meta http-equiv="Content-Security-Policy" content="
     default-src 'self' https://www.google.com/;
-    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms;
+    script-src 'self' 'unsafe-inline' https://www.googletagmanager.com https://www.google-analytics.com https://www.clarity.ms https://apis.google.com;
     style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com/;
     font-src 'self' data: https://fonts.gstatic.com;
     connect-src 'self'
@@ -18,7 +18,8 @@
       https://www.googletagmanager.com
       https://www.clarity.ms
       https://c.clarity.ms
-      https://*.bing.com;
+      https://*.bing.com
+      https://accounts.google.com;
     img-src 'self' data: blob: http://res.cloudinary.com/ https://www.google-analytics.com https://stats.g.doubleclick.net ;
     media-src 'self' http://res.cloudinary.com/;
     object-src 'none';

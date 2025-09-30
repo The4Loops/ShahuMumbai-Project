@@ -1,45 +1,35 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
-const supabase = require("../config/supabaseClient");
-const { encryptData } = require("../utils/crypto");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const sql = require('mssql');
 
 // SEND OTP
 exports.sendOtp = async (req, res) => {
   try {
-    const { email, full_name, password } = req.body;
+    const { Email, FullName, Password } = req.body;
 
     // Check if already exists
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .single();
-
-    if (existingUser) {
-      return res.status(400).json({ error: "Email already registered" });
+    const userResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, Email)
+      .query('SELECT UserId FROM users WHERE Email = @Email');
+    if (userResult.recordset[0]) {
+      return res.status(400).json({ error: 'Email already registered' });
     }
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      return res
-        .status(500)
-        .json({ error: "Email credentials not configured" });
+      return res.status(500).json({ error: 'Email credentials not configured' });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const { error } = await supabase
-      .from("shortmessage")
-      .insert([{ email, otp }]);
-
-    if (error) {
-      console.error("Insert OTP Error:", error);
-      return res.status(500).json({ error: error.message });
-    }
+    await req.dbPool.request()
+      .input('email', sql.NVarChar, Email)
+      .input('otp', sql.NVarChar, otp)
+      .query('INSERT INTO shortmessage (Email, Otp, CreatedAt) VALUES (@email, @otp, GETDATE())');
 
     // Send OTP via email
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -48,292 +38,314 @@ exports.sendOtp = async (req, res) => {
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Your OTP for Registration",
-      text: `Hi ${full_name}, your OTP is: ${otp}`,
+      to: Email,
+      subject: 'Your OTP for Registration',
+      text: `Hi ${FullName}, your OTP is: ${otp}`,
     });
 
-    res.status(200).json({ message: "OTP sent successfully to email" });
+    res.status(200).json({ message: 'OTP sent successfully to email' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in sendOtp:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
 // VERIFY OTP AND REGISTER
 exports.verifyOtpAndRegister = async (req, res) => {
   try {
-    const { full_name, email, password, otp, ssologin = "N" } = req.body;
+    const { FullName, Email, Password, otp, SSOLogin = 'N' } = req.body;
 
-    const { data: otpRecord } = await supabase
-      .from("shortmessage")
-      .select("*")
-      .eq("email", email)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
+    const otpResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, Email)
+      .query(`
+        SELECT TOP 1 Email, Otp
+        FROM ShortMessage
+        WHERE Email = @email
+        ORDER BY CreatedAt DESC
+      `);
+    const otpRecord = otpResult.recordset[0];
 
-    if (!otpRecord || otpRecord.otp !== otp) {
-      return res.status(400).json({ error: "Invalid or expired OTP" });
+    if (!otpRecord || otpRecord.Otp !== otp) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
-    // Fetch the default 'user' role ID
-    const { data: userRole } = await supabase
-      .from("roles")
-      .select("id")
-      .eq("label", "Users")
-      .single();
-
-    if (!userRole) {
-      return res.status(500).json({ error: "Default user role not found" });
+    // Fetch the default 'Users' role ID
+    const roleResult = await req.dbPool.request()
+      .input('Label', sql.NVarChar, 'Users')
+      .query('SELECT RoleId FROM roles WHERE Label = @Label');
+    if (!roleResult.recordset[0]) {
+      return res.status(500).json({ error: 'Default user role not found' });
     }
+    const RoleId = roleResult.recordset[0].RoleId;
 
-    const hashedPassword = password ? await bcrypt.hash(password, 10) : null;
+    const hashedPassword = Password ? await bcrypt.hash(Password, 10) : null;
 
-    const { error } = await supabase.from("users").insert([
-      {
-        full_name,
-        email,
-        password: hashedPassword,
-        role_id: userRole.id, // Use role_id instead of role
-        ssologin,
-        joined: new Date().toISOString(),
-      },
-    ]);
-
-    if (error) return res.status(400).json({ error: error.message });
+    await req.dbPool.request()
+      .input('FullName', sql.NVarChar, FullName)
+      .input('Email', sql.NVarChar, Email)
+      .input('Password', sql.NVarChar, hashedPassword)
+      .input('RoleId', sql.Int, RoleId)
+      .input('SSOLogin', sql.Char(1), SSOLogin)
+      .input('Joined', sql.DateTime, new Date())
+      .input('UpdatedAt', sql.DateTime, new Date())
+      .query(`
+        INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, Joined, UpdatedAt)
+        VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @Joined, @UpdatedAt)
+      `);
 
     // Clean up OTP
-    await supabase.from("shortmessage").delete().eq("email", email);
+    await req.dbPool.request()
+      .input('email', sql.NVarChar, Email)
+      .query('DELETE FROM shortmessage WHERE email = @email');
 
-    res.status(201).json({ message: "User registered successfully" });
+    res.status(201).json({ message: 'User registered successfully' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in verifyOtpAndRegister:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
 // LOGIN
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { Email, Password } = req.body;
 
     // Step 1: Fetch user by email with role information
-    const { data: user, error } = await supabase
-      .from("users")
-      .select("*, roles(label)")
-      .eq("email", email)
-      .maybeSingle();
+    const userResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, Email)
+      .query(`
+        SELECT 
+          u.UserId, 
+          u.FullName, 
+          u.Email, 
+          u.Password, 
+          u.UserLocked, 
+          u.InvalidAttempt, 
+          u.LockedDate,
+          r.Label
+        FROM users u
+        INNER JOIN roles r ON u.RoleId = r.RoleId
+        WHERE u.Email = @Email
+      `);
+    const user = userResult.recordset[0];
 
-    if (!user || error) {
-      return res.status(401).json({ error: "Invalid email or password" });
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
     }
 
     // Step 2: Check if user is locked
-    if (user.userlocked === "Y") {
+    if (user.UserLocked === 'Y') {
       return res.status(403).json({
-        error:
-          "Your account is locked due to multiple failed login attempts. Please contact admin.",
+        error: 'Your account is locked due to multiple failed login attempts. Please contact admin.',
       });
     }
 
     // Step 3: Validate password
-    const isPasswordValid = await bcrypt.compare(password, user.password);
+    const isPasswordValid = await bcrypt.compare(Password, user.Password);
 
     if (!isPasswordValid) {
       // Increment invalid attempts
-      const newAttemptCount = (user.invalidattempt || 0) + 1;
-
+      const newAttemptCount = (user.InvalidAttempt || 0) + 1;
       const updates = {
-        invalidattempt: newAttemptCount,
+        InvalidAttempt: newAttemptCount,
       };
 
       // If attempts >= 3 → lock the account
       if (newAttemptCount >= 3) {
-        updates.userlocked = "Y";
-        updates.lockeddate = new Date().toISOString();
+        updates.UserLocked = 'Y';
+        updates.LockedDate = new Date();
       }
 
-      const { error: updateError } = await supabase
-        .from("users")
-        .update(updates)
-        .eq("id", user.id);
-
-      if (updateError) {
-        console.error("Failed to update invalid attempts:", updateError.message);
-      }
+      await req.dbPool.request()
+        .input('UserId', sql.Int, user.UserId)
+        .input('InvalidAttempt', sql.Int, updates.InvalidAttempt)
+        .input('UserLocked', sql.Char(1), updates.UserLocked || user.UserLocked)
+        .input('LockedDate', sql.DateTime, updates.LockedDate || null)
+        .query(`
+          UPDATE users
+          SET 
+            InvalidAttempt = @InvalidAttempt,
+            UserLocked = @UserLocked,
+            LockedDate = @LockedDate
+          WHERE UserId = @UserId
+        `);
 
       return res.status(401).json({
-        error:
-          newAttemptCount >= 3
-            ? "Account locked due to multiple failed attempts."
-            : "Invalid email or password",
+        error: newAttemptCount >= 3
+          ? 'Account locked due to multiple failed attempts.'
+          : 'Invalid email or password',
       });
     }
 
-    // Step 4: Reset invalid attempts and update last_login
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({
-        invalidattempt: 0,
-        last_login: new Date().toISOString(),
-      })
-      .eq("id", user.id);
-
-    if (updateError) {
-      console.error("Failed to update user data:", updateError.message);
-    }
+    // Step 4: Reset invalid attempts and update LastLogin
+    await req.dbPool.request()
+      .input('UserId', sql.Int, user.UserId)
+      .input('InvalidAttempt', sql.Int, 0)
+      .input('LastLogin', sql.DateTime, new Date())
+      .query(`
+        UPDATE users
+        SET 
+          InvalidAttempt = @InvalidAttempt,
+          LastLogin = @LastLogin
+        WHERE UserId = @UserId
+      `);
 
     // Step 5: Generate JWT
     const token = jwt.sign(
       {
-        id: user.id,
-        fullname: user.full_name,
-        email: user.email,
-        role: user.roles.label, // Include role label from roles table
+        id: user.UserId,
+        fullname: user.FullName,
+        email: user.Email,
+        role: user.Label,
       },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: '2h' }
     );
 
     res.status(200).json({
-      message: "Login successful",
+      message: 'Login successful',
       token,
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in login:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
 // SSO LOGIN
 exports.ssoLogin = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(" ")[1];
-    if (!token) return res.status(401).json({ error: "Missing token" });
+    const token = req.headers.authorization?.split(' ')[1];
+    if (!token) return res.status(401).json({ error: 'Missing token' });
 
-    const {
-      data: { user },
-      error,
-    } = await supabase.auth.getUser(token);
-
-    if (error || !user)
-      return res.status(401).json({ error: "Invalid Supabase token" });
-
-    // Fetch the default 'user' role ID
-    const { data: userRole } = await supabase
-      .from("roles")
-      .select("id, label")
-      .eq("label", "Users")
-      .single();
-
-    if (!userRole) {
-      return res.status(500).json({ error: "Default user role not found" });
+    // Verify Google ID token
+    let payload;
+    try {
+      const ticket = await googleClient.verifyIdToken({
+        idToken: token,
+        audience: process.env.GOOGLE_CLIENT_ID,
+      });
+      payload = ticket.getPayload();
+      if (!payload.email) {
+        return res.status(401).json({ error: 'Invalid Google token: No email found' });
+      }
+    } catch (err) {
+      console.error('Google Token Verification Error:', err);
+      return res.status(401).json({ error: 'Invalid Google token' });
     }
 
-    // Check if user exists in your DB
-    const { data: existingUser, error: userFetchError } = await supabase
-      .from("users")
-      .select("*, roles(label)")
-      .eq("email", user.email)
-      .maybeSingle();
+    const user = {
+      email: payload.email,
+      user_metadata: { full_name: payload.name || payload.email },
+    };
 
-    if (userFetchError) {
-      return res.status(500).json({ error: userFetchError.message });
+    // Fetch the default 'Users' role
+    const roleResult = await req.dbPool.request()
+      .input('Label', sql.NVarChar, 'Users')
+      .query('SELECT RoleId, Label FROM roles WHERE Label = @Label');
+    if (!roleResult.recordset[0]) {
+      return res.status(500).json({ error: 'Default user role not found' });
     }
+    const { RoleId, Label: userRoleLabel } = roleResult.recordset[0];
+
+    // Check if user exists in DB
+    const userResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, user.email)
+      .query(`
+        SELECT 
+          u.UserId, 
+          u.FullName, 
+          u.Email, 
+          u.SSOLogin, 
+          r.Label
+        FROM users u
+        INNER JOIN roles r ON u.RoleId = r.RoleId
+        WHERE u.Email = @Email
+      `);
+    let existingUser = userResult.recordset[0];
 
     let userId;
-    let userRoleLabel = userRole.label;
+    let roleLabel = userRoleLabel;
 
     if (!existingUser) {
-      // New User -> Create with ssologin = Y and joined timestamp
-      const { data: newUser, error: insertError } = await supabase
-        .from("users")
-        .insert([
-          {
-            full_name: user.user_metadata.full_name || user.email,
-            email: user.email,
-            password: "",
-            role_id: userRole.id, // Use role_id instead of role
-            ssologin: "Y",
-            joined: new Date().toISOString(),
-          },
-        ])
-        .select()
-        .single();
-
-      if (insertError) {
-        return res.status(500).json({ error: insertError.message });
-      }
-      userId = newUser.id;
+      // New User -> Create with SSOLogin = 'Y'
+      const insertResult = await req.dbPool.request()
+        .input('FullName', sql.NVarChar, user.user_metadata.full_name || user.email)
+        .input('Email', sql.NVarChar, user.email)
+        .input('Password', sql.NVarChar, '')
+        .input('RoleId', sql.Int, RoleId)
+        .input('SSOLogin', sql.Char(1), 'Y')
+        .input('Joined', sql.DateTime, new Date())
+        .input('UpdatedAt', sql.DateTime, new Date())
+        .query(`
+          INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, Joined, UpdatedAt)
+          OUTPUT INSERTED.UserId
+          VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @Joined, @UpdatedAt)
+        `);
+      userId = insertResult.recordset[0].UserId;
     } else {
-      if (existingUser.ssologin !== "Y") {
-        return res.status(403).json({ error: "SSO login is not allowed for this user." });
+      if (existingUser.SSOLogin !== 'Y') {
+        return res.status(403).json({ error: 'SSO login is not allowed for this user.' });
       }
-      userId = existingUser.id;
-      userRoleLabel = existingUser.roles.label;
+      userId = existingUser.UserId;
+      roleLabel = existingUser.Label;
 
-      // Update last_login for existing user
-      const { error: updateError } = await supabase
-        .from("users")
-        .update({ last_login: new Date().toISOString() })
-        .eq("id", userId);
-
-      if (updateError) {
-        console.error("Failed to update last_login:", updateError.message);
-      }
+      // Update LastLogin
+      await req.dbPool.request()
+        .input('UserId', sql.Int, userId)
+        .input('LastLogin', sql.DateTime, new Date())
+        .query(`
+          UPDATE users
+          SET LastLogin = @LastLogin
+          WHERE UserId = @UserId
+        `);
     }
 
     const appToken = jwt.sign(
-      { id: userId, fullname: user.user_metadata.full_name || user.email, email: user.email, role: userRoleLabel },
+      { id: userId, fullname: user.user_metadata.full_name || user.email, email: user.email, role: roleLabel },
       process.env.JWT_SECRET,
-      { expiresIn: "2h" }
+      { expiresIn: '2h' }
     );
 
     return res.status(200).json({ token: appToken });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('Error in ssoLogin:', err);
+    return res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
-//Send OTP for Reset Password
+// Send OTP for Reset Password
 exports.sendResetPasswordOtp = async (req, res) => {
   try {
-    const { email } = req.body;
+    const { Email } = req.body;
 
     // Validate email presence
-    if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+    if (!Email) {
+      return res.status(400).json({ error: 'Email is required' });
     }
 
     // Check if user exists
-    const { data: existingUser } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .single();
-
-    if (!existingUser) {
-      return res.status(400).json({ error: "Email not found" });
+    const userResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, Email)
+      .query('SELECT UserId FROM users WHERE Email = @Email');
+    if (!userResult.recordset[0]) {
+      return res.status(400).json({ error: 'Email not found' });
     }
 
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
-      return res
-        .status(500)
-        .json({ error: "Email credentials not configured" });
+      return res.status(500).json({ error: 'Email credentials not configured' });
     }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    const { error } = await supabase
-      .from("shortmessage")
-      .insert([{ email, otp }]);
-
-    if (error) {
-      console.error("Insert OTP Error:", error);
-      return res.status(500).json({ error: error.message });
-    }
+    await req.dbPool.request()
+      .input('email', sql.NVarChar, Email)
+      .input('otp', sql.NVarChar, otp)
+      .query('INSERT INTO shortmessage (email, otp, CreatedAt) VALUES (@email, @otp, GETDATE())');
 
     // Send OTP via email
     const transporter = nodemailer.createTransport({
-      service: "gmail",
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -342,85 +354,78 @@ exports.sendResetPasswordOtp = async (req, res) => {
 
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
-      to: email,
-      subject: "Your OTP for Password Reset",
+      to: Email,
+      subject: 'Your OTP for Password Reset',
       text: `Hi, your OTP for resetting your password is: ${otp}`,
     });
 
-    res.status(200).json({ message: "OTP sent successfully to email" });
+    res.status(200).json({ message: 'OTP sent successfully to email' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in sendResetPasswordOtp:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
 
 // Verify OTP and Reset Password
 exports.verifyResetPasswordOtp = async (req, res) => {
   try {
-    const { email, otp, new_password } = req.body;
+    const { Email, otp, NewPassword } = req.body;
 
     // Validate inputs
-    if (!email || !otp || !new_password) {
-      return res.status(400).json({ error: "Email, OTP, and new password are required" });
+    if (!Email || !otp || !NewPassword) {
+      return res.status(400).json({ error: 'Email, OTP, and new password are required' });
     }
 
-    if (new_password.length < 6) {
-      return res.status(400).json({ error: "New password must be at least 6 characters" });
+    if (NewPassword.length < 6) {
+      return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
     // Check if user exists
-    const { data: user } = await supabase
-      .from("users")
-      .select("*")
-      .eq("email", email)
-      .single();
-
-    if (!user) {
-      return res.status(400).json({ error: "Email not found" });
+    const userResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, Email)
+      .query('SELECT UserId FROM users WHERE Email = @Email');
+    if (!userResult.recordset[0]) {
+      return res.status(400).json({ error: 'Email not found' });
     }
 
     // Verify OTP
-    const { data: otpRecord } = await supabase
-      .from("shortmessage")
-      .select("*")
-      .eq("email", email)
-      .eq("otp", otp)
-      .order("created_at", { ascending: false })
-      .limit(1)
-      .single();
-
-    if (!otpRecord) {
-      return res.status(400).json({ error: "Invalid or expired OTP" });
+    const otpResult = await req.dbPool.request()
+      .input('email', sql.NVarChar, Email)
+      .input('otp', sql.NVarChar, otp)
+      .query(`
+        SELECT TOP 1 email, otp
+        FROM shortmessage
+        WHERE email = @email AND otp = @otp
+        ORDER BY CreatedAt DESC
+      `);
+    if (!otpResult.recordset[0]) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
     // Hash the new password
-    const saltRounds = 10;
-    const hashedPassword = await bcrypt.hash(new_password, saltRounds);
+    const hashedPassword = await bcrypt.hash(NewPassword, 10);
 
     // Update user's password
-    const { error: updateError } = await supabase
-      .from("users")
-      .update({ password: hashedPassword })
-      .eq("email", email);
+    await req.dbPool.request()
+      .input('Email', sql.NVarChar, Email)
+      .input('Password', sql.NVarChar, hashedPassword)
+      .query(`
+        UPDATE users
+        SET Password = @Password
+        WHERE Email = @Email
+      `);
 
-    if (updateError) {
-      console.error("Update Password Error:", updateError);
-      return res.status(500).json({ error: updateError.message });
-    }
+    // Delete the used OTP
+    await req.dbPool.request()
+      .input('email', sql.NVarChar, Email)
+      .input('otp', sql.NVarChar, otp)
+      .query('DELETE FROM shortmessage WHERE email = @email AND otp = @otp');
 
-    // Delete the used OTP from shortmessage table
-    const { error: deleteError } = await supabase
-      .from("shortmessage")
-      .delete()
-      .eq("email", email)
-      .eq("otp", otp);
-
-    if (deleteError) {
-      console.error("Delete OTP Error:", deleteError);
-      // Don't fail the request, but log the error
-    }
-
-    res.status(200).json({ message: "Password reset successful" });
+    res.status(200).json({ message: 'Password reset successful' });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error in verifyResetPasswordOtp:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
+
+module.exports = exports;

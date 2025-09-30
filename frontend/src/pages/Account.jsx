@@ -1,43 +1,42 @@
-import React, { useState } from "react";
-import { Helmet } from "react-helmet-async";
-import api from "../supabase/axios";
-import supabase from "../supabase/SupaBase";
-import { toast } from "react-toastify";
-import { jwtDecode } from "jwt-decode";
-import { useNavigate } from "react-router-dom";
-import Layout from "../layout/Layout";
+  import React, { useState, useEffect } from "react";
+  import { Helmet } from "react-helmet-async";
+  import api from "../supabase/axios"; // Path to your axios.js
+  import { toast } from "react-toastify";
+  import { jwtDecode } from "jwt-decode";
+  import { useNavigate } from "react-router-dom";
+  import Layout from "../layout/Layout";
 
-const TextInput = ({
-  type = "text",
-  name,
-  placeholder,
-  value,
-  onChange,
-  error,
-  autoComplete,
-}) => (
-  <>
-    <input
-      type={type}
-      name={name}
-      autoComplete={autoComplete}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      aria-invalid={!!error}
-      aria-describedby={`${name}-error`}
-      className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
-    />
-    {error && (
-      <p id={`${name}-error`} className="text-sm text-red-500">
-        {error}
-      </p>
-    )}
-  </>
-);
+  const TextInput = ({
+    type = "text",
+    name,
+    placeholder,
+    value,
+    onChange,
+    error,
+    autoComplete,
+  }) => (
+    <>
+      <input
+        type={type}
+        name={name}
+        autoComplete={autoComplete}
+        placeholder={placeholder}
+        value={value}
+        onChange={onChange}
+        aria-invalid={!!error}
+        aria-describedby={`${name}-error`}
+        className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:border-blue-600 transition-colors"
+      />
+      {error && (
+        <p id={`${name}-error`} className="text-sm text-red-500">
+          {error}
+        </p>
+      )}
+    </>
+  );
 
-const AuthForm = () => {
-  const [isRegistering, setIsRegistering] = useState(false);
+  const AuthForm = () => {
+    const [isRegistering, setIsRegistering] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     fullName: "",
@@ -140,18 +139,18 @@ const AuthForm = () => {
       if (isRegistering) {
         if (!otpSent) {
           const res = await api.post(`/api/auth/register/send-otp`, {
-            email: formData.email,
-            full_name: formData.fullName,
-            password: formData.password,
+            Email: formData.email,
+            FullName: formData.fullName,
+            Password: formData.password,
           });
           setOtpSent(true);
           toast.dismiss();
           toast.success(res.data.message || "OTP sent to your email.");
         } else {
           const res = await api.post(`/api/auth/register/verify`, {
-            email: formData.email,
-            full_name: formData.fullName,
-            password: formData.password,
+            Email: formData.email,
+            FullName: formData.fullName,
+            Password: formData.password,
             otp: otp,
           });
           toast.dismiss();
@@ -162,8 +161,8 @@ const AuthForm = () => {
         }
       } else {
         const res = await api.post(`/api/auth/login`, {
-          email: formData.email,
-          password: formData.password,
+          Email: formData.email,
+          Password: formData.password,
         });
 
         const { token } = res.data;
@@ -200,22 +199,17 @@ const AuthForm = () => {
     }
   };
 
-  const handleGoogleSSO = async () => {
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${process.env.REACT_APP_API_BASE_URL}/auth/callback`,
-        },
-      });
-
-      if (error) {
-        throw new Error("SSO login failed: " + error.message);
-      }
-    } catch (error) {
-      toast.dismiss();
-      toast.error(error.message || "An error occurred during SSO login.");
+  const handleGoogleSSO = () => {
+    if (!process.env.REACT_APP_GOOGLE_CLIENT_ID) {
+      console.error("Missing REACT_APP_GOOGLE_CLIENT_ID in .env");
+      toast.error("Google login is not configured. Please contact support.");
+      return;
     }
+
+    const redirectUri = `${window.location.origin}/auth/callback`;
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.REACT_APP_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=token&scope=profile email`;
+    console.log("Redirecting to Google OAuth:", authUrl);
+    window.location.href = authUrl;
   };
 
   const handleForgotPasswordSubmit = async (e) => {
@@ -227,7 +221,7 @@ const AuthForm = () => {
     try {
       if (!resetOtpSent) {
         const res = await api.post(`/api/auth/reset-password/send-otp`, {
-          email: resetData.email,
+          Email: resetData.email,
         });
         if (res.status === 200) {
           setResetOtpSent(true);
@@ -236,9 +230,9 @@ const AuthForm = () => {
         }
       } else {
         const res = await api.post(`/api/auth/reset-password/verify`, {
-          email: resetData.email,
+          Email: resetData.email,
           otp: resetData.otp,
-          new_password: resetData.newPassword,
+          NewPassword: resetData.newPassword,
         });
         toast.dismiss();
         toast.success(res.data.message || "Password reset successful. You can now login.");
@@ -267,204 +261,131 @@ const AuthForm = () => {
       ? window.location.origin + "/account"
       : "https://www.shahumumbai.com/account";
 
-  return (
-    <Layout>
-      <Helmet>
-        <title>{isRegistering ? "Create Account — Shahu Mumbai" : "Sign In — Shahu Mumbai"}</title>
-        <meta
-          name="description"
-          content={
-            isRegistering
-              ? "Create your Shahu Mumbai account to manage orders and wishlist."
-              : "Sign in to Shahu Mumbai to access your profile, orders, and wishlist."
-          }
-        />
-        <link rel="canonical" href={url} />
-        <meta name="robots" content="noindex,nofollow" />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content={isRegistering ? "Create Account — Shahu Mumbai" : "Sign In — Shahu Mumbai"} />
-        <meta property="og:description" content="Account access for Shahu Mumbai customers." />
-        <meta property="og:url" content={url} />
-        <meta name="twitter:card" content="summary" />
-      </Helmet>
+    return (
+      <Layout>
+        <Helmet>
+          <title>{isRegistering ? "Create Account — Shahu Mumbai" : "Sign In — Shahu Mumbai"}</title>
+          <meta
+            name="description"
+            content={
+              isRegistering
+                ? "Create your Shahu Mumbai account to manage orders and wishlist."
+                : "Sign in to Shahu Mumbai to access your profile, orders, and wishlist."
+            }
+          />
+          <link rel="canonical" href={url} />
+          <meta name="robots" content="noindex,nofollow" />
+          <meta property="og:type" content="website" />
+          <meta property="og:title" content={isRegistering ? "Create Account — Shahu Mumbai" : "Sign In — Shahu Mumbai"} />
+          <meta property="og:description" content="Account access for Shahu Mumbai customers." />
+          <meta property="og:url" content={url} />
+          <meta name="twitter:card" content="summary" />
+          <script src="https://apis.google.com/js/platform.js" async defer></script>
+        </Helmet>
 
-      <div className="flex justify-center items-center py-12 px-4 sm:px-6 lg:px-8 min-h-36">
-        <div className="bg-white p-6 sm:p-8 rounded-lg w-full max-w-sm shadow-md">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
-              {isRegistering ? "Register" : "Sign In"}
-            </h2>
-            <button
-              onClick={() => {
-                setIsRegistering(!isRegistering);
-                resetForm();
-                setOtpSent(false);
-              }}
-              className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              {isRegistering ? "Have an account? Sign In" : "Create Account"}
-            </button>
-          </div>
-
-          <button
-            type="button"
-            onClick={handleGoogleSSO}
-            className="flex items-center justify-center gap-2 bg-white border border-gray-300 py-2 text-sm font-medium rounded-md hover:bg-gray-100 transition-colors mb-4 w-full"
-          >
-            <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
-            {isRegistering ? "Sign up with Google" : "Sign in with Google"}
-          </button>
-
-          <div className="relative text-center my-3 text-sm text-gray-500">
-            <span className="before:absolute before:left-0 before:top-1/2 before:w-[40%] before:h-px before:bg-gray-300 after:absolute after:right-0 after:top-1/2 after:w-[40%] after:h-px after:bg-gray-300">
-              OR
-            </span>
-          </div>
-
-          <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
-            {isRegistering && (
-              <TextInput
-                name="fullName"
-                placeholder="Full Name"
-                value={formData.fullName}
-                onChange={handleChange}
-                error={errors.fullName}
-                autoComplete="name"
-              />
-            )}
-
-            <TextInput
-              type="email"
-              name="email"
-              placeholder="Email"
-              value={formData.email}
-              onChange={handleChange}
-              error={errors.email}
-              autoComplete="email"
-            />
-
-            <TextInput
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={formData.password}
-              onChange={handleChange}
-              error={errors.password}
-              autoComplete={isRegistering ? "new-password" : "current-password"}
-            />
-
-            {isRegistering && (
-              <TextInput
-                type="password"
-                name="confirmPassword"
-                placeholder="Confirm Password"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                error={errors.confirmPassword}
-                autoComplete="new-password"
-              />
-            )}
-
-            {isRegistering && otpSent && (
-              <TextInput
-                name="otp"
-                placeholder="Enter OTP"
-                value={otp}
-                onChange={(e) => setOtp(e.target.value)}
-                error={errors.otp}
-              />
-            )}
-
-            {!isRegistering && (
-              <div className="flex justify-between items-center">
-                <label className="text-sm text-gray-700 flex items-center">
-                  <input type="checkbox" className="mr-2" />
-                  Remember me
-                </label>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotPassword(true)}
-                  className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                >
-                  Forgot Password?
-                </button>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`bg-gray-900 text-white font-semibold py-2 rounded-md transition-colors ${
-                isSubmitting ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-800"
-              }`}
-            >
-              {isSubmitting
-                ? "Submitting..."
-                : isRegistering
-                ? otpSent
-                  ? "Verify OTP"
-                  : "Send OTP"
-                : "Login"}
-            </button>
-          </form>
-        </div>
-      </div>
-
-      {showForgotPassword && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded-lg w-full max-w-sm shadow-lg">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Reset Password</h2>
+        <div className="flex justify-center items-center py-12 px-4 sm:px-6 lg:px-8 min-h-36">
+          <div className="bg-white p-6 sm:p-8 rounded-lg w-full max-w-sm shadow-md">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900">
+                {isRegistering ? "Register" : "Sign In"}
+              </h2>
               <button
                 onClick={() => {
-                  setShowForgotPassword(false);
-                  resetPasswordForm();
+                  setIsRegistering(!isRegistering);
+                  resetForm();
+                  setOtpSent(false);
                 }}
-                className="text-gray-500 hover:text-gray-700"
+                className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
               >
-                ✕
+                {isRegistering ? "Have an account? Sign In" : "Create Account"}
               </button>
             </div>
-            <form className="flex flex-col gap-3" onSubmit={handleForgotPasswordSubmit}>
+
+            <button
+              type="button"
+              onClick={handleGoogleSSO}
+              className="flex items-center justify-center gap-2 bg-white border border-gray-300 py-2 text-sm font-medium rounded-md hover:bg-gray-100 transition-colors mb-4 w-full"
+            >
+              <img src="/google-icon.svg" alt="Google" className="w-5 h-5" />
+              {isRegistering ? "Sign up with Google" : "Sign in with Google"}
+            </button>
+
+            <div className="relative text-center my-3 text-sm text-gray-500">
+              <span className="before:absolute before:left-0 before:top-1/2 before:w-[40%] before:h-px before:bg-gray-300 after:absolute after:right-0 after:top-1/2 after:w-[40%] after:h-px after:bg-gray-300">
+                OR
+              </span>
+            </div>
+
+            <form className="flex flex-col gap-3" onSubmit={handleSubmit}>
+              {isRegistering && (
+                <TextInput
+                  name="fullName"
+                  placeholder="Full Name"
+                  value={formData.fullName}
+                  onChange={handleChange}
+                  error={errors.fullName}
+                  autoComplete="name"
+                />
+              )}
+
               <TextInput
                 type="email"
                 name="email"
                 placeholder="Email"
-                value={resetData.email}
-                onChange={handleResetChange}
-                error={resetErrors.email}
+                value={formData.email}
+                onChange={handleChange}
+                error={errors.email}
                 autoComplete="email"
               />
-              {resetOtpSent && (
-                <>
-                  <TextInput
-                    name="otp"
-                    placeholder="Enter OTP"
-                    value={resetData.otp}
-                    onChange={handleResetChange}
-                    error={resetErrors.otp}
-                    autoComplete="off"
-                  />
-                  <TextInput
-                    type="password"
-                    name="newPassword"
-                    placeholder="New Password"
-                    value={resetData.newPassword}
-                    onChange={handleResetChange}
-                    error={resetErrors.newPassword}
-                    autoComplete="new-password"
-                  />
-                  <TextInput
-                    type="password"
-                    name="confirmNewPassword"
-                    placeholder="Confirm New Password"
-                    value={resetData.confirmNewPassword}
-                    onChange={handleResetChange}
-                    error={resetErrors.confirmNewPassword}
-                    autoComplete="new-password"
-                  />
-                </>
+
+              <TextInput
+                type="password"
+                name="password"
+                placeholder="Password"
+                value={formData.password}
+                onChange={handleChange}
+                error={errors.password}
+                autoComplete={isRegistering ? "new-password" : "current-password"}
+              />
+
+              {isRegistering && (
+                <TextInput
+                  type="password"
+                  name="confirmPassword"
+                  placeholder="Confirm Password"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  error={errors.confirmPassword}
+                  autoComplete="new-password"
+                />
               )}
+
+              {isRegistering && otpSent && (
+                <TextInput
+                  name="otp"
+                  placeholder="Enter OTP"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  error={errors.otp}
+                />
+              )}
+
+              {!isRegistering && (
+                <div className="flex justify-between items-center">
+                  <label className="text-sm text-gray-700 flex items-center">
+                    <input type="checkbox" className="mr-2" />
+                    Remember me
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-blue-600 hover:text-blue-700 transition-colors"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isSubmitting}
@@ -474,16 +395,90 @@ const AuthForm = () => {
               >
                 {isSubmitting
                   ? "Submitting..."
-                  : resetOtpSent
-                  ? "Reset Password"
-                  : "Send OTP"}
+                  : isRegistering
+                  ? otpSent
+                    ? "Verify OTP"
+                    : "Send OTP"
+                  : "Login"}
               </button>
             </form>
           </div>
         </div>
-      )}
-    </Layout>
-  );
-};
 
-export default AuthForm;
+        {showForgotPassword && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white p-6 rounded-lg w-full max-w-sm shadow-lg">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Reset Password</h2>
+                <button
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    resetPasswordForm();
+                  }}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+              <form className="flex flex-col gap-3" onSubmit={handleForgotPasswordSubmit}>
+                <TextInput
+                  type="email"
+                  name="email"
+                  placeholder="Email"
+                  value={resetData.email}
+                  onChange={handleResetChange}
+                  error={resetErrors.email}
+                  autoComplete="email"
+                />
+                {resetOtpSent && (
+                  <>
+                    <TextInput
+                      name="otp"
+                      placeholder="Enter OTP"
+                      value={resetData.otp}
+                      onChange={handleResetChange}
+                      error={resetErrors.otp}
+                      autoComplete="off"
+                    />
+                    <TextInput
+                      type="password"
+                      name="newPassword"
+                      placeholder="New Password"
+                      value={resetData.newPassword}
+                      onChange={handleResetChange}
+                      error={resetErrors.newPassword}
+                      autoComplete="new-password"
+                    />
+                    <TextInput
+                      type="password"
+                      name="confirmNewPassword"
+                      placeholder="Confirm New Password"
+                      value={resetData.confirmNewPassword}
+                      onChange={handleResetChange}
+                      error={resetErrors.confirmNewPassword}
+                      autoComplete="new-password"
+                    />
+                  </>
+                )}
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={`bg-gray-900 text-white font-semibold py-2 rounded-md transition-colors ${
+                    isSubmitting ? "opacity-60 cursor-not-allowed" : "hover:bg-gray-800"
+                  }`}
+                >
+                  {isSubmitting
+                    ? "Submitting..."
+                    : resetOtpSent
+                    ? "Reset Password"
+                    : "Send OTP"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+      </Layout>
+    );
+  };
+
+  export default AuthForm;
