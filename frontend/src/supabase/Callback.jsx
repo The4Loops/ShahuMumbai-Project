@@ -9,7 +9,7 @@ const AuthCallback = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.substring(1));
-    const idToken = params.get("access_token");
+    const idToken = params.get("id_token");
     const error = params.get("error");
 
     if (error) {
@@ -20,8 +20,8 @@ const AuthCallback = () => {
     }
 
     if (!idToken) {
-      console.error("No access token found in URL hash");
-      toast.error("Google login failed: No token received.");
+      console.error("No ID token found in URL hash");
+      toast.error("Google login failed: No ID token received.");
       navigate("/account");
       return;
     }
@@ -64,6 +64,7 @@ const AuthCallback = () => {
       })
       .catch((error) => {
         console.error("SSO Login Error:", error);
+        toast.dismiss();
         toast.error(error.response?.data?.error || error.message || "Google login failed.");
         navigate("/account");
       });
