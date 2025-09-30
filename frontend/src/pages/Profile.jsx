@@ -68,17 +68,31 @@ function Profile() {
           headers: { Authorization: `Bearer ${token}` },
         });
         const { user } = response.data;
+
+        let formattedJoined = "";
+        if (user.Joined) {
+          const [day, month, year] = user.Joined.split("/").map(Number);
+          const parsedDate = new Date(year, month - 1, day);
+
+          formattedJoined = parsedDate.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          });
+        }
+
         setProfile({
-          name: user.full_name || "",
-          email: user.email || "",
-          phone: user.phone || "",
-          about: user.about || "",
-          country: user.country || "",
+          name: user.FullName || "",
+          email: user.Email || "",
+          phone: user.Phone || "",
+          about: user.About || "",
+          country: user.Country || "",
           role: user.role || "",
+          joined: formattedJoined || "",
           preferences: {
-            newsletter: user.preferences?.newsletter || false,
-            emailNotifications: user.preferences?.emailNotifications || false,
-            publicProfile: user.preferences?.publicProfile || false,
+            newsletter: user.preferences?.newsletter === 'Y'? true : false || false,
+            emailNotifications: user.preferences?.emailNotifications === 'Y'? true : false || false,
+            publicProfile: user.preferences?.publicProfile === 'Y'? true : false || false,
           },
           socialLinks: {
             twitter: user.socialLinks?.twitter || "",
@@ -127,37 +141,47 @@ function Profile() {
         const response = await api.put(
           "/api/edit-profile",
           {
-            full_name: profile.name,
-            email: profile.email,
-            phone: profile.phone,
-            about: profile.about,
-            country: profile.country,
-            newsletter_subscription: profile.preferences.newsletter,
-            email_notifications: profile.preferences.emailNotifications,
-            public_profile: profile.preferences.publicProfile,
-            twitter_url: profile.socialLinks.twitter,
-            facebook_url: profile.socialLinks.facebook,
-            instagram_url: profile.socialLinks.instagram,
-            linkedin_url: profile.socialLinks.linkedin,
-            profile_image: profile.image,
-          },
-          {
-            // ✅ FIX: add auth header for saving
-            headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+            FullName: profile.name,
+            Email: profile.email,
+            Phone: profile.phone,
+            About: profile.about,
+            Country: profile.country,
+            NewsLetterSubscription: profile.preferences.newsletter,
+            EmailNotifications: profile.preferences.emailNotifications,
+            PublicProfile: profile.preferences.publicProfile,
+            TwitterUrl: profile.socialLinks.twitter,
+            FacebookUrl: profile.socialLinks.facebook,
+            InstagramUrl: profile.socialLinks.instagram,
+            LinkedInUrl: profile.socialLinks.linkedin,
+            ProfileImage: profile.image,
           }
         );
         const { user } = response.data;
+
+        let formattedJoined = "";
+        if (user.Joined) {
+          const [day, month, year] = user.Joined.split("/").map(Number);
+          const parsedDate = new Date(year, month - 1, day);
+
+          formattedJoined = parsedDate.toLocaleDateString("en-GB", {
+            day: "2-digit",
+            month: "long",
+            year: "numeric",
+          });
+        }
+
         setProfile({
-          name: user.full_name || "",
-          email: user.email || "",
-          phone: user.phone || "",
-          about: user.about || "",
-          country: user.country || "",
+          name: user.FullName || "",
+          email: user.Email || "",
+          phone: user.Phone || "",
+          about: user.About || "",
+          country: user.Country || "",
+          joined: formattedJoined || "",
           role: user.role || "",
           preferences: {
-            newsletter: user.preferences?.newsletter || false,
-            emailNotifications: user.preferences?.emailNotifications || false,
-            publicProfile: user.preferences?.publicProfile || false,
+            newsletter: user.preferences?.newsletter === 'Y'? true : false || false,
+            emailNotifications: user.preferences?.emailNotifications === 'Y'? true : false || false,
+            publicProfile: user.preferences?.publicProfile === 'Y'? true : false || false,
           },
           socialLinks: {
             twitter: user.socialLinks?.twitter || "",
@@ -253,7 +277,7 @@ function Profile() {
           ) : (
             <p className="text-sm text-gray-500 mt-1">{profile.country || "Unknown Location"}</p>
           )}
-          <p className="text-xs text-gray-400 mt-1">Member since March 2021</p>
+          <p className="text-xs text-gray-400 mt-1">Member since {profile.joined}</p>
         </div>
 
         {/* Personal Info */}
