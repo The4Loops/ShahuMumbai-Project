@@ -1,7 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import { motion, useScroll, useTransform, useInView } from "framer-motion";
 import {useNavigate} from 'react-router-dom';
-import video from "../assets/ComingSoon.mp4";
 import api from "../supabase/axios";
 
 function Hero() {
@@ -61,11 +60,9 @@ function Hero() {
   };
 
   // Fallback content
-  const title = formatTitle(banner?.title);
-  const description =
-    banner?.description ||
-    "Discover curated vintage pieces that tell stories of bygone eras. Each item is carefully selected for its unique character and enduring style.";
-  const mediaUrl = banner?.image_url || video;
+  const title = formatTitle(banner?.Title);
+  const description = banner?.Description ;
+  const mediaUrl = banner?.ImageUrl;
 
   return (
     <section className="relative min-h-screen w-full overflow-hidden bg-[#F1E7E5]">

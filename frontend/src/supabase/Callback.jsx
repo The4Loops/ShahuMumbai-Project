@@ -64,6 +64,7 @@ const AuthCallback = () => {
       })
       .catch((error) => {
         console.error("SSO Login Error:", error);
+        toast.dismiss();
         toast.error(error.response?.data?.error || error.message || "Google login failed.");
         navigate("/account");
       });
