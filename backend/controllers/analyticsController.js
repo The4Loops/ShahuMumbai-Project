@@ -295,7 +295,6 @@ exports.getSalesReport = async (req, res) => {
 
 
 
-// -- analytics_events
 // CREATE TABLE dbo.analytics_events (
 //   id           BIGINT IDENTITY(1,1) PRIMARY KEY,
 //   occurred_at  DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),

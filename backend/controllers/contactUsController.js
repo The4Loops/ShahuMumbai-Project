@@ -1,4 +1,4 @@
-const supabase = require("../config/supabaseClient");
+const sql = require("mssql");
 
 // Create a new contact message
 exports.createContact = async (req, res) => {
@@ -8,16 +8,23 @@ exports.createContact = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const { data, error } = await supabase
-      .from("contact_us")
-      .insert([{ name, email, subject, message, status: status || "pending" }])
-      .select();
-    if (error) throw error;
+    const result = await req.dbPool.request()
+      .input("Name", sql.NVarChar, name)
+      .input("Email", sql.NVarChar, email)
+      .input("Subject", sql.NVarChar, subject)
+      .input("Message", sql.NVarChar, message)
+      .input("Status", sql.NVarChar, status || "pending")
+      .input("CreatedAt", sql.DateTime, new Date())
+      .query(`
+        INSERT INTO ContactUs (Name, Email, Subject, Message, Status, CreatedAt)
+        OUTPUT INSERTED.*
+        VALUES (@Name, @Email, @Subject, @Message, @Status, @CreatedAt)
+      `);
 
-    return res.status(201).json({ message: "Created successfully" });
+    res.status(201).json({ message: "Created successfully", contact: result.recordset[0] });
   } catch (e) {
     console.error("contact-us.createContact error", e);
-    return res.status(500).json({ error: "internal_error" });
+    res.status(500).json({ error: "internal_error", details: e.message });
   }
 };
 
@@ -25,51 +32,43 @@ exports.createContact = async (req, res) => {
 exports.getAllContact = async (req, res) => {
   try {
     const {
-      status = 'All',
-      q = '',
-      limit: limitStr = '50',
-      offset: offsetStr = '0',
+      status = "All",
+      q = "",
+      limit: limitStr = "50",
+      offset: offsetStr = "0",
     } = req.query;
 
     const limit = Math.min(Math.max(parseInt(limitStr, 10) || 50, 1), 100);
     const offset = Math.max(parseInt(offsetStr, 10) || 0, 0);
 
-    let queryBuilder = supabase
-      .from('contact_us')
-      .select('id, name, email, subject, message, status, created_at', { count: 'exact' })
-      .order('created_at', { ascending: false });
+    let query = `
+      SELECT Id, Name, Email, Subject, Message, Status, CreatedAt
+      FROM ContactUs
+      WHERE 1=1
+    `;
 
-    if (status && status !== 'All') {
-      queryBuilder = queryBuilder.eq('status', status.toLowerCase());
+    if (status && status !== "All") {
+      query += ` AND Status = @Status`;
     }
-
     if (q) {
-      // Search by name or email (case-insensitive)
-      const like = `%${q}%`;
-      queryBuilder = queryBuilder.or(`name.ilike.${like},email.ilike.${like}`);
+      query += ` AND (Name LIKE @Search OR Email LIKE @Search)`;
     }
 
-    // Pagination
-    queryBuilder = queryBuilder.range(offset, offset + limit - 1);
+    query += ` ORDER BY CreatedAt DESC
+               OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY`;
 
-    const { data, error, count } = await queryBuilder;
-    if (error) throw error;
+    const request = req.dbPool.request()
+      .input("Limit", sql.Int, limit)
+      .input("Offset", sql.Int, offset);
 
-    // Map to a minimal shape for the UI
-    const contacts = (data || []).map(c => ({
-      id: c.id,
-      name: c.name,
-      email: c.email,
-      subject: c.subject,
-      message: c.message,
-      status: (c.status || 'pending').replace(/^\w/, c => c.toUpperCase()), // Pending/Resolved/Closed
-      created_at: c.created_at,
-    }));
+    if (status && status !== "All") request.input("Status", sql.NVarChar, status.toLowerCase());
+    if (q) request.input("Search", sql.NVarChar, `%${q}%`);
 
-    return res.json({ contacts, total: count ?? contacts.length });
+    const result = await request.query(query);
+    res.json({ contacts: result.recordset, total: result.recordset.length });
   } catch (e) {
-    console.error('contact-us.listContacts error', e);
-    return res.status(500).json({ error: 'internal_error' });
+    console.error("contact-us.listContacts error", e);
+    res.status(500).json({ error: "internal_error", details: e.message });
   }
 };
 
@@ -78,31 +77,18 @@ exports.getContact = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
-      .from("contact_us")
-      .select("id, name, email, subject, message, status, created_at")
-      .eq("id", id)
-      .single();
-    if (error) throw error;
+    const result = await req.dbPool.request()
+      .input("Id", sql.Int, id)
+      .query(`SELECT Id, Name, Email, Subject, Message, Status, CreatedAt FROM ContactUs WHERE Id = @Id`);
 
-    if (!data) {
+    if (!result.recordset[0]) {
       return res.status(404).json({ error: "Contact not found" });
     }
 
-    const contact = {
-      id: data.id,
-      name: data.name,
-      email: data.email,
-      subject: data.subject,
-      message: data.message,
-      status: (data.status || "pending").replace(/^\w/, (c) => c.toUpperCase()),
-      created_at: data.created_at,
-    };
-
-    return res.json(contact);
+    res.json(result.recordset[0]);
   } catch (e) {
     console.error("contact-us.getContact error", e);
-    return res.status(500).json({ error: "internal_error" });
+    res.status(500).json({ error: "internal_error", details: e.message });
   }
 };
 
@@ -112,32 +98,41 @@ exports.updateContact = async (req, res) => {
     const { id } = req.params;
     const { name, email, subject, message, status } = req.body;
 
-    const updates = {};
-    if (name) updates.name = name;
-    if (email) updates.email = email;
-    if (subject) updates.subject = subject;
-    if (message) updates.message = message;
-    if (status) updates.status = status;
+    let updateFields = [];
+    if (name) updateFields.push("Name = @Name");
+    if (email) updateFields.push("Email = @Email");
+    if (subject) updateFields.push("Subject = @Subject");
+    if (message) updateFields.push("Message = @Message");
+    if (status) updateFields.push("Status = @Status");
 
-    if (Object.keys(updates).length === 0) {
+    if (updateFields.length === 0) {
       return res.status(400).json({ error: "No fields to update" });
     }
 
-    const { data, error } = await supabase
-      .from("contact_us")
-      .update(updates)
-      .eq("id", id)
-      .select();
-    if (error) throw error;
+    const query = `
+      UPDATE ContactUs
+      SET ${updateFields.join(", ")}, UpdatedAt = GETDATE()
+      OUTPUT INSERTED.*
+      WHERE Id = @Id
+    `;
 
-    if (data.length === 0) {
+    const request = req.dbPool.request().input("Id", sql.Int, id);
+    if (name) request.input("Name", sql.NVarChar, name);
+    if (email) request.input("Email", sql.NVarChar, email);
+    if (subject) request.input("Subject", sql.NVarChar, subject);
+    if (message) request.input("Message", sql.NVarChar, message);
+    if (status) request.input("Status", sql.NVarChar, status);
+
+    const result = await request.query(query);
+
+    if (!result.recordset[0]) {
       return res.status(404).json({ error: "Contact not found" });
     }
 
-    return res.json({ message: "updated successfully" });
+    res.json({ message: "Updated successfully", contact: result.recordset[0] });
   } catch (e) {
     console.error("contact-us.updateContact error", e);
-    return res.status(500).json({ error: "internal_error" });
+    res.status(500).json({ error: "internal_error", details: e.message });
   }
 };
 
@@ -146,12 +141,17 @@ exports.deleteContact = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { error } = await supabase.from("contact_us").delete().eq("id", id);
-    if (error) throw error;
+    const result = await req.dbPool.request()
+      .input("Id", sql.Int, id)
+      .query(`DELETE FROM ContactUs OUTPUT DELETED.* WHERE Id = @Id`);
 
-    return res.status(200).json({ message: "Deleted successfully" });
+    if (!result.recordset[0]) {
+      return res.status(404).json({ error: "Contact not found" });
+    }
+
+    res.json({ message: "Deleted successfully" });
   } catch (e) {
     console.error("contact-us.deleteContact error", e);
-    return res.status(500).json({ error: "internal_error" });
+    res.status(500).json({ error: "internal_error", details: e.message });
   }
 };

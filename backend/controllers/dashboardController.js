@@ -1,9 +1,14 @@
-// controllers/dashboardController.js
-const supabase = require("../config/supabaseClient");
-const toStart = (d) => (d ? `${d} 00:00:00+00` : null);
-const toEnd   = (d) => (d ? `${d} 23:59:59.999+00` : null);
+const sql = require('mssql');
 
-// ---------- SUMMARY ----------
+const toStart = (d) => (d ? `${d} 00:00:00.000` : null);
+const toEnd   = (d) => (d ? `${d} 23:59:59.999` : null);
+const dbReady = (req) => req.dbPool && req.dbPool.connected;
+const devFakeAllowed = () => process.env.ALLOW_FAKE === '1';
+
+/* 
+   SUMMARY
+   GET /api/dashboard/summary?from=YYYY-MM-DD&to=YYYY-MM-DD&top_limit=5
+   Returns: { kpis, topProducts } */
 exports.getSummary = async (req, res) => {
   try {
     const { from, to } = req.query;
@@ -11,27 +16,43 @@ exports.getSummary = async (req, res) => {
     const p_to   = toEnd(to);
     const topLimit = Math.min(Number(req.query.top_limit || 5), 20);
 
-    // 1) Orders in window
-    let oq = supabase
-      .from('orders')
-      .select('id,total,status,placed_at', { count: 'exact' })
-      .order('placed_at', { ascending: false })
-      .limit(5000);
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.json({
+        kpis: {
+          revenue_30d: 123456,
+          orders_30d: 42,
+          avg_order_value: 2939.43,
+          refund_rate_pct: 2.38,
+        },
+        topProducts: [
+          { product_title: 'Sample Lehenga', qty: 28, revenue: 56000, purchases: 15 },
+          { product_title: 'Banarasi Saree', qty: 20, revenue: 40000, purchases: 12 },
+        ].slice(0, topLimit),
+      });
+    }
 
-    if (p_from) oq = oq.gte('placed_at', p_from);
-    if (p_to)   oq = oq.lte('placed_at', p_to);
+    const clauses = [];
+    const req1 = req.dbPool.request();
+    if (p_from) { clauses.push('placed_at >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
+    if (p_to)   { clauses.push('placed_at <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
+    const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
-    const { data: orders, error: oErr, count } = await oq;
-    if (oErr) throw new Error(`orders select failed: ${oErr.message}`);
+    const ordersRes = await req1.query(`
+      SELECT TOP (5000) id, total, status, placed_at
+      FROM dbo.orders
+      ${where}
+      ORDER BY placed_at DESC
+    `);
 
-    // KPIs
+    const orders = ordersRes.recordset || [];
+    const ordersCount = orders.length;
+
     let revenue = 0;
     let refundCount = 0;
     for (const o of orders) {
       revenue += Number(o.total || 0);
-      if (o.status === 'refunded') refundCount += 1;
+      if (String(o.status).toLowerCase() === 'refunded') refundCount += 1;
     }
-    const ordersCount = count ?? orders.length;
     const kpis = {
       revenue_30d: revenue,
       orders_30d: ordersCount,
@@ -39,20 +60,22 @@ exports.getSummary = async (req, res) => {
       refund_rate_pct: ordersCount ? (refundCount / ordersCount) * 100 : 0,
     };
 
-    // 2) Top products (aggregate in Node)
-    const orderIds = orders.map(o => o.id);
     let topProducts = [];
-    if (orderIds.length) {
-      const { data: items, error: iErr } = await supabase
-        .from('order_items')
-        .select('order_id, product_title, qty, line_total')
-        .in('order_id', orderIds)
-        .limit(10000); // safety cap
-      if (iErr) throw new Error(`order_items select failed: ${iErr.message}`);
+    if (orders.length) {
+      const ids = orders.map(o => o.id);
+      const inList = ids.map((_, i) => `@O${i}`).join(',');
+      const itemsReq = req.dbPool.request();
+      ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
 
-      const map = new Map(); // title -> { product_title, qty, revenue, purchases }
-      const purchasesByTitle = new Map(); // title -> Set(order_id) to count purchases
-      for (const it of items) {
+      const itemsRes = await itemsReq.query(`
+        SELECT order_id, product_title, qty, line_total
+        FROM dbo.order_items
+        WHERE order_id IN (${inList})
+      `);
+
+      const map = new Map(); 
+      const purchasesByTitle = new Map(); 
+      for (const it of (itemsRes.recordset || [])) {
         const t = it.product_title || 'Unknown';
         const cur = map.get(t) || { product_title: t, qty: 0, revenue: 0, purchases: 0 };
         cur.qty += Number(it.qty || 0);
@@ -78,26 +101,42 @@ exports.getSummary = async (req, res) => {
   }
 };
 
-// ---------- SALES ----------
+/* 
+   SALES (timeseries)
+   GET /api/dashboard/sales?from=YYYY-MM-DD&to=YYYY-MM-DD&metric=orders|revenue
+   Returns: { data: [{ day, value }] } */
 exports.getSales = async (req, res) => {
   try {
     const { from, to, metric = 'orders' } = req.query;
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    // Fetch orders in window
-    let q = supabase
-      .from('orders')
-      .select('placed_at, total')
-      .order('placed_at', { ascending: true })
-      .limit(5000);
+    /* Dev fallback */
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.json({
+        data: [
+          { day: '2025-09-01', value: 5 },
+          { day: '2025-09-02', value: 7 },
+          { day: '2025-09-03', value: 3 },
+        ],
+      });
+    }
 
-    if (p_from) q = q.gte('placed_at', p_from);
-    if (p_to)   q = q.lte('placed_at', p_to);
+    const clauses = [];
+    const req1 = req.dbPool.request();
+    if (p_from) { clauses.push('placed_at >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
+    if (p_to)   { clauses.push('placed_at <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
+    const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
-    const { data: rows, error } = await q;
-    if (error) throw new Error(`orders select failed: ${error.message}`);
+    const rowsRes = await req1.query(`
+      SELECT placed_at, total
+      FROM dbo.orders
+      ${where}
+      ORDER BY placed_at ASC
+      OFFSET 0 ROWS FETCH NEXT 5000 ROWS ONLY
+    `);
 
+    const rows = rowsRes.recordset || [];
     const byDay = new Map(); // YYYY-MM-DD -> value
     for (const r of rows) {
       const day = String(r.placed_at).slice(0, 10);
@@ -105,7 +144,7 @@ exports.getSales = async (req, res) => {
       if (metric === 'revenue') {
         byDay.set(day, byDay.get(day) + Number(r.total || 0));
       } else {
-        byDay.set(day, byDay.get(day) + 1); // orders count
+        byDay.set(day, byDay.get(day) + 1);
       }
     }
     const data = Array.from(byDay.entries())
@@ -119,34 +158,56 @@ exports.getSales = async (req, res) => {
   }
 };
 
-// ---------- TOP PRODUCTS ----------
+/*   TOP PRODUCTS (standalone)
+   GET /api/dashboard/top-products?from=YYYY-MM-DD&to=YYYY-MM-DD&limit=5
+   Returns: { items: [{ product_title, qty, revenue, purchases }] } */
 exports.getTopProducts = async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit || 5), 20);
     const p_from = toStart(req.query.from);
     const p_to   = toEnd(req.query.to);
 
-    // limit to orders in window
-    let oq = supabase.from('orders').select('id, placed_at').order('placed_at', { ascending: false }).limit(5000);
-    if (p_from) oq = oq.gte('placed_at', p_from);
-    if (p_to)   oq = oq.lte('placed_at', p_to);
+    /* Dev fallback */
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.json({
+        items: [
+          { product_title: 'Sample Lehenga', qty: 28, revenue: 56000, purchases: 15 },
+          { product_title: 'Banarasi Saree', qty: 20, revenue: 40000, purchases: 12 },
+        ].slice(0, limit),
+      });
+    }
 
-    const { data: orders, error: oErr } = await oq;
-    if (oErr) throw new Error(`orders select failed: ${oErr.message}`);
+    // limit to orders in window
+    const clauses = [];
+    const ordersReq = req.dbPool.request();
+    if (p_from) { clauses.push('placed_at >= @From'); ordersReq.input('From', sql.DateTime2, new Date(p_from)); }
+    if (p_to)   { clauses.push('placed_at <= @To');   ordersReq.input('To',   sql.DateTime2, new Date(p_to)); }
+    const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
+
+    const oRes = await ordersReq.query(`
+      SELECT TOP (5000) id, placed_at
+      FROM dbo.orders
+      ${where}
+      ORDER BY placed_at DESC
+    `);
+    const orders = oRes.recordset || [];
 
     let itemsOut = [];
     if (orders.length) {
-      const orderIds = orders.map(o => o.id);
-      const { data: items, error: iErr } = await supabase
-        .from('order_items')
-        .select('order_id, product_title, qty, line_total')
-        .in('order_id', orderIds)
-        .limit(10000);
-      if (iErr) throw new Error(`order_items select failed: ${iErr.message}`);
+      const ids = orders.map(o => o.id);
+      const inList = ids.map((_, i) => `@O${i}`).join(',');
+      const itemsReq = req.dbPool.request();
+      ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
+
+      const iRes = await itemsReq.query(`
+        SELECT order_id, product_title, qty, line_total
+        FROM dbo.order_items
+        WHERE order_id IN (${inList})
+      `);
 
       const map = new Map();
       const purchasesByTitle = new Map();
-      for (const it of items) {
+      for (const it of (iRes.recordset || [])) {
         const t = it.product_title || 'Unknown';
         const cur = map.get(t) || { product_title: t, qty: 0, revenue: 0, purchases: 0 };
         cur.qty += Number(it.qty || 0);
@@ -171,30 +232,52 @@ exports.getTopProducts = async (req, res) => {
   }
 };
 
-// ---------- RECENT ORDERS ----------
+/* RECENT ORDERS
+   GET /api/dashboard/recent-orders?limit=5
+   Returns: { orders: [{ order_id, occurred_at, customer, total, status }] }*/
 exports.getRecentOrders = async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit || 5), 50);
 
-    const { data: rows, error } = await supabase
-      .from('orders')
-      .select('id, order_number, placed_at, status, total, user_id, customer_name, customer_email')
-      .order('placed_at', { ascending: false })
-      .limit(limit);
+    /* Dev fallback */
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.json({
+        orders: [
+          {
+            order_id: 'ORD-1001',
+            occurred_at: new Date().toISOString(),
+            customer: 'Guest',
+            total: 1999,
+            status: 'paid',
+          },
+        ],
+      });
+    }
 
-    if (error) throw new Error(`orders select failed: ${error.message}`);
+    const ordersRes = await req.dbPool.request()
+      .input('Limit', sql.Int, limit)
+      .query(`
+        SELECT TOP (@Limit)
+          id, order_number, placed_at, status, total, user_id, customer_name, customer_email
+        FROM dbo.orders
+        ORDER BY placed_at DESC
+      `);
+
+    const rows = ordersRes.recordset || [];
 
     // optional user enrichment
-    const userIds = [...new Set(rows.map(r => r.user_id).filter(Boolean))];
+    const userIds = [...new Set(rows.map(r => r.user_id).filter(v => v !== null && v !== undefined))];
     let userMap = new Map();
     if (userIds.length) {
-      const { data: users, error: uErr } = await supabase
-        .from('users')
-        .select('id, full_name, email')
-        .in('id', userIds);
-      if (!uErr && Array.isArray(users)) {
-        userMap = new Map(users.map(u => [u.id, u]));
-      }
+      const inList = userIds.map((_, i) => `@U${i}`).join(',');
+      const uReq = req.dbPool.request();
+      userIds.forEach((id, i) => uReq.input(`U${i}`, sql.Int, id));
+      const uRes = await uReq.query(`
+        SELECT id, full_name, email
+        FROM dbo.users
+        WHERE id IN (${inList})
+      `);
+      userMap = new Map((uRes.recordset || []).map(u => [u.id, u]));
     }
 
     const out = rows.map(r => {
@@ -203,9 +286,9 @@ exports.getRecentOrders = async (req, res) => {
       return {
         order_id: r.order_number || `ORD-${r.id}`,
         occurred_at: r.placed_at,
-        customer,
         total: Number(r.total || 0),
-        status: r.status
+        status: r.status,
+        customer,
       };
     });
 

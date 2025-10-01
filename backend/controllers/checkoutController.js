@@ -1,78 +1,94 @@
-const supabase = require("../config/supabaseClient");
+const sql = require('mssql');
 
+function dbReady(req) {
+  return req.dbPool && req.dbPool.connected;
+}
+function devFakeAllowed() {
+  return process.env.ALLOW_FAKE === '1';
+}
 
 exports.createOrder = async (req, res) => {
-  try {
-    const {
-      customer,                  
-      currency = "INR",
-      items = [],                 
-      discount_total = 0,
-      tax_total = 0,
-      shipping_total = 0,
-      payment_method,
-      meta: extraMeta = {}
-    } = req.body;
+  const {
+    customer,
+    currency = 'INR',
+    items = [],
+    discount_total = 0,
+    tax_total = 0,
+    shipping_total = 0,
+    payment_method,
+    meta: extraMeta = {},
+  } = req.body || {};
 
-    //  Basic validation 
+  try {
     if (!customer?.name || !customer?.email) {
-      return res.status(400).json({ error: "missing_customer" });
+      return res.status(400).json({ error: 'missing_customer' });
     }
     if (!Array.isArray(items) || items.length === 0) {
-      return res.status(400).json({ error: "no_items" });
+      return res.status(400).json({ error: 'no_items' });
     }
 
-    //  1) Fetch products (authoritative pricing) 
+    if (!dbReady(req) && devFakeAllowed()) {
+      const subtotal = items.reduce((s, it) => s + (Number(it.unit_price || 0) * Number(it.qty || 1)), 0);
+      const toNum = (n) => Number(n || 0);
+      const total = toNum(subtotal) - toNum(discount_total) + toNum(tax_total) + toNum(shipping_total);
+      return res.json({
+        ok: true,
+        order_id: 1,
+        order_number: 'FAKE-0001',
+        total,
+      });
+    }
+
     const ids = items.map((it) => it.product_id).filter(Boolean);
     if (ids.length !== items.length) {
-      return res.status(400).json({ error: "missing_product_id" });
+      return res.status(400).json({ error: 'missing_product_id' });
     }
 
-    const { data: dbProducts, error: prodErr } = await supabase
-      .from("products")
-      .select("id, name, price, discountprice, stock, isactive")
-      .in("id", ids);
+    const inList = ids.map((_, i) => `@P${i}`).join(',');
+    const prodReq = req.dbPool.request();
+    ids.forEach((id, i) => prodReq.input(`P${i}`, sql.Int, id));
+    const prodRes = await prodReq.query(`
+      SELECT ProductId AS id, Name AS name, Price AS price, DiscountPrice AS discountprice,
+             Stock AS stock, IsActive AS isactive
+      FROM dbo.products
+      WHERE ProductId IN (${inList})
+    `);
 
-    if (prodErr) {
-      return res.status(500).json({ error: "product_lookup_failed", details: prodErr });
+    const dbProducts = prodRes.recordset || [];
+    if (dbProducts.length !== ids.length) {
+      return res.status(404).json({ error: 'some_products_not_found' });
     }
-    if (!dbProducts || dbProducts.length !== ids.length) {
-      return res.status(404).json({ error: "some_products_not_found" });
-    }
-
     const byId = new Map(dbProducts.map((p) => [String(p.id), p]));
 
-    // 2) Compute totals from DB (ignore client unit_price) 
     let subtotal = 0;
-    const orderItemsPayload = [];
+    const normalizedItems = [];
 
     for (const it of items) {
       const p = byId.get(String(it.product_id));
       if (!p) {
-        return res.status(404).json({ error: "product_not_found", product_id: it.product_id });
+        return res.status(404).json({ error: 'product_not_found', product_id: it.product_id });
       }
 
-      if (p.isactive === false) {
-        return res.status(400).json({ error: "product_inactive", product_id: p.id });
+      const inactive = (p.isactive === 0 || p.isactive === 'N' || p.isactive === false);
+      if (inactive) {
+        return res.status(400).json({ error: 'product_inactive', product_id: p.id });
       }
 
       const qty = Math.max(1, Number(it.qty || 1));
-
-      if (typeof p.stock === "number" && p.stock < qty) {
-        return res.status(409).json({ error: "insufficient_stock", product_id: p.id });
+      if (Number.isFinite(p.stock) && p.stock < qty) {
+        return res.status(409).json({ error: 'insufficient_stock', product_id: p.id });
       }
 
       const unit_price = Number(p.discountprice ?? p.price);
       if (!Number.isFinite(unit_price) || unit_price < 0) {
-        return res.status(400).json({ error: "invalid_price", product_id: p.id });
+        return res.status(400).json({ error: 'invalid_price', product_id: p.id });
       }
 
       const line_total = unit_price * qty;
       subtotal += line_total;
 
-      orderItemsPayload.push({
-        order_id: null,                         
-        product_id: p.id,                       
+      normalizedItems.push({
+        product_id: p.id,
         product_title: it.product_title || p.name,
         unit_price,
         qty,
@@ -84,75 +100,101 @@ exports.createOrder = async (req, res) => {
     const toNum = (n) => Number(n || 0);
     const total = toNum(subtotal) - toNum(discount_total) + toNum(tax_total) + toNum(shipping_total);
 
-    //  3) Insert order (force pending) 
-    const orderInsert = {
-      user_id: null,                           
-      customer_name: customer.name,
-      customer_email: customer.email,
-      status: "pending",
-      payment_status: "pending",
-      currency,                                 
-      subtotal,
-      discount_total,
-      tax_total,
-      shipping_total,
-      total,
-      meta: {
-        phone: customer.phone,
-        address: customer.address,
-        payment_method,
-        cart: items,                            
-        ...extraMeta,
-      },
-    };
+    const tx = new sql.Transaction(req.dbPool);
+    await tx.begin();
 
-    const { data: orderIns, error: orderErr } = await supabase
-      .from("orders")
-      .insert([orderInsert])
-      .select("id, order_number")
-      .single();
+    try {
+      const orderReq = new sql.Request(tx);
+      orderReq
+        .input('UserId', sql.Int, null) 
+        .input('CustName', sql.NVarChar(255), String(customer.name))
+        .input('CustEmail', sql.NVarChar(255), String(customer.email))
+        .input('Status', sql.NVarChar(20), 'pending')
+        .input('PayStatus', sql.NVarChar(20), 'pending')
+        .input('Currency', sql.NVarChar(8), currency)
+        .input('Subtotal', sql.Decimal(18, 2), subtotal)
+        .input('Discount', sql.Decimal(18, 2), discount_total || 0)
+        .input('Tax', sql.Decimal(18, 2), tax_total || 0)
+        .input('Shipping', sql.Decimal(18, 2), shipping_total || 0)
+        .input('Total', sql.Decimal(18, 2), total)
+        .input('Meta', sql.NVarChar(sql.MAX), JSON.stringify({
+          phone: customer.phone,
+          address: customer.address,
+          payment_method,
+          cart: items, 
+          ...extraMeta,
+        }))
+        .input('PlacedAt', sql.DateTime2, new Date());
 
-    if (orderErr) {
-      return res.status(500).json({ error: "order_insert_failed", details: orderErr });
-    }
+      const orderIns = await orderReq.query(`
+        INSERT INTO dbo.orders
+          (user_id, customer_name, customer_email, status, payment_status, currency,
+           subtotal, discount_total, tax_total, shipping_total, total, meta, placed_at)
+        OUTPUT INSERTED.id, INSERTED.order_number
+        VALUES
+          (@UserId, @CustName, @CustEmail, @Status, @PayStatus, @Currency,
+           @Subtotal, @Discount, @Tax, @Shipping, @Total, @Meta, @PlacedAt)
+      `);
 
-    const orderId = orderIns.id;
+      const orderRow = orderIns.recordset?.[0];
+      if (!orderRow) throw new Error('order_insert_failed');
 
-    //  4) Insert order_items 
-    const itemsForInsert = orderItemsPayload.map((oi) => ({ ...oi, order_id: orderId }));
-    const { error: itemsErr } = await supabase.from("order_items").insert(itemsForInsert);
-    if (itemsErr) {
-      await supabase.from("orders").delete().eq("id", orderId);
-      return res.status(500).json({ error: "items_insert_failed", details: itemsErr });
-    }
+      const orderId = orderRow.id;
 
-    //  5) Decrement stock via RPC (you have this function) 
-    for (const it of itemsForInsert) {
-      if (!it.product_id) continue;
-      const { error: decErr } = await supabase.rpc("decrement_stock", {
-        p_id: it.product_id,
-        p_qty: it.qty,
-      });
-      if (decErr) {
-        await supabase.from("order_items").delete().eq("order_id", orderId);
-        await supabase.from("orders").delete().eq("id", orderId);
-
-        if (String(decErr.message || "").includes("insufficient_stock")) {
-          return res.status(409).json({ error: "insufficient_stock", product_id: it.product_id });
-        }
-        return res.status(500).json({ error: "stock_decrement_failed", details: decErr });
+      for (const it of normalizedItems) {
+        const itemReq = new sql.Request(tx);
+        await itemReq
+          .input('OrderId', sql.Int, orderId)
+          .input('ProductId', sql.Int, it.product_id)
+          .input('Title', sql.NVarChar(255), it.product_title)
+          .input('UnitPrice', sql.Decimal(18, 2), it.unit_price)
+          .input('Qty', sql.Int, it.qty)
+          .input('LineTotal', sql.Decimal(18, 2), it.line_total)
+          .input('Meta', sql.NVarChar(sql.MAX), JSON.stringify(it.meta || {}))
+          .query(`
+            INSERT INTO dbo.order_items
+              (order_id, product_id, product_title, unit_price, qty, line_total, meta)
+            VALUES
+              (@OrderId, @ProductId, @Title, @UnitPrice, @Qty, @LineTotal, @Meta)
+          `);
       }
-    }
 
-    //  6) Success 
-    return res.json({
-      ok: true,
-      order_id: orderId,
-      order_number: orderIns.order_number,   
-      total,
-    });
+      for (const it of normalizedItems) {
+        const stockReq = new sql.Request(tx);
+        const upd = await stockReq
+          .input('ProductId', sql.Int, it.product_id)
+          .input('Qty', sql.Int, it.qty)
+          .query(`
+            UPDATE dbo.products
+            SET Stock = Stock - @Qty
+            WHERE ProductId = @ProductId AND Stock >= @Qty
+          `);
+        if (upd.rowsAffected[0] === 0) {
+          throw Object.assign(new Error('insufficient_stock'), { product_id: it.product_id });
+        }
+      }
+
+      await tx.commit();
+
+      return res.json({
+        ok: true,
+        order_id: orderId,
+        order_number: orderRow.order_number || null,
+        total,
+      });
+    } catch (inner) {
+      try { await tx.rollback(); } catch (_) {}
+      if (inner?.message === 'insufficient_stock') {
+        return res.status(409).json({ error: 'insufficient_stock', product_id: inner.product_id });
+      }
+      if (inner?.message === 'order_insert_failed') {
+        return res.status(500).json({ error: 'order_insert_failed' });
+      }
+      console.error('createOrder (tx) error:', inner);
+      return res.status(500).json({ error: 'internal_error' });
+    }
   } catch (e) {
-    console.error("checkout.createOrder error", e);
-    return res.status(500).json({ error: "internal_error" });
+    console.error('checkout.createOrder error', e);
+    return res.status(500).json({ error: 'internal_error' });
   }
 };

@@ -1,19 +1,26 @@
-const supabase = require("../config/supabaseClient");
+const sql = require('mssql');
+const crypto = require('crypto');
+
+function dbReady(req) {
+  return req.dbPool && req.dbPool.connected;
+}
+function devFakeAllowed() {
+  return process.env.ALLOW_FAKE === '1';
+}
+const now = () => new Date();
 
 function buildReviewTree(reviews) {
   const reviewMap = new Map();
   const roots = [];
-  reviews.forEach(review => {
+  (reviews || []).forEach(review => {
     review.replies = [];
     review.date = new Date(review.created_at).toLocaleDateString();
     reviewMap.set(review.id, review);
   });
-  reviews.forEach(review => {
+  (reviews || []).forEach(review => {
     if (review.parent_id) {
       const parent = reviewMap.get(review.parent_id);
-      if (parent) {
-        parent.replies.push(review);
-      }
+      if (parent) parent.replies.push(review);
     } else {
       roots.push(review);
     }
@@ -27,7 +34,10 @@ function buildReviewTree(reviews) {
   return roots;
 }
 
-// Create or Update Blog
+const uuidRegex = /^[0-9a-fA-F-]{36}$/;
+
+// POST /api/blogs           (create)
+// PUT  /api/blogs/:id       (update)
 exports.createOrUpdateBlog = async (req, res) => {
   try {
     const {
@@ -42,368 +52,503 @@ exports.createOrUpdateBlog = async (req, res) => {
       meta_title,
       meta_description,
       cover_image,
-    } = req.body;
+    } = req.body || {};
 
     if (!title || !slug || !excerpt || !content || !category || !status) {
-      return res.status(400).json({ error: "Missing required fields" });
+      return res.status(400).json({ error: 'Missing required fields' });
     }
-
-    if (status !== "DRAFT" && status !== "PUBLISHED") {
-      return res.status(400).json({ error: "Invalid status value" });
+    if (status !== 'DRAFT' && status !== 'PUBLISHED') {
+      return res.status(400).json({ error: 'Invalid status value' });
     }
 
     const blogData = {
-      title: title.trim(),
-      slug: slug.trim(),
+      title: String(title).trim(),
+      slug: String(slug).trim(),
       cover_image: cover_image || null,
       category,
-      excerpt: excerpt.trim(),
-      tags: tags ? JSON.parse(tags) : [],
+      excerpt: String(excerpt).trim(),
+      tags: tags ? (Array.isArray(tags) ? tags : (() => { try { return JSON.parse(tags); } catch { return []; } })()) : [],
       content,
       status,
-      publish_at: status === "PUBLISHED" && publish_at ? publish_at : null,
+      publish_at: status === 'PUBLISHED' && publish_at ? new Date(publish_at) : null,
       meta_title: meta_title?.trim() || null,
       meta_description: meta_description?.trim() || null,
-      updated_at: new Date(),
+      updated_at: now(),
     };
 
-    let data, error;
-    if (req.params.id) {
-      ({ data, error } = await supabase
-        .from("blogs")
-        .update(blogData)
-        .eq("id", req.params.id)
-        .eq("is_active", true)
-        .select()
-        .single());
-      if (!data) {
-        return res.status(404).json({ error: "Blog not found or not active" });
-      }
-    } else {
-      ({ data, error } = await supabase
-        .from("blogs")
-        .insert(blogData)
-        .select()
-        .single());
+    if (!dbReady(req) && devFakeAllowed()) {
+      const fake = { id: crypto.randomUUID(), is_active: true, created_at: now(), ...blogData };
+      return res.status(200).json(fake);
     }
 
-    if (error) throw error;
+    const hasId = Boolean(req.params?.id);
+    if (hasId && !uuidRegex.test(req.params.id)) {
+      return res.status(400).json({ error: 'Invalid UUID format' });
+    }
 
-    res.status(200).json(data);
+    if (hasId) {
+      
+      const r = await req.dbPool.request()
+        .input('Id', sql.NVarChar(36), req.params.id)
+        .input('Title', sql.NVarChar(255), blogData.title)
+        .input('Slug', sql.NVarChar(255), blogData.slug)
+        .input('CoverImage', sql.NVarChar(1024), blogData.cover_image)
+        .input('Category', sql.NVarChar(100), blogData.category)
+        .input('Excerpt', sql.NVarChar(sql.MAX), blogData.excerpt)
+        .input('Tags', sql.NVarChar(sql.MAX), JSON.stringify(blogData.tags || []))
+        .input('Content', sql.NVarChar(sql.MAX), blogData.content)
+        .input('Status', sql.NVarChar(16), blogData.status)
+        .input('PublishAt', sql.DateTime2, blogData.publish_at)
+        .input('MetaTitle', sql.NVarChar(255), blogData.meta_title)
+        .input('MetaDesc', sql.NVarChar(500), blogData.meta_description)
+        .input('UpdatedAt', sql.DateTime2, blogData.updated_at)
+        .query(`
+          UPDATE dbo.blogs
+          SET title=@Title, slug=@Slug, cover_image=@CoverImage, category=@Category,
+              excerpt=@Excerpt, tags=@Tags, content=@Content, status=@Status,
+              publish_at=@PublishAt, meta_title=@MetaTitle, meta_description=@MetaDesc,
+              updated_at=@UpdatedAt
+          OUTPUT INSERTED.*
+          WHERE id=@Id AND is_active=1
+        `);
+
+      const data = r.recordset?.[0];
+      if (!data) return res.status(404).json({ error: 'Blog not found or not active' });
+      return res.status(200).json(data);
+    } else {
+      // INSERT
+      const id = crypto.randomUUID();
+      const r = await req.dbPool.request()
+        .input('Id', sql.NVarChar(36), id)
+        .input('Title', sql.NVarChar(255), blogData.title)
+        .input('Slug', sql.NVarChar(255), blogData.slug)
+        .input('CoverImage', sql.NVarChar(1024), blogData.cover_image)
+        .input('Category', sql.NVarChar(100), blogData.category)
+        .input('Excerpt', sql.NVarChar(sql.MAX), blogData.excerpt)
+        .input('Tags', sql.NVarChar(sql.MAX), JSON.stringify(blogData.tags || []))
+        .input('Content', sql.NVarChar(sql.MAX), blogData.content)
+        .input('Status', sql.NVarChar(16), blogData.status)
+        .input('PublishAt', sql.DateTime2, blogData.publish_at)
+        .input('MetaTitle', sql.NVarChar(255), blogData.meta_title)
+        .input('MetaDesc', sql.NVarChar(500), blogData.meta_description)
+        .input('IsActive', sql.Bit, 1)
+        .input('CreatedAt', sql.DateTime2, now())
+        .input('UpdatedAt', sql.DateTime2, now())
+        .query(`
+          INSERT INTO dbo.blogs
+            (id, title, slug, cover_image, category, excerpt, tags, content, status,
+             publish_at, meta_title, meta_description, is_active, created_at, updated_at)
+          OUTPUT INSERTED.*
+          VALUES
+            (@Id, @Title, @Slug, @CoverImage, @Category, @Excerpt, @Tags, @Content, @Status,
+             @PublishAt, @MetaTitle, @MetaDesc, @IsActive, @CreatedAt, @UpdatedAt)
+        `);
+
+      const data = r.recordset?.[0];
+      return res.status(200).json(data);
+    }
   } catch (err) {
-    console.error("Error in createOrUpdateBlog:", err);
+    console.error('Error in createOrUpdateBlog:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// Reset Blog (Soft Delete Draft)
+// PATCH /api/blogs/:id/reset
 exports.resetBlog = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'Blog ID is required' });
+    if (!uuidRegex.test(id)) return res.status(400).json({ error: 'Invalid UUID format' });
 
-    if (!id) {
-      return res.status(400).json({ error: "Blog ID is required" });
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.status(200).json({ message: 'Draft reset successfully' });
     }
 
-    const { data, error } = await supabase
-      .from("blogs")
-      .update({ is_active: false, updated_at: new Date() })
-      .eq("id", id)
-      .eq("status", "DRAFT")
-      .eq("is_active", true)
-      .select()
-      .single();
+    const r = await req.dbPool.request()
+      .input('Id', sql.NVarChar(36), id)
+      .input('UpdatedAt', sql.DateTime2, now())
+      .query(`
+        UPDATE dbo.blogs
+        SET is_active=0, updated_at=@UpdatedAt
+        OUTPUT INSERTED.id
+        WHERE id=@Id AND status='DRAFT' AND is_active=1
+      `);
 
-    if (error) throw error;
-    if (!data) {
-      return res.status(404).json({ error: "Draft blog not found" });
-    }
-
-    res.status(200).json({ message: "Draft reset successfully" });
+    if (!r.recordset?.[0]) return res.status(404).json({ error: 'Draft blog not found' });
+    res.status(200).json({ message: 'Draft reset successfully' });
   } catch (err) {
-    console.error("Error in resetBlog:", err);
+    console.error('Error in resetBlog:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// Get Blog by ID (for editing)
+// GET /api/blogs/:id
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'Blog ID is required' });
+    if (!uuidRegex.test(id)) return res.status(400).json({ error: 'Invalid UUID format' });
 
-    if (!id) {
-      return res.status(400).json({ error: "Blog ID is required" });
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.status(200).json({
+        id,
+        title: 'Sample Blog',
+        slug: 'sample-blog',
+        excerpt: 'Lorem ipsum',
+        content: '<p>content</p>',
+        category: 'General',
+        tags: JSON.stringify(['sample']),
+        status: 'DRAFT',
+        is_active: true,
+        created_at: now(),
+        updated_at: now(),
+      });
     }
 
-    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-    if (!uuidRegex.test(id)) {
-      return res.status(400).json({ error: "Invalid UUID format" });
-    }
+    const r = await req.dbPool.request()
+      .input('Id', sql.NVarChar(36), id)
+      .query(`SELECT * FROM dbo.blogs WHERE id=@Id AND is_active=1`);
 
-    const { data, error } = await supabase
-      .from("blogs")
-      .select("*")
-      .eq("id", id)
-      .eq("is_active", true)
-      .single();
-
-    if (error) throw error;
-    if (!data) {
-      return res.status(404).json({ error: "Blog not found or not active" });
-    }
-
+    const data = r.recordset?.[0];
+    if (!data) return res.status(404).json({ error: 'Blog not found or not active' });
     res.status(200).json(data);
   } catch (err) {
-    console.error("Error in getBlogById:", err);
+    console.error('Error in getBlogById:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// Get User's Drafts
-exports.getUserDrafts = async (req, res) => {
+// GET /api/blogs/drafts
+exports.getUserDrafts = async (_req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("blogs")
-      .select("*")
-      .eq("status", "DRAFT")
-      .eq("is_active", true)
-      .order("updated_at", { ascending: false });
+    if (!dbReady(_req) && devFakeAllowed()) {
+      return res.status(200).json([{
+        id: crypto.randomUUID(),
+        title: 'Draft Blog',
+        slug: 'draft-blog',
+        status: 'DRAFT',
+        is_active: true,
+        updated_at: now(),
+      }]);
+    }
 
-    if (error) throw error;
+    const r = await _req.dbPool.request().query(`
+      SELECT * FROM dbo.blogs
+      WHERE status='DRAFT' AND is_active=1
+      ORDER BY updated_at DESC
+    `);
 
-    res.status(200).json(data || []);
+    res.status(200).json(r.recordset || []);
   } catch (err) {
-    console.error("Error in getUserDrafts:", err);
+    console.error('Error in getUserDrafts:', err);
     res.status(500).json({ error: err.message });
   }
 };
 
-// Get All Blogs with Reviews
+// GET /api/blogs
 exports.getAllBlogs = async (req, res) => {
   try {
-    const { data: blogs, error: blogError } = await supabase
-      .from('blogs')
-      .select('*')
-      .eq('status', 'PUBLISHED')
-      .order('publish_at', { ascending: false });
-
-    if (blogError) {
-      throw new Error(blogError.message);
+    if (!dbReady(req) && devFakeAllowed()) {
+      const id = crypto.randomUUID();
+      return res.status(200).json([{
+        id,
+        title: 'Hello World',
+        slug: 'hello-world',
+        status: 'PUBLISHED',
+        publish_at: now(),
+        is_active: 1,
+        reviews: buildReviewTree([{
+          id: crypto.randomUUID(),
+          blog_id: id,
+          parent_id: null,
+          user_id: 'u1',
+          name: 'Alice',
+          created_at: now(),
+          text: 'Great post!',
+          stars: 5,
+        }]),
+      }]);
     }
+
+    const blogsRes = await req.dbPool.request().query(`
+      SELECT * FROM dbo.blogs
+      WHERE status='PUBLISHED' AND is_active=1
+      ORDER BY publish_at DESC
+    `);
+
+    const blogs = blogsRes.recordset || [];
+    if (!blogs.length) return res.status(200).json([]);
 
     const blogIds = blogs.map(b => b.id);
-    const { data: allReviews, error: reviewError } = await supabase
-      .from('blogreviews')
-      .select('id, blog_id, parent_id, user_id, name, created_at, text, stars')
-      .in('blog_id', blogIds)
-      .order('created_at', { ascending: true });
+  
+    const inList = blogIds.map((_, i) => `@B${i}`).join(',');
+    const rReq = req.dbPool.request();
+    blogIds.forEach((id, i) => rReq.input(`B${i}`, sql.NVarChar(36), id));
 
-    if (reviewError) {
-      throw new Error(reviewError.message);
-    }
+    const reviewsRes = await rReq.query(`
+      SELECT id, blog_id, parent_id, user_id, name, created_at, text, stars
+      FROM dbo.blogreviews
+      WHERE blog_id IN (${inList})
+      ORDER BY created_at ASC
+    `);
 
-    const reviewsByBlog = allReviews.reduce((acc, rev) => {
-      if (!acc[rev.blog_id]) acc[rev.blog_id] = [];
-      acc[rev.blog_id].push(rev);
+    const allReviews = reviewsRes.recordset || [];
+    const byBlog = allReviews.reduce((acc, rev) => {
+      (acc[rev.blog_id] ||= []).push(rev);
       return acc;
     }, {});
 
-    blogs.forEach(blog => {
-      const blogReviews = reviewsByBlog[blog.id] || [];
-      blog.reviews = buildReviewTree(blogReviews);
+    blogs.forEach(b => {
+      b.reviews = buildReviewTree(byBlog[b.id] || []);
     });
 
     res.status(200).json(blogs);
   } catch (error) {
-    console.error("Error in getAllBlogs:", error);
+    console.error('Error in getAllBlogs:', error);
     res.status(500).json({ message: 'Failed to fetch blogs', error: error.message });
   }
 };
 
-// Get User's Likes
+// GET /api/blogs/likes?user_id=...
 exports.getUserLikes = async (req, res) => {
   const { user_id } = req.query;
-
-  if (!user_id) {
-    return res.status(400).json({ message: 'User ID is required' });
-  }
+  if (!user_id) return res.status(400).json({ message: 'User ID is required' });
 
   try {
-    const { data, error } = await supabase
-      .from('user_interactions')
-      .select('blog_id')
-      .eq('user_id', user_id)
-      .eq('action_type', 'LIKE');
-
-    if (error) {
-      throw new Error(error.message);
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.status(200).json({ likedBlogIds: [] });
     }
 
-    const likedBlogIds = data.map(item => item.blog_id);
+    const r = await req.dbPool.request()
+      .input('UserId', sql.NVarChar(128), String(user_id))
+      .query(`
+        SELECT blog_id
+        FROM dbo.user_interactions
+        WHERE user_id=@UserId AND action_type='LIKE'
+      `);
+
+    const likedBlogIds = (r.recordset || []).map(x => x.blog_id);
     res.status(200).json({ likedBlogIds });
   } catch (error) {
-    console.error("Error in getUserLikes:", error);
+    console.error('Error in getUserLikes:', error);
     res.status(500).json({ message: 'Failed to fetch user likes', error: error.message });
   }
 };
 
-// Add Review to Blog
+// POST /api/blogs/:id/reviews
 exports.addReview = async (req, res) => {
   const { id } = req.params;
-  const { user_id, name, text, stars } = req.body;
-
+  const { user_id, name, text, stars } = req.body || {};
   try {
+    if (!uuidRegex.test(id)) return res.status(400).json({ message: 'Invalid blog id' });
     if (!user_id || !name || !text || stars < 1 || stars > 5) {
       return res.status(400).json({ message: 'Invalid review data' });
     }
 
-    const { data, error } = await supabase
-      .rpc('add_review', {
-        p_user_id: user_id,
-        p_blog_id: id,
-        p_name: name,
-        p_text: text,
-        p_stars: stars
-      })
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
+    if (!dbReady(req) && devFakeAllowed()) {
+      const created = {
+        id: crypto.randomUUID(),
+        blog_id: id,
+        parent_id: null,
+        user_id, name, text, stars,
+        created_at: now()
+      };
+      created.date = new Date(created.created_at).toLocaleDateString();
+      created.replies = [];
+      return res.status(200).json(created);
     }
 
+    const r = await req.dbPool.request()
+      .input('Id', sql.NVarChar(36), crypto.randomUUID())
+      .input('BlogId', sql.NVarChar(36), id)
+      .input('ParentId', sql.NVarChar(36), null)
+      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('Name', sql.NVarChar(120), String(name))
+      .input('Text', sql.NVarChar(sql.MAX), String(text))
+      .input('Stars', sql.Int, stars)
+      .input('CreatedAt', sql.DateTime2, now())
+      .query(`
+        INSERT INTO dbo.blogreviews (id, blog_id, parent_id, user_id, name, text, stars, created_at)
+        OUTPUT INSERTED.*
+        VALUES (@Id, @BlogId, @ParentId, @UserId, @Name, @Text, @Stars, @CreatedAt)
+      `);
+
+    const data = r.recordset?.[0];
     data.date = new Date(data.created_at).toLocaleDateString();
     data.replies = [];
-
     res.status(200).json(data);
   } catch (error) {
-    console.error("Error in addReview:", error);
+    console.error('Error in addReview:', error);
     res.status(500).json({ message: 'Failed to add review', error: error.message });
   }
 };
 
-// Add Reply to Review
+// POST /api/blogs/:id/reviews/:reviewId/replies
 exports.addReply = async (req, res) => {
   const { id, reviewId } = req.params;
-  const { user_id, name, text } = req.body;
+  const { user_id, name, text } = req.body || {};
 
   try {
+    if (!uuidRegex.test(id) || !uuidRegex.test(reviewId)) {
+      return res.status(400).json({ message: 'Invalid id format' });
+    }
     if (!user_id || !name || !text) {
       return res.status(400).json({ message: 'Invalid reply data' });
     }
 
-    const { data, error } = await supabase
-      .from('blogreviews')
-      .insert({
+    if (!dbReady(req) && devFakeAllowed()) {
+      const data = {
+        id: crypto.randomUUID(),
         blog_id: id,
         parent_id: reviewId,
-        user_id,
-        name,
-        text,
+        user_id, name, text,
         stars: null,
-      })
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(error.message);
+        created_at: now()
+      };
+      data.date = new Date(data.created_at).toLocaleDateString();
+      return res.status(200).json(data);
     }
 
-    data.date = new Date(data.created_at).toLocaleDateString();
+    const r = await req.dbPool.request()
+      .input('Id', sql.NVarChar(36), crypto.randomUUID())
+      .input('BlogId', sql.NVarChar(36), id)
+      .input('ParentId', sql.NVarChar(36), reviewId)
+      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('Name', sql.NVarChar(120), String(name))
+      .input('Text', sql.NVarChar(sql.MAX), String(text))
+      .input('Stars', sql.Int, null)
+      .input('CreatedAt', sql.DateTime2, now())
+      .query(`
+        INSERT INTO dbo.blogreviews (id, blog_id, parent_id, user_id, name, text, stars, created_at)
+        OUTPUT INSERTED.*
+        VALUES (@Id, @BlogId, @ParentId, @UserId, @Name, @Text, @Stars, @CreatedAt)
+      `);
 
+    const data = r.recordset?.[0];
+    data.date = new Date(data.created_at).toLocaleDateString();
     res.status(200).json(data);
   } catch (error) {
-    console.error("Error in addReply:", error);
+    console.error('Error in addReply:', error);
     res.status(500).json({ message: 'Failed to add reply', error: error.message });
   }
 };
 
-// Increment Likes for a Blog
+// POST /api/blogs/:id/like
 exports.incrementLikes = async (req, res) => {
   const { id } = req.params;
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return res.status(400).json({ message: 'User ID is required' });
-  }
+  const { user_id } = req.body || {};
+  if (!user_id) return res.status(400).json({ message: 'User ID is required' });
 
   try {
-    const { data, error } = await supabase
-      .rpc('like_blog', { p_user_id: user_id, p_blog_id: id });
-
-    if (error) {
-      if (error.message === 'User has already liked this blog') {
-        return res.status(400).json({ message: error.message });
-      }
-      throw new Error(error.message);
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.status(200).json({ likes: 1 });
     }
 
-    res.status(200).json({ likes: data });
+    const request = req.dbPool.request()
+      .input('BlogId', sql.NVarChar(36), id)
+      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('Action', sql.NVarChar(16), 'LIKE')
+      .input('CreatedAt', sql.DateTime2, now());
+
+    const exists = await request.query(`
+      SELECT 1 FROM dbo.user_interactions
+      WHERE blog_id=@BlogId AND user_id=@UserId AND action_type='LIKE'
+    `);
+    if (exists.recordset?.[0]) {
+      return res.status(400).json({ message: 'User has already liked this blog' });
+    }
+
+    await req.dbPool.request()
+      .input('Id', sql.NVarChar(36), crypto.randomUUID())
+      .input('BlogId', sql.NVarChar(36), id)
+      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('Action', sql.NVarChar(16), 'LIKE')
+      .input('CreatedAt', sql.DateTime2, now())
+      .query(`
+        INSERT INTO dbo.user_interactions (id, blog_id, user_id, action_type, created_at)
+        VALUES (@Id, @BlogId, @UserId, @Action, @CreatedAt)
+      `);
+
+    const countRes = await req.dbPool.request()
+      .input('BlogId', sql.NVarChar(36), id)
+      .query(`SELECT COUNT(*) AS likes FROM dbo.user_interactions WHERE blog_id=@BlogId AND action_type='LIKE'`);
+
+    res.status(200).json({ likes: countRes.recordset?.[0]?.likes || 0 });
   } catch (error) {
-    console.error("Error in incrementLikes:", error);
+    console.error('Error in incrementLikes:', error);
     res.status(500).json({ message: 'Failed to like blog', error: error.message });
   }
 };
 
-// Increment Views for a Blog
+// POST /api/blogs/:id/view
 exports.incrementViews = async (req, res) => {
   const { id } = req.params;
-  const { user_id } = req.body;
-
-  if (!user_id) {
-    return res.status(400).json({ message: 'User ID is required' });
-  }
+  const { user_id } = req.body || {};
+  if (!user_id) return res.status(400).json({ message: 'User ID is required' });
 
   try {
-    const { data, error } = await supabase
-      .rpc('view_blog', { p_user_id: user_id, p_blog_id: id });
-
-    if (error) {
-      throw new Error(error.message);
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.status(200).json({ views: 1 });
     }
 
-    res.status(200).json({ views: data });
+    const ex = await req.dbPool.request()
+      .input('BlogId', sql.NVarChar(36), id)
+      .input('UserId', sql.NVarChar(128), String(user_id))
+      .query(`
+        SELECT 1 FROM dbo.user_interactions
+        WHERE blog_id=@BlogId AND user_id=@UserId AND action_type='VIEW'
+      `);
+
+    if (!ex.recordset?.[0]) {
+      await req.dbPool.request()
+        .input('Id', sql.NVarChar(36), crypto.randomUUID())
+        .input('BlogId', sql.NVarChar(36), id)
+        .input('UserId', sql.NVarChar(128), String(user_id))
+        .input('Action', sql.NVarChar(16), 'VIEW')
+        .input('CreatedAt', sql.DateTime2, now())
+        .query(`
+          INSERT INTO dbo.user_interactions (id, blog_id, user_id, action_type, created_at)
+          VALUES (@Id, @BlogId, @UserId, @Action, @CreatedAt)
+        `);
+    }
+
+    const countRes = await req.dbPool.request()
+      .input('BlogId', sql.NVarChar(36), id)
+      .query(`SELECT COUNT(*) AS views FROM dbo.user_interactions WHERE blog_id=@BlogId AND action_type='VIEW'`);
+
+    res.status(200).json({ views: countRes.recordset?.[0]?.views || 0 });
   } catch (error) {
-    console.error("Error in incrementViews:", error);
+    console.error('Error in incrementViews:', error);
     res.status(500).json({ message: 'Failed to increment views', error: error.message });
   }
 };
 
-// Delete blog by id
+// DELETE /api/blogs/:id
 exports.deleteBlog = async (req, res) => {
   try {
     const { id } = req.params;
+    if (!id) return res.status(400).json({ error: 'Blog ID is required' });
+    if (!uuidRegex.test(id)) return res.status(400).json({ error: 'Invalid UUID format' });
 
-    if (!id) {
-      return res.status(400).json({ error: "Blog ID is required" });
+    if (!dbReady(req) && devFakeAllowed()) {
+      return res.status(200).json({ message: 'Blog and associated reviews deleted successfully' });
     }
 
-    const uuidRegex = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
-    if (!uuidRegex.test(id)) {
-      return res.status(400).json({ error: "Invalid UUID format" });
+    await req.dbPool.request()
+      .input('BlogId', sql.NVarChar(36), id)
+      .query(`DELETE FROM dbo.blogreviews WHERE blog_id=@BlogId`);
+
+    const del = await req.dbPool.request()
+      .input('Id', sql.NVarChar(36), id)
+      .query(`DELETE FROM dbo.blogs OUTPUT DELETED.id WHERE id=@Id`);
+
+    if (!del.recordset?.[0]) {
+      return res.status(404).json({ error: 'Blog not found or already deleted' });
     }
 
-    // Soft delete all associated reviews
-    const { error: reviewError } = await supabase
-      .from("blogreviews")
-      .delete()
-      .eq("blog_id", id);
-
-    if (reviewError) throw reviewError;
-
-    // Start a Supabase transaction to ensure atomicity
-    const { data: blogData, error: blogError } = await supabase
-      .from("blogs")
-      .delete()
-      .eq("id", id)
-
-    if (blogError) throw blogError;
-    if (!blogData) {
-      return res.status(404).json({ error: "Blog not found or already deleted" });
-    }
-
-    res.status(200).json({ message: "Blog and associated reviews deleted successfully" });
+    res.status(200).json({ message: 'Blog and associated reviews deleted successfully' });
   } catch (err) {
-    console.error("Error in deleteBlog:", err);
+    console.error('Error in deleteBlog:', err);
     res.status(500).json({ error: err.message });
   }
 };
