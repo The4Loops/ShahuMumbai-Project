@@ -1,20 +1,42 @@
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
-const supabase = require("../config/supabaseClient");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const sql = require('mssql');
 
 // API: Get Users with Newsletter Subscription
 exports.getSubscribeUser = async (req, res) => {
   try {
-    const { data, error } = await supabase
-      .from("users")
-      .select(
-        "id, full_name, email, phone, about, country, newsletter_subscription, email_notifications, public_profile, twitter_url, facebook_url, instagram_url, linkedin_url, profile_image, roles!role_id(label), active, joined, last_login, updated_at"
-      )
-      .eq("newsletter_subscription", true);
+    const result = await req.dbPool.request()
+      .query(`
+        SELECT 
+          UserId AS id,
+          FullName AS full_name,
+          Email AS email,
+          Phone AS phone,
+          About AS about,
+          Country AS country,
+          NewsLetterSubscription AS newsletter_subscription,
+          EmailNotifications AS email_notifications,
+          PublicProfile AS public_profile,
+          TwitterUrl AS twitter_url,
+          FacebookUrl AS facebook_url,
+          InstagramUrl AS instagram_url,
+          LinkedInUrl AS linkedin_url,
+          ProfileImage AS profile_image,
+          RoleId,
+          Active AS active,
+          Joined AS joined,
+          LastLogin AS last_login,
+          UpdatedAt AS updated_at,
+          r.Label
+        FROM users u
+        INNER JOIN roles r ON u.RoleId = r.RoleId
+        WHERE u.NewsLetterSubscription = 'Y'
+      `);
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
+    const data = result.recordset;
+    if (!data) {
+      return res.status(400).json({ error: 'Error fetching subscribers' });
     }
 
     const transformedData = data.map((user) => ({
@@ -25,33 +47,28 @@ exports.getSubscribeUser = async (req, res) => {
       about: user.about,
       country: user.country,
       preferences: {
-        newsletter: user.newsletter_subscription,
-        emailNotifications: user.email_notifications,
-        publicProfile: user.public_profile,
+        newsletter: user.newsletter_subscription ==='Y'? true : false,
+        emailNotifications: user.email_notifications ==='Y'? true : false,
+        publicProfile: user.public_profile ==='Y'? true : false,
       },
       socialLinks: {
-        twitter: user.twitter_url || "",
-        facebook: user.facebook_url || "",
-        instagram: user.instagram_url || "",
-        linkedin: user.linkedin_url || "",
+        twitter: user.twitter_url || '',
+        facebook: user.facebook_url || '',
+        instagram: user.instagram_url || '',
+        linkedin: user.linkedin_url || '',
       },
       image: user.profile_image || null,
-      role: user.roles.label,
-      active: user.active === "Y",
-      joined: user.joined ? new Date(user.joined).toLocaleDateString() : "N/A",
-      last_login: user.last_login
-        ? new Date(user.last_login).toLocaleDateString()
-        : "Never",
-      updated_date: user.updated_at
-        ? new Date(user.updated_at).toLocaleDateString()
-        : "N/A",
-      updated_time: user.updated_at
-        ? new Date(user.updated_at).toLocaleTimeString()
-        : "N/A",
+      role: user.Label,
+      active: user.active === 'Y',
+      joined: user.joined ? new Date(user.joined).toLocaleDateString() : 'N/A',
+      last_login: user.last_login ? new Date(user.last_login).toLocaleDateString() : 'Never',
+      updated_date: user.updated_at ? new Date(user.updated_at).toLocaleDateString() : 'N/A',
+      updated_time: user.updated_at ? new Date(user.updated_at).toLocaleTimeString() : 'N/A',
     }));
 
     res.status(200).json({ users: transformedData });
   } catch (err) {
+    console.error('getSubscribeUser:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -60,28 +77,25 @@ exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const { data, error } = await supabase
-      .from("users")
-      .update({
-        newsletter_subscription: false,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", id)
-      .select("id, full_name, email, newsletter_subscription")
-      .single();
+    const result = await req.dbPool.request()
+      .input('UserId', sql.Int, id)
+      .input('NewsLetterSubscription', sql.Char(1),'N')
+      .input('UpdatedAt', sql.DateTime, new Date().toISOString())
+      .query(`
+        UPDATE users
+        SET NewsLetterSubscription = @NewsLetterSubscription, UpdatedAt = @UpdatedAt
+        OUTPUT INSERTED.UserId, INSERTED.FullName, INSERTED.Email, INSERTED.NewsLetterSubscription
+        WHERE UserId = @UserId
+      `);
 
-    if (error) {
-      return res.status(400).json({ error: error.message });
-    }
-
+    const data = result.recordset[0];
     if (!data) {
-      return res.status(404).json({ error: "User not found" });
+      return res.status(404).json({ error: 'User not found' });
     }
 
-    res
-      .status(200)
-      .json({ message: "User newsletter subscription disabled", user: data });
+    res.status(200).json({ message: 'User newsletter subscription disabled', user: data });
   } catch (err) {
+    console.error('deleteUser:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -91,44 +105,44 @@ exports.sendSubscriberMail = async (req, res) => {
     const { email } = req.body;
 
     if (!email) {
-      return res.status(400).json({ error: "Email is required" });
+      return res.status(400).json({ error: 'Email is required' });
     }
 
     // Fetch user to verify existence
-    const { data: user, error: userError } = await supabase
-      .from("users")
-      .select("id, email, newsletter_subscription")
-      .eq("email", email)
-      .single();
+    const userResult = await req.dbPool.request()
+      .input('Email', sql.NVarChar, email)
+      .query(`
+        SELECT UserId, Email, NewsLetterSubscription
+        FROM users
+        WHERE Email = @Email
+      `);
 
-    if (userError || !user) {
-      return res.status(404).json({ error: "User not found" });
+    const user = userResult.recordset[0];
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
     }
 
     // Fetch email content from module table
-    const { data: module, error: moduleError } = await supabase
-      .from("module")
-      .select("mailsubject, maildescription")
-      .eq("mailtype", "Subscriber")
-      .single();
+    const moduleResult = await req.dbPool.request()
+      .input('mailtype', sql.NVarChar, 'Subscriber')
+      .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
 
-    if (moduleError || !module) {
-      return res
-        .status(400)
-        .json({ error: "Subscriber email template not found" });
+    const module = moduleResult.recordset[0];
+    if (!module) {
+      return res.status(400).json({ error: 'Subscriber email template not found' });
     }
 
     // Replace #username with email in maildescription
-    const mailContent = module.maildescription.replace("#username", email);
+    const mailContent = module.maildescription.replace('#username', email);
 
     const plainTextContent = mailContent
-      .replace(/<[^>]+>/g, "")
-      .replace(/\s+/g, " ")
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
     // Send email
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -146,29 +160,29 @@ exports.sendSubscriberMail = async (req, res) => {
     await transporter.sendMail(mailOptions);
 
     // Update user's newsletter_subscription to true
-    const { data: updatedUser, error: updateError } = await supabase
-      .from("users")
-      .update({
-        newsletter_subscription: true,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", user.id)
-      .select("id, email, newsletter_subscription")
-      .single();
+    const updateResult = await req.dbPool.request()
+      .input('UserId', sql.Int, user.UserId)
+      .input('NewsLetterSubscription', sql.Chat(1),'Y')
+      .input('UpdatedAt', sql.DateTime, new Date().toISOString())
+      .query(`
+        UPDATE users
+        SET NewsLetterSubscription = @NewsLetterSubscription, UpdatedAt = @UpdatedAt
+        OUTPUT INSERTED.UserId, INSERTED.Email, INSERTED.NewsLetterSubscription
+        WHERE UserId = @UserId
+      `);
 
-    if (updateError) {
-      return res
-        .status(400)
-        .json({ error: "Failed to update newsletter subscription" });
+    const updatedUser = updateResult.recordset[0];
+    if (!updatedUser) {
+      return res.status(400).json({ error: 'Failed to update newsletter subscription' });
     }
 
     res.status(200).json({
-      message: "Newsletter email sent and subscription enabled",
+      message: 'Newsletter email sent and subscription enabled',
       user: updatedUser,
     });
   } catch (error) {
-    console.error("sendNewsletterEmail error", error);
-    res.status(500).json({ error: "Server error", details: error.message });
+    console.error('sendSubscriberMail:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
 
@@ -177,34 +191,27 @@ exports.sendNewsletterMail = async (req, res) => {
     const { subject, htmlContent } = req.body;
     
     if (!subject || !htmlContent) {
-      return res
-        .status(400)
-        .json({ error: "Subject and HTML content are required" });
+      return res.status(400).json({ error: 'Subject and HTML content are required' });
     }
 
     // Fetch users with newsletter_subscription: true
-    const { data: users, error: usersError } = await supabase
-      .from("users")
-      .select("email")
-      .eq("newsletter_subscription", true);
+    const usersResult = await req.dbPool.request()
+      .query(`SELECT Email FROM users WHERE NewsLetterSubscription ='Y'  `);
 
-    if (usersError) {
-      return res.status(400).json({ error: usersError.message });
-    }
-
+    const users = usersResult.recordset;
     if (!users || users.length === 0) {
-      return res.status(404).json({ error: "No subscribers found" });
+      return res.status(404).json({ error: 'No subscribers found' });
     }
 
     // Create plain text fallback by stripping HTML tags
     const plainTextContent = htmlContent
-      .replace(/<[^>]+>/g, "")
-      .replace(/\s+/g, " ")
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
       .trim();
 
     // Configure nodemailer transporter
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -215,7 +222,7 @@ exports.sendNewsletterMail = async (req, res) => {
     const emailPromises = users.map((user) =>
       transporter.sendMail({
         from: process.env.EMAIL_USER,
-        to: user.email,
+        to: user.Email,
         subject,
         html: htmlContent,
         text: plainTextContent,
@@ -228,7 +235,7 @@ exports.sendNewsletterMail = async (req, res) => {
       message: `Newsletter sent to ${users.length} subscriber(s)`,
     });
   } catch (error) {
-    console.error("sendNewsletter error:", err);
-    res.status(500).json({ error: "Server error", details: err.message });
+    console.error('sendNewsletterMail:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
   }
 };

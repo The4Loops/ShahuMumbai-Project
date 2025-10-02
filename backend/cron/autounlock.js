@@ -1,12 +1,23 @@
-// backend/cron/autounlock.js
 const cron = require('node-cron');
-const supabase = require('../config/supabaseClient');
+const sql = require('mssql');
+const sqlConfig = require('../config/db');
 
 const unlockAfterMinutes = 5;
 let running = false;
+let pool;
 
 // small util
 const asBool = (v) => v === true || v === 'true' || v === 1 || v === '1';
+
+async function initPool() {
+  try {
+    pool = await sql.connect(sqlConfig);
+    console.log('MSSQL pool connected for autounlock cron');
+  } catch (err) {
+    console.error('Failed to connect MSSQL pool for autounlock cron:', err);
+    throw err;
+  }
+}
 
 async function autoUnlockUsers() {
   if (running) {
@@ -24,18 +35,6 @@ async function autoUnlockUsers() {
   const thresholdDateOnly = thresholdIso.slice(0, 10);
   const useDateCompare = asBool(process.env.LOCKEDDATE_IS_DATE);
 
-  // Basic sanity checks: URL + some key present
-  if (!process.env.SUPABASE_URL || !/^https?:\/\//i.test(process.env.SUPABASE_URL)) {
-    console.error('[autoUnlockUsers] Invalid SUPABASE_URL:', process.env.SUPABASE_URL);
-    running = false;
-    return;
-  }
-  if (!process.env.SUPABASE_SERVICE_ROLE_KEY && !process.env.SUPABASE_KEY) {
-    console.error('[autoUnlockUsers] Missing Supabase key env (prefer SUPABASE_SERVICE_ROLE_KEY).');
-    running = false;
-    return;
-  }
-
   const ctx = {
     function: 'autoUnlockUsers',
     threshold: useDateCompare ? thresholdDateOnly : thresholdIso,
@@ -45,38 +44,58 @@ async function autoUnlockUsers() {
 
   try {
     // 1) Who is currently eligible to unlock?
-    const { data: lockedUsers } = await supabase
-      .from('users')
-      .select('id,email,lockeddate,userlocked')
-      .eq('userlocked', 'Y')
-      .lte('lockeddate', useDateCompare ? thresholdDateOnly : thresholdIso)
-      .throwOnError();
+    let query = `
+      SELECT UserId, Email, LockedDate, UserLocked
+      FROM users
+      WHERE UserLocked = 'Y'
+    `;
+    const parameters = [];
 
+    if (useDateCompare) {
+      query += ' AND CAST(LockedDate AS DATE) <= @threshold';
+      parameters.push({ name: 'threshold', type: sql.Date, value: thresholdDateOnly });
+    } else {
+      query += ' AND LockedDate <= @threshold';
+      parameters.push({ name: 'threshold', type: sql.DateTime, value: thresholdIso });
+    }
+
+    const lockedUsersResult = await pool.request();
+    parameters.forEach(param => lockedUsersResult.input(param.name, param.type, param.value));
+    const lockedUsersData = await lockedUsersResult.query(query);
+
+    const lockedUsers = lockedUsersData.recordset;
     if (!lockedUsers || lockedUsers.length === 0) {
       console.info(`[autoUnlockUsers] No locked users <= ${ctx.threshold} (${ctx.compareMode}).`);
       return;
     }
 
     // 2) Bulk update
-    const { data: updated } = await supabase
-      .from('users')
-      .update({ userlocked: 'N', lockeddate: null, invalidattempt: 0 })
-      .eq('userlocked', 'Y')
-      .lte('lockeddate', useDateCompare ? thresholdDateOnly : thresholdIso)
-      .select('id,email')
-      .throwOnError();
-
-    const updatedCount = updated?.length || 0;
-    const candidateCount = lockedUsers.length;
-
-    console.info(
-      `[autoUnlockUsers] Unlocked ${updatedCount} of ${candidateCount} eligible users (<= ${ctx.threshold}, ${ctx.compareMode}).`
-    );
+    const updateQuery = `
+      UPDATE users
+      SET UserLocked = 'N', LockedDate = NULL, InvalidAttempt = 0
+      OUTPUT INSERTED.UserId, INSERTED.Email
+      WHERE UserLocked = 'Y'
+    `;
+    if (useDateCompare) {
+      updateQuery += ` AND CAST(LockedDate AS DATE) <= @threshold`;
+      const updateRequest = pool.request().input('threshold', sql.Date, thresholdDateOnly);
+      const updatedData = await updateRequest.query(updateQuery);
+      const updated = updatedData.recordset;
+      const updatedCount = updated.length;
+      console.info(`[autoUnlockUsers] Unlocked ${updatedCount} of ${lockedUsers.length} eligible users (<= ${ctx.threshold}, ${ctx.compareMode}).`);
+    } else {
+      updateQuery += ` AND LockedDate <= @threshold`;
+      const updateRequest = pool.request().input('threshold', sql.DateTime, thresholdIso);
+      const updatedData = await updateRequest.query(updateQuery);
+      const updated = updatedData.recordset;
+      const updatedCount = updated.length;
+      console.info(`[autoUnlockUsers] Unlocked ${updatedCount} of ${lockedUsers.length} eligible users (<= ${ctx.threshold}, ${ctx.compareMode}).`);
+    }
 
     if (updatedCount > 0) {
       // Keep log concise but useful
       const emails = updated
-        .map((u) => u.email)
+        .map((u) => u.Email)
         .filter(Boolean)
         .slice(0, 20); // cap to avoid huge logs
       console.info(`[autoUnlockUsers] Sample unlocked emails (${emails.length} shown):`, emails);
@@ -89,7 +108,7 @@ async function autoUnlockUsers() {
 }
 
 /**
- * Better error logger for Supabase/PostgREST/undici/Node errors.
+ * Better error logger for MSSQL errors.
  * - Preserves object fields (code, details, hint, status)
  * - Keeps a (safe) raw snapshot for debugging
  */
@@ -115,8 +134,8 @@ function logUndiciError(title, err, ctx = {}) {
     errorName: eObj.name || (err instanceof Error ? err.name : 'Error'),
     errorMessage: eObj.message || (err instanceof Error ? err.message : String(err)),
 
-    // Supabase/PostgREST fields
-    code: eObj.code || eObj.status || '',
+    // MSSQL fields
+    code: eObj.code || eObj.number || '',
     details: eObj.details || '',
     hint: eObj.hint || '',
     statusText: eObj.statusText || '',
@@ -130,7 +149,6 @@ function logUndiciError(title, err, ctx = {}) {
     stack: (err instanceof Error && err.stack) ? err.stack : undefined,
 
     // Safe env context
-    supabaseUrl: process.env.SUPABASE_URL,
     nodeEnv: process.env.NODE_ENV,
 
     // Raw snapshot (safe-stringified)
@@ -144,6 +162,15 @@ function logUndiciError(title, err, ctx = {}) {
 }
 
 // Export: schedule every minute (Asia/Kolkata)
-module.exports = () => {
+module.exports = async () => {
+  try {
+    await initPool();
+  } catch (err) {
+    console.error('Failed to initialize pool for autounlock cron:', err);
+    return;
+  }
+
   cron.schedule('* * * * *', autoUnlockUsers, { timezone: 'Asia/Kolkata' });
+
+  console.log('Auto unlock scheduler started');
 };

@@ -1,6 +1,7 @@
 const cron = require("node-cron");
-const supabase = require("../config/supabaseClient");
+const sql = require('mssql');
 const nodemailer = require("nodemailer");
+const sqlConfig = require("../config/db");
 
 const cartItemTemplate = `
 <tr>
@@ -22,104 +23,103 @@ const cartItemTemplate = `
 `;
 
 let running = false;
+let pool;
 
-async function sendCartReminderEmails(req, res) {
+async function initPool() {
+  try {
+    pool = await sql.connect(sqlConfig);
+    console.log('MSSQL pool connected for cron');
+  } catch (err) {
+    console.error('Failed to connect MSSQL pool for cron:', err);
+    throw err;
+  }
+}
+
+async function sendCartReminderEmails() {
   const startTs = new Date().toISOString();
   try {
-    const { data: moduleData, error: moduleError } = await supabase
-      .from("module")
-      .select("maildescription,mailsubject")
-      .eq("mailtype", "cart_reminder_email")
-      .single();
+    const moduleResult = await pool.request()
+      .input('mailtype', sql.NVarChar, 'cart_reminder_email')
+      .query('SELECT maildescription, mailsubject FROM module WHERE mailtype = @mailtype');
 
-    if (moduleError || !moduleData) {
-      throw new Error(
-        "Template not found: " + (moduleError?.message || "No data")
-      );
+    const moduleData = moduleResult.recordset[0];
+    if (!moduleData) {
+      throw new Error('Template not found');
     }
 
     const mainTemplate = moduleData.maildescription;
-    const mailsubject = moduleData.mailsubject || "Your Cart is Waiting!";
+    const mailsubject = moduleData.mailsubject || 'Your Cart is Waiting!';
 
     // Fetch cart data
-    const { data: cartData, error: cartError } = await supabase
-      .from("carts")
-      .select("user_id, product_id, quantity");
-
-    if (cartError) {
-      throw new Error("Error fetching cart data: " + cartError.message);
-    }
+    const cartResult = await pool.request().query('SELECT UserId, ProductId, Quantity FROM carts');
+    const cartData = cartResult.recordset;
 
     // Fetch all users
-    const { data: usersData, error: usersError } = await supabase
-      .from("users")
-      .select("id, email, full_name");
-
-    if (usersError) {
-      throw new Error("Error fetching users data: " + usersError.message);
-    }
+    const usersResult = await pool.request().query('SELECT UserId, Email, FullName FROM users');
+    const usersData = usersResult.recordset;
 
     // Fetch all products with images
-    const { data: productsData, error: productsError } = await supabase.from(
-      "products"
-    ).select(`
-        id,
-        name,
-        price,
-        discountprice,
-        shortdescription,
-        product_images(image_url, is_hero)
-      `);
-
-    if (productsError) {
-      throw new Error("Error fetching products data: " + productsError.message);
-    }
+    const productsResult = await pool.request().query(`
+      SELECT 
+        p.ProductId, p.Name, p.Price, p.DiscountPrice, p.ShortDescription,
+        pi.image_url, pi.is_hero
+      FROM products p
+      LEFT JOIN product_images pi ON p.ProductId = pi.product_id
+    `);
+    const productsData = productsResult.recordset;
 
     // Create a map for users and products for quick lookup
     const usersMap = {};
     usersData.forEach((user) => {
-      usersMap[user.id] = {
-        email: user.email,
-        full_name: user.full_name || "Customer",
+      usersMap[user.UserId] = {
+        email: user.Email,
+        fullName: user.FullName || 'Customer',
       };
     });
 
     const productsMap = {};
     productsData.forEach((product) => {
-      productsMap[product.id] = product;
+      if (!productsMap[product.ProductId]) {
+        productsMap[product.ProductId] = {
+          ...product,
+          product_images: [],
+        };
+      }
+      if (product.image_url) {
+        productsMap[product.ProductId].product_images.push({
+          image_url: product.image_url,
+          is_hero: product.is_hero === 'Y' ? true : false,
+        });
+      }
     });
 
     // Organize cart data by user
     const userCarts = {};
     cartData.forEach((item) => {
-      const userId = item.user_id;
+      const userId = item.UserId;
       if (!usersMap[userId]) {
-        console.warn(
-          `[sendCartReminderMail] Skipping cart for user ${userId}: No user found`
-        );
+        console.warn(`[sendCartReminderMail] Skipping cart for user ${userId}: No user found`);
         return;
       }
       if (!userCarts[userId]) {
         userCarts[userId] = {
           email: usersMap[userId].email,
-          fullName: usersMap[userId].full_name,
+          fullName: usersMap[userId].fullName,
           items: [],
         };
       }
-      if (productsMap[item.product_id]) {
+      if (productsMap[item.ProductId]) {
         userCarts[userId].items.push({
           ...item,
-          products: productsMap[item.product_id],
+          products: productsMap[item.ProductId],
         });
       } else {
-        console.warn(
-          `[sendCartReminderMail] Skipping product ${item.product_id} for user ${userId}: No product found`
-        );
+        console.warn(`[sendCartReminderMail] Skipping product ${item.ProductId} for user ${userId}: No product found`);
       }
     });
 
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
+    const transporter = nodemailer.createTransporter({
+      service: 'gmail',
       auth: {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
@@ -130,118 +130,101 @@ async function sendCartReminderEmails(req, res) {
     await new Promise((resolve, reject) => {
       transporter.verify((error, success) => {
         if (error) {
-          console.error("Transporter error:", error);
-          reject(
-            new Error("Email transporter verification failed: " + error.message)
-          );
+          console.error('Transporter error:', error);
+          reject(new Error('Email transporter verification failed: ' + error.message));
         } else {
-          console.log("Transporter is ready");
+          console.log('Transporter is ready');
           resolve();
         }
       });
     });
 
-    const emailPromises = Object.entries(userCarts).map(
-      async ([userId, { email, fullName, items }]) => {
-        if (!email) {
-          console.warn(
-            `[sendCartReminderMail] Skipping user ${userId}: No email found`
-          );
-          return;
-        }
-
-        let cartItemsHtml = "";
-        items.forEach((item) => {
-          const product = item.products;
-          if (!product) return;
-          const escapedName = product.name ? product.name.replace(/['"]/g, '&quot;') : 'Unknown Product';
-          const salePrice =
-            product.discountprice && product.discountprice < product.price
-              ? (product.price - product.discountprice).toFixed(2)
-              : product.price.toFixed(2);
-          const imageUrl =
-            product.product_images?.find((img) => img.is_hero)?.image_url ||
-            "https://via.placeholder.com/220";
-          const description =
-            product.shortdescription || "No description available";
-
-          const itemHtml = cartItemTemplate
-            .replace(/{{image_url}}/g, imageUrl)
-            .replace(/{{productName}}/g, escapedName) // Use regex with global flag
-            .replace(/{{description}}/g, description.replace(/['"]/g, "&quot;"))
-            .replace(/{{price}}/g, salePrice);
-
-          cartItemsHtml += itemHtml;
-        });
-
-        if (!cartItemsHtml) {
-          console.warn(
-            `[sendCartReminderMail] Skipping user ${userId}: No valid cart items`
-          );
-          return;
-        }
-
-        const emailHtml = mainTemplate.replace("{{cartItems}}", cartItemsHtml);
-        const plainTextContent = emailHtml
-          .replace(/<[^>]+>/g, "")
-          .replace(/\s+/g, " ")
-          .trim();
-
-        return transporter
-          .sendMail({
-            from: process.env.EMAIL_USER,
-            to: email,
-            subject: mailsubject,
-            html: emailHtml,
-            text: plainTextContent,
-          })
-          .then(() =>
-            console.log(`[sendCartReminderMail] Email sent to ${email}`)
-          );
+    const emailPromises = Object.entries(userCarts).map(async ([userId, { email, fullName, items }]) => {
+      if (!email) {
+        console.warn(`[sendCartReminderMail] Skipping user ${userId}: No email found`);
+        return;
       }
-    );
+
+      let cartItemsHtml = '';
+      items.forEach((item) => {
+        const product = item.products;
+        if (!product) return;
+        const escapedName = product.Name ? product.Name.replace(/['"]/g, '&quot;') : 'Unknown Product';
+        const salePrice = product.DiscountPrice && product.DiscountPrice < product.Price
+          ? (product.Price - product.DiscountPrice).toFixed(2)
+          : product.Price.toFixed(2);
+        const imageUrl = product.product_images?.find((img) => img.is_hero)?.image_url
+          || 'https://via.placeholder.com/220';
+        const description = product.ShortDescription || 'No description available';
+
+        const itemHtml = cartItemTemplate
+          .replace(/{{image_url}}/g, imageUrl)
+          .replace(/{{productName}}/g, escapedName)
+          .replace(/{{description}}/g, description.replace(/['"]/g, '&quot;'))
+          .replace(/{{price}}/g, salePrice);
+
+        cartItemsHtml += itemHtml;
+      });
+
+      if (!cartItemsHtml) {
+        console.warn(`[sendCartReminderMail] Skipping user ${userId}: No valid cart items`);
+        return;
+      }
+
+      const emailHtml = mainTemplate.replace('{{cartItems}}', cartItemsHtml);
+      const plainTextContent = emailHtml
+        .replace(/<[^>]+>/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      return transporter
+        .sendMail({
+          from: process.env.EMAIL_USER,
+          to: email,
+          subject: mailsubject,
+          html: emailHtml,
+          text: plainTextContent,
+        })
+        .then(() => console.log(`[sendCartReminderMail] Email sent to ${email}`));
+    });
 
     await Promise.all(emailPromises);
 
-    const message = `Cart reminder emails sent to ${
-      Object.keys(userCarts).length
-    } user(s)`;
+    const message = `Cart reminder emails sent to ${Object.keys(userCarts).length} user(s)`;
     console.log(`[Cron] ${message}`);
     return { status: 200, message };
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error:', error);
     return { status: 500, error: error.message };
   }
 }
 
-module.exports = () => {
+module.exports = async () => {
+  try {
+    await initPool();
+  } catch (err) {
+    console.error('Failed to initialize pool for cron:', err);
+    return;
+  }
+
   cron.schedule(
-    "0 8 */3 * *",
+    '0 8 */3 * *',
     async () => {
       if (running) {
-        console.warn(
-          "[sendCartReminderMail] Previous run still in progress, skipping."
-        );
+        console.warn('[sendCartReminderMail] Previous run still in progress, skipping.');
         return;
       }
       running = true;
       try {
-        await sendCartReminderEmails(
-          {},
-          {
-            status: () => ({
-              json: (data) => console.log("[Cron] " + data.message),
-            }),
-          }
-        );
+        await sendCartReminderEmails();
       } catch (err) {
-        console.error("[Cron] Error in scheduled task:", err);
+        console.error('[Cron] Error in scheduled task:', err);
       } finally {
         running = false;
       }
     },
-    { timezone: "Asia/Kolkata" }
+    { timezone: 'Asia/Kolkata' }
   );
 
-  console.log("Cart reminder scheduler started");
+  console.log('Cart reminder scheduler started');
 };
