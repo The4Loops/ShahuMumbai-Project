@@ -90,17 +90,17 @@ const Blog = () => {
   const filteredBlogs = blogs
     .filter(
       (blog) =>
-        (blog.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          blog.tags.some((tag) =>
+        (blog.Title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          blog.Tags.some((tag) =>
             tag.toLowerCase().includes(searchTerm.toLowerCase())
           ) ||
-          blog.excerpt.toLowerCase().includes(searchTerm.toLowerCase())) &&
-        (categoryFilter ? blog.category === categoryFilter : true)
+          blog.Excerpt.toLowerCase().includes(searchTerm.toLowerCase())) &&
+        (categoryFilter ? blog.Category === categoryFilter : true)
     )
     .sort((a, b) =>
       sortOrder === "Newest First"
-        ? new Date(b.publish_at) - new Date(a.publish_at)
-        : new Date(a.publish_at) - new Date(b.publish_at)
+        ? new Date(b.PublishAt) - new Date(a.PublishAt)
+        : new Date(a.PublishAt) - new Date(b.PublishAt)
     );
 
   const handleLike = async (blogId) => {
@@ -133,7 +133,7 @@ const Blog = () => {
   };
 
   const getShareUrls = (blog) => {
-    const url = `${window.location.origin}/blogs/${blog.id}`;
+    const url = `${window.location.origin}/blogs/${blog.BlogId}`;
     return {
       twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(blog.title)}`,
       facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
@@ -158,14 +158,14 @@ const Blog = () => {
       "Stories & insights on heritage fashion, sustainable luxury, and the artisans behind every piece.",
     blogPost: filteredBlogs.slice(0, 10).map((b, idx) => ({
       "@type": "BlogPosting",
-      "@id": `${baseUrl}/blogs/${b.id}`,
-      headline: b.title,
-      image: b.cover_image ? [b.cover_image] : undefined,
-      datePublished: b.publish_at || b.created_at,
-      dateModified: b.updated_at || b.publish_at || b.created_at,
-      author: b.author ? { "@type": "Person", name: b.author } : undefined,
-      description: b.excerpt,
-      mainEntityOfPage: `${baseUrl}/blogs/${b.id}`,
+      "@id": `${baseUrl}/blogs/${b.BlogId}`,
+      headline: b.Title,
+      image: b.CoverImage ? [b.CoverImage] : undefined,
+      datePublished: b.PublishAt || b.CreatedAt,
+      dateModified: b.UpdatedAt || b.PublishAt || b.CreatedAt,
+      author: b.Author ? { "@type": "Person", name: b.Author } : undefined,
+      description: b.Excerpt,
+      mainEntityOfPage: `${baseUrl}/blogs/${b.BlogId}`,
       position: idx + 1,
     })),
   };
@@ -176,8 +176,8 @@ const Blog = () => {
     itemListElement: filteredBlogs.slice(0, 10).map((b, i) => ({
       "@type": "ListItem",
       position: i + 1,
-      url: `${baseUrl}/blogs/${b.id}`,
-      name: b.title,
+      url: `${baseUrl}/blogs/${b.BlogId}`,
+      name: b.Title,
     })),
   };
 
@@ -314,11 +314,11 @@ const Blog = () => {
         ) : (
           filteredBlogs.map((blog) => {
             const shareUrls = getShareUrls(blog);
-            const isLiked = likedBlogs.includes(blog.id);
+            const isLiked = likedBlogs.includes(blog.BlogId);
 
             return (
               <motion.div
-                key={blog.id}
+                key={blog.BlogId}
                 initial={{ opacity: 0, scale: 0.97 }}
                 whileInView={{ opacity: 1, scale: 1 }}
                 viewport={{ once: true }}
@@ -326,10 +326,10 @@ const Blog = () => {
                 className="bg-white rounded-lg shadow overflow-hidden hover:shadow-lg transition-shadow duration-300 mb-8"
               >
                 <div className="h-60">
-                  {blog.cover_image ? (
+                  {blog.CoverImage ? (
                     <img
-                      src={blog.cover_image}
-                      alt={blog.title}
+                      src={blog.CoverImage}
+                      alt={blog.Title}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -338,12 +338,12 @@ const Blog = () => {
                 </div>
                 <div className="p-6">
                   <h2 className="text-2xl font-semibold mb-2 text-[#5d4037]">
-                    {blog.title}
+                    {blog.Title}
                   </h2>
                   <div className="flex flex-wrap items-center text-sm text-gray-500 gap-2 mb-4">
-                    <span>{blog.category}</span>
+                    <span>{blog.Category}</span>
                     <span>•</span>
-                    <span>{new Date(blog.created_at).toLocaleDateString()}</span>
+                    <span>{new Date(blog.CreatedAt).toLocaleDateString()}</span>
                     <span>•</span>
                     <span>8 min read</span>
                   </div>
@@ -357,9 +357,9 @@ const Blog = () => {
                       </span>
                     ))}
                   </div>
-                  <p className="text-gray-700 mb-4">{blog.excerpt}</p>
+                  <p className="text-gray-700 mb-4">{blog.Excerpt}</p>
                   <Link
-                    to={`/blogs/${blog.id}`}
+                    to={`/blogs/${blog.BlogId}`}
                     state={{ blog }}
                     className="text-[#6d4c41] hover:underline"
                   >
@@ -369,18 +369,18 @@ const Blog = () => {
                   {/* Blog footer */}
                   <div className="flex items-center gap-6 mt-4 text-gray-500 text-sm">
                     <div className="flex items-center gap-1">
-                      <FaEye /> {blog.views || 0}
+                      <FaEye /> {blog.Views || 0}
                     </div>
                     <div
                       className="flex items-center gap-1 cursor-pointer"
-                      onClick={() => handleLike(blog.id)}
+                      onClick={() => handleLike(blog.BlogId)}
                     >
                       {isLiked ? (
                         <FaHeart className="text-red-500" />
                       ) : (
                         <FaRegHeart className="text-gray-500" />
                       )}
-                      {blog.likes || 0}
+                      {blog.Likes || 0}
                     </div>
                     <div className="flex items-center gap-2">
                       <a href={shareUrls.twitter} target="_blank" rel="noopener noreferrer">

@@ -10,7 +10,7 @@ router.put('/blogs/:id', blogController.createOrUpdateBlog);
 router.patch('/blogs/:id/reset', blogController.resetBlog);
 
 // Get one 
-router.get('/blogs/:id', blogController.getBlogById);
+router.get('/admin/blogs/:id', blogController.getBlogById);
 
 // Drafts
 router.get('/blogs/drafts', blogController.getUserDrafts);
@@ -19,7 +19,7 @@ router.get('/blogs/drafts', blogController.getUserDrafts);
 router.get('/blogs', blogController.getAllBlogs);
 
 // Likes & views
-router.get('/blogs/likes', blogController.getUserLikes);
+router.get('/user/likes', blogController.getUserLikes);
 router.post('/blogs/:id/like', blogController.incrementLikes);
 router.post('/blogs/:id/view', blogController.incrementViews);
 

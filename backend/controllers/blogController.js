@@ -34,8 +34,6 @@ function buildReviewTree(reviews) {
   return roots;
 }
 
-const uuidRegex = /^[0-9a-fA-F-]{36}$/;
-
 // POST /api/blogs           (create)
 // PUT  /api/blogs/:id       (update)
 exports.createOrUpdateBlog = async (req, res) => {
@@ -82,9 +80,6 @@ exports.createOrUpdateBlog = async (req, res) => {
     }
 
     const hasId = Boolean(req.params?.id);
-    if (hasId && !uuidRegex.test(req.params.id)) {
-      return res.status(400).json({ error: 'Invalid UUID format' });
-    }
 
     if (hasId) {
       
@@ -104,12 +99,12 @@ exports.createOrUpdateBlog = async (req, res) => {
         .input('UpdatedAt', sql.DateTime2, blogData.updated_at)
         .query(`
           UPDATE dbo.blogs
-          SET title=@Title, slug=@Slug, cover_image=@CoverImage, category=@Category,
+          SET title=@Title, slug=@Slug, CoverImage=@CoverImage, category=@Category,
               excerpt=@Excerpt, tags=@Tags, content=@Content, status=@Status,
-              publish_at=@PublishAt, meta_title=@MetaTitle, meta_description=@MetaDesc,
-              updated_at=@UpdatedAt
+              PublishAt=@PublishAt, MetaTitle=@MetaTitle, MetaDescription=@MetaDesc,
+              UpdatedAt=@UpdatedAt
           OUTPUT INSERTED.*
-          WHERE id=@Id AND is_active=1
+          WHERE BlogId=@Id AND IsActive='Y'
         `);
 
       const data = r.recordset?.[0];
@@ -131,13 +126,13 @@ exports.createOrUpdateBlog = async (req, res) => {
         .input('PublishAt', sql.DateTime2, blogData.publish_at)
         .input('MetaTitle', sql.NVarChar(255), blogData.meta_title)
         .input('MetaDesc', sql.NVarChar(500), blogData.meta_description)
-        .input('IsActive', sql.Bit, 1)
+        .input('IsActive', sql.Char(1), 'Y')
         .input('CreatedAt', sql.DateTime2, now())
         .input('UpdatedAt', sql.DateTime2, now())
         .query(`
           INSERT INTO dbo.blogs
-            (id, title, slug, cover_image, category, excerpt, tags, content, status,
-             publish_at, meta_title, meta_description, is_active, created_at, updated_at)
+            (id, title, slug, coverimage, category, excerpt, tags, content, status,
+             Publishat, MetaTitle, MetaDescription, IsActive, CreatedAt, UpdatedAt)
           OUTPUT INSERTED.*
           VALUES
             (@Id, @Title, @Slug, @CoverImage, @Category, @Excerpt, @Tags, @Content, @Status,
@@ -158,7 +153,6 @@ exports.resetBlog = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: 'Blog ID is required' });
-    if (!uuidRegex.test(id)) return res.status(400).json({ error: 'Invalid UUID format' });
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.status(200).json({ message: 'Draft reset successfully' });
@@ -169,9 +163,9 @@ exports.resetBlog = async (req, res) => {
       .input('UpdatedAt', sql.DateTime2, now())
       .query(`
         UPDATE dbo.blogs
-        SET is_active=0, updated_at=@UpdatedAt
+        SET IsActive='Y', updated_at=@UpdatedAt
         OUTPUT INSERTED.id
-        WHERE id=@Id AND status='DRAFT' AND is_active=1
+        WHERE id=@Id AND status='DRAFT' AND is_active='Y'
       `);
 
     if (!r.recordset?.[0]) return res.status(404).json({ error: 'Draft blog not found' });
@@ -187,7 +181,6 @@ exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
     if (!id) return res.status(400).json({ error: 'Blog ID is required' });
-    if (!uuidRegex.test(id)) return res.status(400).json({ error: 'Invalid UUID format' });
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.status(200).json({
@@ -202,16 +195,112 @@ exports.getBlogById = async (req, res) => {
         is_active: true,
         created_at: now(),
         updated_at: now(),
+        reviews: [
+          {
+            BlogReviewId: 1,
+            BlogId: id,
+            ParentId: null,
+            UserId: 1,
+            Name: 'John',
+            CreatedAt: new Date().toISOString(),
+            Text: 'Amazing insights!',
+            Stars: 5,
+            replies: [
+              {
+                BlogReviewId: 11,
+                BlogId: id,
+                ParentId: 1,
+                UserId: 2,
+                Name: 'Alice',
+                CreatedAt: new Date().toISOString(),
+                Text: 'Totally agree!',
+                Stars: null,
+                replies: [
+                  {
+                    BlogReviewId: 111,
+                    BlogId: id,
+                    ParentId: 11,
+                    UserId: 3,
+                    Name: 'Mike',
+                    CreatedAt: new Date().toISOString(),
+                    Text: 'Same here!',
+                    Stars: null,
+                    replies: [],
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            BlogReviewId: 2,
+            BlogId: id,
+            ParentId: null,
+            UserId: 4,
+            Name: 'Sarah',
+            CreatedAt: new Date().toISOString(),
+            Text: 'Great read but needs more examples.',
+            Stars: 4,
+            replies: [],
+          },
+        ],
       });
     }
 
-    const r = await req.dbPool.request()
+    const blogQuery = await req.dbPool.request()
       .input('Id', sql.NVarChar(36), id)
-      .query(`SELECT * FROM dbo.blogs WHERE id=@Id AND is_active=1`);
+      .query(`SELECT * FROM dbo.blogs WHERE BlogId=@Id AND IsActive='Y'`);
 
-    const data = r.recordset?.[0];
-    if (!data) return res.status(404).json({ error: 'Blog not found or not active' });
-    res.status(200).json(data);
+    const blogData = blogQuery.recordset?.[0];
+    if (!blogData) return res.status(404).json({ error: 'Blog not found or not active' });
+
+    const reviewsQuery = await req.dbPool.request()
+      .input('BlogId', sql.NVarChar(36), id)
+      .query(`SELECT * FROM dbo.blogreviews WHERE BlogId=@BlogId ORDER BY CreatedAt ASC`);
+
+    const allReviews = reviewsQuery.recordset || [];
+    const reviewMap = new Map();
+    const topLevelReviews = [];
+
+    allReviews.forEach(review => {
+      review.replies = [];
+      reviewMap.set(review.BlogReviewId, review);
+    });
+
+    allReviews.forEach(review => {
+      if (review.ParentId) {
+        const parent = reviewMap.get(review.ParentId);
+        if (parent) {
+          parent.replies.push(review);
+        }
+      } else {
+        topLevelReviews.push(review);
+      }
+    });
+
+    topLevelReviews.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt));
+
+    topLevelReviews.forEach(review => {
+      if (review.replies.length > 0) {
+        review.replies.sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+        // Recursively sort nested replies
+        const sortReplies = (replies) => {
+          replies.forEach(r => {
+            if (r.replies.length > 0) {
+              r.replies.sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+              sortReplies(r.replies);
+            }
+          });
+        };
+        sortReplies(review.replies);
+      }
+    });
+
+    const responseData = {
+      ...blogData,
+      reviews: topLevelReviews,
+    };
+
+    res.status(200).json(responseData);
   } catch (err) {
     console.error('Error in getBlogById:', err);
     res.status(500).json({ error: err.message });
@@ -234,8 +323,8 @@ exports.getUserDrafts = async (_req, res) => {
 
     const r = await _req.dbPool.request().query(`
       SELECT * FROM dbo.blogs
-      WHERE status='DRAFT' AND is_active=1
-      ORDER BY updated_at DESC
+      WHERE status='DRAFT' AND is_active='Y'
+      ORDER BY UpdatedAt DESC
     `);
 
     res.status(200).json(r.recordset || []);
@@ -272,8 +361,8 @@ exports.getAllBlogs = async (req, res) => {
 
     const blogsRes = await req.dbPool.request().query(`
       SELECT * FROM dbo.blogs
-      WHERE status='PUBLISHED' AND is_active=1
-      ORDER BY publish_at DESC
+      WHERE status='PUBLISHED' AND isActive='Y'
+      ORDER BY PublishAt DESC
     `);
 
     const blogs = blogsRes.recordset || [];
@@ -286,10 +375,10 @@ exports.getAllBlogs = async (req, res) => {
     blogIds.forEach((id, i) => rReq.input(`B${i}`, sql.NVarChar(36), id));
 
     const reviewsRes = await rReq.query(`
-      SELECT id, blog_id, parent_id, user_id, name, created_at, text, stars
-      FROM dbo.blogreviews
-      WHERE blog_id IN (${inList})
-      ORDER BY created_at ASC
+      SELECT BlogReviewId AS id, BlogId AS blog_id,ParentId AS parent_id,UserId AS user_id, name,CreatedAt AS created_at, text, stars
+      FROM dbo.BlogReviews
+      WHERE BlogId IN (${inList})
+      ORDER BY CreatedAt ASC
     `);
 
     const allReviews = reviewsRes.recordset || [];
@@ -322,9 +411,9 @@ exports.getUserLikes = async (req, res) => {
     const r = await req.dbPool.request()
       .input('UserId', sql.NVarChar(128), String(user_id))
       .query(`
-        SELECT blog_id
-        FROM dbo.user_interactions
-        WHERE user_id=@UserId AND action_type='LIKE'
+        SELECT BlogId AS blog_id
+        FROM dbo.UserInteractions
+        WHERE UserId=@UserId AND ActionType='LIKE'
       `);
 
     const likedBlogIds = (r.recordset || []).map(x => x.blog_id);
@@ -340,14 +429,12 @@ exports.addReview = async (req, res) => {
   const { id } = req.params;
   const { user_id, name, text, stars } = req.body || {};
   try {
-    if (!uuidRegex.test(id)) return res.status(400).json({ message: 'Invalid blog id' });
     if (!user_id || !name || !text || stars < 1 || stars > 5) {
       return res.status(400).json({ message: 'Invalid review data' });
     }
 
     if (!dbReady(req) && devFakeAllowed()) {
       const created = {
-        id: crypto.randomUUID(),
         blog_id: id,
         parent_id: null,
         user_id, name, text, stars,
@@ -359,7 +446,6 @@ exports.addReview = async (req, res) => {
     }
 
     const r = await req.dbPool.request()
-      .input('Id', sql.NVarChar(36), crypto.randomUUID())
       .input('BlogId', sql.NVarChar(36), id)
       .input('ParentId', sql.NVarChar(36), null)
       .input('UserId', sql.NVarChar(128), String(user_id))
@@ -368,13 +454,13 @@ exports.addReview = async (req, res) => {
       .input('Stars', sql.Int, stars)
       .input('CreatedAt', sql.DateTime2, now())
       .query(`
-        INSERT INTO dbo.blogreviews (id, blog_id, parent_id, user_id, name, text, stars, created_at)
+        INSERT INTO dbo.blogreviews (BlogId, ParentId, UserId, name, text, stars, CreatedAt)
         OUTPUT INSERTED.*
-        VALUES (@Id, @BlogId, @ParentId, @UserId, @Name, @Text, @Stars, @CreatedAt)
+        VALUES (@BlogId, @ParentId, @UserId, @Name, @Text, @Stars, @CreatedAt)
       `);
 
     const data = r.recordset?.[0];
-    data.date = new Date(data.created_at).toLocaleDateString();
+    data.date = new Date(data.CreatedAt).toLocaleDateString();
     data.replies = [];
     res.status(200).json(data);
   } catch (error) {
@@ -389,16 +475,12 @@ exports.addReply = async (req, res) => {
   const { user_id, name, text } = req.body || {};
 
   try {
-    if (!uuidRegex.test(id) || !uuidRegex.test(reviewId)) {
-      return res.status(400).json({ message: 'Invalid id format' });
-    }
     if (!user_id || !name || !text) {
       return res.status(400).json({ message: 'Invalid reply data' });
     }
 
     if (!dbReady(req) && devFakeAllowed()) {
       const data = {
-        id: crypto.randomUUID(),
         blog_id: id,
         parent_id: reviewId,
         user_id, name, text,
@@ -410,7 +492,6 @@ exports.addReply = async (req, res) => {
     }
 
     const r = await req.dbPool.request()
-      .input('Id', sql.NVarChar(36), crypto.randomUUID())
       .input('BlogId', sql.NVarChar(36), id)
       .input('ParentId', sql.NVarChar(36), reviewId)
       .input('UserId', sql.NVarChar(128), String(user_id))
@@ -419,13 +500,13 @@ exports.addReply = async (req, res) => {
       .input('Stars', sql.Int, null)
       .input('CreatedAt', sql.DateTime2, now())
       .query(`
-        INSERT INTO dbo.blogreviews (id, blog_id, parent_id, user_id, name, text, stars, created_at)
+        INSERT INTO dbo.blogreviews (BlogId, ParentId, UserId, name, text, stars, CreatedAt)
         OUTPUT INSERTED.*
-        VALUES (@Id, @BlogId, @ParentId, @UserId, @Name, @Text, @Stars, @CreatedAt)
+        VALUES (@BlogId, @ParentId, @UserId, @Name, @Text, @Stars, @CreatedAt)
       `);
 
     const data = r.recordset?.[0];
-    data.date = new Date(data.created_at).toLocaleDateString();
+    data.date = new Date(data.CreatedAt).toLocaleDateString();
     res.status(200).json(data);
   } catch (error) {
     console.error('Error in addReply:', error);
@@ -451,27 +532,26 @@ exports.incrementLikes = async (req, res) => {
       .input('CreatedAt', sql.DateTime2, now());
 
     const exists = await request.query(`
-      SELECT 1 FROM dbo.user_interactions
-      WHERE blog_id=@BlogId AND user_id=@UserId AND action_type='LIKE'
+      SELECT 1 FROM dbo.UserInteractions
+      WHERE BlogId=@BlogId AND UserId=@UserId AND ActionType='LIKE'
     `);
     if (exists.recordset?.[0]) {
       return res.status(400).json({ message: 'User has already liked this blog' });
     }
 
     await req.dbPool.request()
-      .input('Id', sql.NVarChar(36), crypto.randomUUID())
       .input('BlogId', sql.NVarChar(36), id)
       .input('UserId', sql.NVarChar(128), String(user_id))
       .input('Action', sql.NVarChar(16), 'LIKE')
       .input('CreatedAt', sql.DateTime2, now())
       .query(`
-        INSERT INTO dbo.user_interactions (id, blog_id, user_id, action_type, created_at)
-        VALUES (@Id, @BlogId, @UserId, @Action, @CreatedAt)
+        INSERT INTO dbo.UserInteractions (BlogId, userId, ActionType, CreatedAt)
+        VALUES (@BlogId, @UserId, @Action, @CreatedAt)
       `);
 
     const countRes = await req.dbPool.request()
       .input('BlogId', sql.NVarChar(36), id)
-      .query(`SELECT COUNT(*) AS likes FROM dbo.user_interactions WHERE blog_id=@BlogId AND action_type='LIKE'`);
+      .query(`SELECT COUNT(*) AS likes FROM dbo.UserInteractions WHERE BlogId=@BlogId AND ActionType='LIKE'`);
 
     res.status(200).json({ likes: countRes.recordset?.[0]?.likes || 0 });
   } catch (error) {
@@ -495,26 +575,25 @@ exports.incrementViews = async (req, res) => {
       .input('BlogId', sql.NVarChar(36), id)
       .input('UserId', sql.NVarChar(128), String(user_id))
       .query(`
-        SELECT 1 FROM dbo.user_interactions
-        WHERE blog_id=@BlogId AND user_id=@UserId AND action_type='VIEW'
+        SELECT 1 FROM dbo.UserInteractions
+        WHERE BlogId=@BlogId AND UserId=@UserId AND ActionType='VIEW'
       `);
 
     if (!ex.recordset?.[0]) {
       await req.dbPool.request()
-        .input('Id', sql.NVarChar(36), crypto.randomUUID())
         .input('BlogId', sql.NVarChar(36), id)
         .input('UserId', sql.NVarChar(128), String(user_id))
         .input('Action', sql.NVarChar(16), 'VIEW')
         .input('CreatedAt', sql.DateTime2, now())
         .query(`
-          INSERT INTO dbo.user_interactions (id, blog_id, user_id, action_type, created_at)
-          VALUES (@Id, @BlogId, @UserId, @Action, @CreatedAt)
+          INSERT INTO dbo.UserInteractions (BlogId, UserId, ActionType, CreatedAt)
+          VALUES (@BlogId, @UserId, @Action, @CreatedAt)
         `);
     }
 
     const countRes = await req.dbPool.request()
       .input('BlogId', sql.NVarChar(36), id)
-      .query(`SELECT COUNT(*) AS views FROM dbo.user_interactions WHERE blog_id=@BlogId AND action_type='VIEW'`);
+      .query(`SELECT COUNT(*) AS views FROM dbo.UserInteractions WHERE BlogId=@BlogId AND ActionType='VIEW'`);
 
     res.status(200).json({ views: countRes.recordset?.[0]?.views || 0 });
   } catch (error) {

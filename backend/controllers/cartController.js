@@ -94,7 +94,6 @@ exports.getCartItems = async (req, res) => {
     if (!dbReady(req) && devFakeAllowed()) {
       return res.status(200).json([
         {
-          id: crypto.randomUUID(),
           user_id: owner,
           product_id: 1,
           quantity: 2,
@@ -123,7 +122,7 @@ exports.getCartItems = async (req, res) => {
           p.Price           AS prod_price,
           p.DiscountPrice   AS prod_discount,
           p.Stock           AS prod_stock,
-          pi.id             AS img_id,
+          pi.ProductImageId             AS img_id,
           pi.ImageUrl      AS img_url,
           pi.isHero        AS img_is_hero,
           c2.CategoryId     AS cat_id,

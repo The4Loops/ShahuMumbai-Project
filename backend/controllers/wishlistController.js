@@ -80,12 +80,12 @@ exports.getWishlist = async (req, res) => {
           p.Price AS price,
           p.DiscountPrice AS discountprice,
           p.Stock AS stock,
-          pi.image_url,
+          pi.ImageUrl AS image_url,
           c.CategoryId AS categoryid,
           c.Name AS category_name
         FROM wishlist w
         INNER JOIN products p ON w.ProductId = p.ProductId
-        LEFT JOIN product_images pi ON p.ProductId = pi.product_id AND pi.is_hero = 1
+        LEFT JOIN ProductImages pi ON p.ProductId = pi.productId AND pi.IsHero = 'Y'
         LEFT JOIN categories c ON p.CategoryId = c.CategoryId
         WHERE w.UserId = @UserId
       `);

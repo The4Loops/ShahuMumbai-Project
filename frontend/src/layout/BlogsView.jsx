@@ -5,6 +5,7 @@ import { FaEye, FaClock, FaTag, FaStar, FaReply } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../supabase/axios";
 import Layout from "../layout/Layout";
+import {jwtDecode} from 'jwt-decode';
 
 const BlogsView = () => {
   const { id } = useParams();
@@ -15,33 +16,29 @@ const BlogsView = () => {
   const [loading, setLoading] = useState(!optimisticBlog);
   const [error, setError] = useState(null);
 
-  // --- Reviews state (demo only) ---
-  const [reviews, setReviews] = useState([
-    {
-      id: 1,
-      user: "John",
-      rating: 5,
-      text: "Amazing insights!",
-      replies: [
-        {
-          id: 11,
-          user: "Alice",
-          text: "Totally agree!",
-          replies: [{ id: 111, user: "Mike", text: "Same here!", replies: [] }],
-        },
-      ],
-    },
-    {
-      id: 2,
-      user: "Sarah",
-      rating: 4,
-      text: "Great read but needs more examples.",
-      replies: [],
-    },
-  ]);
+  // --- Reviews state ---
+  const [reviews, setReviews] = useState([]);
   const [newReview, setNewReview] = useState("");
   const [replyingTo, setReplyingTo] = useState(null);
   const [newReply, setNewReply] = useState("");
+  const [user, setUser] = useState(null);
+  const [selectedStars, setSelectedStars] = useState(5);
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (token) {
+      try {
+        const payload = jwtDecode(token);
+        setUser({
+          id: payload.id || payload.sub,
+          name: payload.fullname,
+        });
+      } catch (err) {
+        console.error("Failed to decode token:", err);
+        setUser(null);
+      }
+    }
+  }, []);
 
   // fetch the blog by ID
   useEffect(() => {
@@ -52,7 +49,10 @@ const BlogsView = () => {
       try {
         setLoading(true);
         const { data } = await api.get(`/api/admin/blogs/${id}`);
-        if (!cancelled) setBlog(data);
+        if (!cancelled) {
+          setBlog(data);
+          setReviews(data.reviews || []);
+        }
       } catch (e) {
         const msg = e?.response?.data?.error || "Failed to load blog";
         if (!cancelled) {
@@ -67,6 +67,7 @@ const BlogsView = () => {
     if (!optimisticBlog || optimisticBlog.id !== id) {
       fetchBlog();
     } else {
+      setReviews(optimisticBlog.reviews || []);
       setLoading(false);
     }
 
@@ -77,75 +78,87 @@ const BlogsView = () => {
 
   // increment views
   useEffect(() => {
-    if (!blog?.id) return;
-    const user_id = localStorage.getItem("user_id");
+    if (!blog?.BlogId) return;
+    const user_id = user?.id;
     if (user_id) {
-      api.post(`/api/blogs/${blog.id}/view`, { user_id }).catch(() => {});
+      api.post(`/api/blogs/${blog.BlogId}/view`, { user_id }).catch(() => {});
     }
-  }, [blog?.id]);
+  }, [blog?.BlogId, user?.id]);
 
-  // --- Reviews helpers ---
-  const addReview = () => {
-    if (!newReview.trim()) return;
-    setReviews((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        user: "Guest",
-        rating: 5,
-        text: newReview.trim(),
-        replies: [],
-      },
-    ]);
-    setNewReview("");
+  // Fetch updated reviews
+  const fetchReviews = async () => {
+    try {
+      const { data } = await api.get(`/api/admin/blogs/${id}`);
+      setReviews(data.reviews || []);
+    } catch (e) {
+      toast.error(e?.response?.data?.error || "Failed to fetch reviews");
+    }
   };
 
-  const handleReply = (replyId) => {
-    if (!newReply.trim()) return;
+  // --- Reviews helpers ---
+  const addReview = async () => {
+    if (!newReview.trim() || !user?.id) {
+      toast.error("Please log in to add a review");
+      return;
+    }
+    try {
+      await api.post(`/api/blogs/${id}/reviews`, {
+        blogId: id,
+        user_id: user.id,
+        name: user.name,
+        text: newReview.trim(),
+        stars: selectedStars,
+      });
+      setNewReview("");
+      setSelectedStars(5);
+      await fetchReviews();
+      toast.success("Review added successfully!");
+    } catch (e) {
+      toast.error(e?.response?.data?.error || "Failed to add review");
+    }
+  };
 
-    const addReplyRecursive = (items) =>
-      items.map((item) =>
-        item.id === replyId
-          ? {
-              ...item,
-              replies: [
-                ...item.replies,
-                {
-                  id: Date.now(),
-                  user: "Guest",
-                  text: newReply.trim(),
-                  replies: [],
-                },
-              ],
-            }
-          : { ...item, replies: addReplyRecursive(item.replies) }
-      );
-
-    setReviews(addReplyRecursive(reviews));
-    setNewReply("");
-    setReplyingTo(null);
+  const handleReply = async (parentId) => {
+    if (!newReply.trim() || !user?.id) {
+      toast.error("Please log in to reply");
+      return;
+    }
+    try {
+      await api.post(`/api/blogs/${id}/reviews/${parentId}/replies`, {
+        parentId,
+        user_id: user.id,
+        name: user.name,
+        text: newReply.trim(),
+      });
+      setNewReply("");
+      setReplyingTo(null);
+      await fetchReviews();
+      toast.success("Reply added successfully!");
+    } catch (e) {
+      toast.error(e?.response?.data?.error || "Failed to add reply");
+    }
   };
 
   const renderReplies = (replies, level = 1) => (
     <div className="mt-2 space-y-2">
       {replies.map((reply) => (
         <div
-          key={reply.id}
+          key={reply.BlogReviewId}
           className="border-l-2 pl-3 border-gray-300"
           style={{ marginLeft: level * 12 }} // slightly smaller indent for mobile
         >
           <p className="text-sm">
-            <span className="font-semibold">{reply.user}:</span> {reply.text}
+            <span className="font-semibold">{reply.Name}:</span> {reply.Text}
           </p>
 
           <button
-            onClick={() => setReplyingTo(reply.id)}
+            onClick={() => setReplyingTo(reply.BlogReviewId)}
             className="text-xs text-blue-600 flex items-center gap-1 mt-1"
           >
             <FaReply /> Reply
           </button>
 
-          {replyingTo === reply.id && (
+          {replyingTo === reply.BlogReviewId && (
             <div className="mt-2 flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
@@ -155,7 +168,7 @@ const BlogsView = () => {
                 className="flex-1 border rounded px-2 py-1 text-sm"
               />
               <button
-                onClick={() => handleReply(reply.id)}
+                onClick={() => handleReply(reply.BlogReviewId)}
                 className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
               >
                 Post
@@ -163,7 +176,7 @@ const BlogsView = () => {
             </div>
           )}
 
-          {reply.replies.length > 0 && renderReplies(reply.replies, level + 1)}
+          {reply.replies && reply.replies.length > 0 && renderReplies(reply.replies, level + 1)}
         </div>
       ))}
     </div>
@@ -189,38 +202,38 @@ const BlogsView = () => {
   }
   if (!blog) return null;
 
-  const displayDate = blog.publish_at || blog.created_at;
+  const displayDate = blog.PublishAt || blog.CreatedAt;
 
   return (
     <Layout>
       <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
         {/* Cover Image */}
-        {blog.cover_image && (
+        {blog.CoverImage && (
           <img
-            src={blog.cover_image}
-            alt={blog.title}
+            src={blog.CoverImage}
+            alt={blog.Title}
             className="w-full h-48 sm:h-64 object-cover rounded-xl shadow-md"
           />
         )}
 
         {/* Title */}
-        <h1 className="text-xl sm:text-3xl font-bold mt-4">{blog.title}</h1>
+        <h1 className="text-xl sm:text-3xl font-bold mt-4">{blog.Title}</h1>
 
         {/* Meta */}
         <p className="text-xs sm:text-sm text-gray-500 flex flex-wrap gap-3 items-center mt-2">
-          <span>{blog.category}</span>
+          <span>{blog.Category}</span>
           <span className="flex items-center gap-1">
             <FaClock className="hidden sm:inline" />
             {displayDate ? new Date(displayDate).toLocaleDateString() : "—"}
           </span>
           <span className="flex items-center gap-1">
-            <FaEye className="hidden sm:inline" /> {blog.views ?? 0} views
+            <FaEye className="hidden sm:inline" /> {blog.Views ?? 0} views
           </span>
         </p>
 
         {/* Tags */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {(blog.tags || []).map((tag, i) => (
+          {JSON.parse(blog.tags || '[]').map((tag, i) => (
             <span
               key={i}
               className="text-xs bg-gray-200 px-2 py-1 rounded flex items-center gap-1"
@@ -233,7 +246,7 @@ const BlogsView = () => {
         {/* Content */}
         <div
           className="mt-6 prose prose-sm sm:prose lg:prose-lg max-w-none"
-          dangerouslySetInnerHTML={{ __html: blog.content }}
+          dangerouslySetInnerHTML={{ __html: blog.Content }}
         />
 
         {/* Reviews */}
@@ -243,27 +256,29 @@ const BlogsView = () => {
           <div className="space-y-4 mt-4">
             {reviews.map((review) => (
               <div
-                key={review.id}
+                key={review.BlogReviewId}
                 className="border p-3 sm:p-4 rounded-md bg-gray-50"
               >
-                <p className="font-semibold">{review.user}</p>
-                <p className="text-yellow-500 flex text-sm sm:text-base">
-                  {Array(review.rating)
-                    .fill(0)
-                    .map((_, i) => (
-                      <FaStar key={i} />
-                    ))}
-                </p>
-                <p className="text-sm sm:text-base">{review.text}</p>
+                <p className="font-semibold">{review.Name}</p>
+                {review.Stars && (
+                  <p className="text-yellow-500 flex text-sm sm:text-base">
+                    {Array(review.Stars)
+                      .fill(0)
+                      .map((_, i) => (
+                        <FaStar key={i} />
+                      ))}
+                  </p>
+                )}
+                <p className="text-sm sm:text-base">{review.Text}</p>
 
                 <button
-                  onClick={() => setReplyingTo(review.id)}
+                  onClick={() => setReplyingTo(review.BlogReviewId)}
                   className="text-xs sm:text-sm text-blue-600 flex items-center gap-1 mt-1"
                 >
                   <FaReply /> Reply
                 </button>
 
-                {replyingTo === review.id && (
+                {replyingTo === review.BlogReviewId && (
                   <div className="mt-2 flex flex-col sm:flex-row gap-2">
                     <input
                       type="text"
@@ -273,7 +288,7 @@ const BlogsView = () => {
                       className="flex-1 border rounded px-2 py-1 text-sm"
                     />
                     <button
-                      onClick={() => handleReply(review.id)}
+                      onClick={() => handleReply(review.BlogReviewId)}
                       className="bg-blue-600 text-white px-3 py-1 rounded text-sm"
                     >
                       Post
@@ -281,26 +296,37 @@ const BlogsView = () => {
                   </div>
                 )}
 
-                {review.replies.length > 0 && renderReplies(review.replies)}
+                {review.replies && review.replies.length > 0 && renderReplies(review.replies)}
               </div>
             ))}
           </div>
 
           {/* Add Review */}
-          <div className="mt-6 flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              value={newReview}
-              onChange={(e) => setNewReview(e.target.value)}
-              placeholder="Write a review..."
-              className="flex-1 border rounded px-3 py-2 text-sm sm:text-base"
-            />
-            <button
-              onClick={addReview}
-              className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded text-sm sm:text-base"
-            >
-              Post
-            </button>
+          <div className="mt-6">
+            <div className="flex items-center gap-1 mb-2">
+              {[...Array(5)].map((_, i) => (
+                <FaStar
+                  key={i}
+                  className={`cursor-pointer text-lg ${i < selectedStars ? 'text-yellow-500' : 'text-gray-300'}`}
+                  onClick={() => setSelectedStars(i + 1)}
+                />
+              ))}
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                type="text"
+                value={newReview}
+                onChange={(e) => setNewReview(e.target.value)}
+                placeholder="Write a review..."
+                className="flex-1 border rounded px-3 py-2 text-sm sm:text-base"
+              />
+              <button
+                onClick={addReview}
+                className="bg-green-600 text-white px-3 sm:px-4 py-2 rounded text-sm sm:text-base"
+              >
+                Post
+              </button>
+            </div>
           </div>
         </div>
       </div>
