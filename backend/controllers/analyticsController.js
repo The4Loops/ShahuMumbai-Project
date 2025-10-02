@@ -44,7 +44,7 @@ exports.trackEvent = async (req, res) => {
       .input('ip', sql.NVarChar(64), ip)
       .query(`
         INSERT INTO analytics_events
-          (name, anon_id, user_id, url, referrer, utm, props, user_agent, ip, occurred_at)
+          (name, AnonId, UserId, url, referrer, utm, props, UserAgent, ip, OccurredAt)
         VALUES
           (@name, @anon_id, @user_id, @url, @referrer, @utm, @props, @user_agent, @ip, SYSUTCDATETIME());
       `);
@@ -72,20 +72,20 @@ exports.getSummary = async (req, res) => {
     if (p_to)   kpiReq.input('to', sql.DateTime2, new Date(p_to));
 
     const where = [];
-    if (p_from) where.push('occurred_at >= @from');
-    if (p_to)   where.push('occurred_at <= @to');
+    if (p_from) where.push('OccurredAt >= @from');
+    if (p_to)   where.push('OccurredAt <= @to');
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const kpiSql = `
       ;WITH base AS (
-        SELECT name, anon_id, user_id
-        FROM analytics_events
+        SELECT name, AnonId, UserId
+        FROM AnalyticsEvent
         ${whereSql}
       )
       SELECT
         (SELECT COUNT(*) FROM base) AS total_events,
-        (SELECT COUNT(DISTINCT anon_id) FROM base WHERE anon_id IS NOT NULL) AS unique_sessions,
-        (SELECT COUNT(DISTINCT user_id) FROM base WHERE user_id IS NOT NULL)  AS unique_users,
+        (SELECT COUNT(DISTINCT AnonId) FROM base WHERE AnonId IS NOT NULL) AS unique_sessions,
+        (SELECT COUNT(DISTINCT UserId) FROM base WHERE UserId IS NOT NULL)  AS unique_users,
         (SELECT COUNT(*) FROM base WHERE name = 'view_item')       AS view_item,
         (SELECT COUNT(*) FROM base WHERE name = 'add_to_cart')     AS add_to_cart,
         (SELECT COUNT(*) FROM base WHERE name = 'begin_checkout')  AS begin_checkout,
@@ -111,10 +111,10 @@ exports.getSummary = async (req, res) => {
             WHEN JSON_VALUE(props, '$.item_name') IS NOT NULL THEN JSON_VALUE(props, '$.item_name')
             ELSE 'Unknown'
           END AS product_title
-        FROM analytics_events
+        FROM AnalyticsEvent
         WHERE name = 'add_to_cart'
-          ${p_from ? 'AND occurred_at >= @from' : ''}
-          ${p_to   ? 'AND occurred_at <= @to'   : ''}
+          ${p_from ? 'AND OccurredAt >= @from' : ''}
+          ${p_to   ? 'AND OccurredAt <= @to'   : ''}
       )
       SELECT TOP 10 product_title, COUNT(*) AS add_to_cart_count
       FROM addc
@@ -145,18 +145,18 @@ exports.getDailyCounts = async (req, res) => {
 
     const where = [];
     if (name)   where.push('name = @name');
-    if (p_from) where.push('occurred_at >= @from');
-    if (p_to)   where.push('occurred_at <= @to');
+    if (p_from) where.push('OccurredAt >= @from');
+    if (p_to)   where.push('OccurredAt <= @to');
     const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
 
     const q = await r.query(`
       SELECT
-        CAST(occurred_at AS date) AS day,
+        CAST(OccurredAt AS date) AS day,
         name,
         COUNT(*) AS count
-      FROM analytics_events
+      FROM AnalyticsEvent
       ${whereSql}
-      GROUP BY CAST(occurred_at AS date), name
+      GROUP BY CAST(OccurredAt AS date), name
       ORDER BY day ASC;
     `);
 
@@ -182,18 +182,18 @@ exports.getEvents = async (req, res) => {
 
     const q = await r.query(`
       SELECT
-        id,
-        occurred_at,
+        AnalyticsEventId,
+        OccurredAt,
         name,
-        anon_id,
-        user_id,
+        AnonId,
+        UserId,
         url,
         referrer,
         utm,
         props
-      FROM analytics_events
+      FROM AnalyticsEvent
       ${name ? 'WHERE name = @name' : ''}
-      ORDER BY occurred_at DESC
+      ORDER BY OccurredAt DESC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
     `);
 
@@ -223,18 +223,18 @@ exports.getSalesReport = async (req, res) => {
     // Count paid orders (payment_status) with fallback to status, across three windows
     const salesSql = `
       ;WITH paid AS (
-        SELECT id, placed_at
+        SELECT OrderId, PlacedAt
         FROM orders
-        WHERE payment_status IN (${paidPaymentStatuses.map((_, i) => `'${paidPaymentStatuses[i]}'`).join(', ')})
+        WHERE PaymentStatus IN (${paidPaymentStatuses.map((_, i) => `'${paidPaymentStatuses[i]}'`).join(', ')})
         UNION
-        SELECT id, placed_at
+        SELECT OrderId, PlacedAt
         FROM orders
-        WHERE payment_status IS NULL
+        WHERE PaymentStatus IS NULL
           AND status IN (${paidOrderStatuses.map((_, i) => `'${paidOrderStatuses[i]}'`).join(', ')})
       )
       SELECT
-        (SELECT COUNT(*) FROM paid WHERE placed_at >= @d24) AS c24,
-        (SELECT COUNT(*) FROM paid WHERE placed_at >= @d30) AS c30,
+        (SELECT COUNT(*) FROM paid WHERE PlacedAt >= @d24) AS c24,
+        (SELECT COUNT(*) FROM paid WHERE PlacedAt >= @d30) AS c30,
         (SELECT COUNT(*) FROM paid)                        AS call;
     `;
     const sRes = await reqBase.query(salesSql);
@@ -243,16 +243,16 @@ exports.getSalesReport = async (req, res) => {
     // Top products from ALL paid orders
     const paidIdsRes = await req.dbPool.request().query(`
       ;WITH paid AS (
-        SELECT id
+        SELECT OrderId
         FROM orders
-        WHERE payment_status IN (${paidPaymentStatuses.map(s => `'${s}'`).join(', ')})
+        WHERE PaymentStatus IN (${paidPaymentStatuses.map(s => `'${s}'`).join(', ')})
         UNION
-        SELECT id
+        SELECT OrderId
         FROM orders
-        WHERE payment_status IS NULL
+        WHERE PaymentStatus IS NULL
           AND status IN (${paidOrderStatuses.map(s => `'${s}'`).join(', ')})
       )
-      SELECT id FROM paid;
+      SELECT OrderId AS id FROM paid;
     `);
     const paidIds = paidIdsRes.recordset?.map(r => r.id) || [];
 
@@ -261,13 +261,12 @@ exports.getSalesReport = async (req, res) => {
       // chunk IN() to avoid parameter limits if needed; assuming small here
       const r = await req.dbPool.request().query(`
         SELECT
-          COALESCE(CAST(product_id AS NVARCHAR(64)), CONCAT('title:', COALESCE(product_title, 'Untitled'))) AS key,
-          MAX(product_id) AS id,
-          MAX(product_title) AS name,
+          MAX(ProductId) AS id,
+          MAX(ProductTitle) AS name,
           SUM(TRY_CONVERT(int, qty)) AS sales
-        FROM order_items
-        WHERE order_id IN (${paidIds.map(id => `'${id}'`).join(',')})
-        GROUP BY COALESCE(CAST(product_id AS NVARCHAR(64)), CONCAT('title:', COALESCE(product_title, 'Untitled')))
+        FROM OrderItems
+        WHERE OrderId IN (${paidIds.map(id => `'${id}'`).join(',')})
+        GROUP BY COALESCE(CAST(ProductId AS NVARCHAR(64)), CONCAT('title:', COALESCE(ProductTitle, 'Untitled')))
         ORDER BY sales DESC
         OFFSET 0 ROWS FETCH NEXT 6 ROWS ONLY;
       `);

@@ -33,15 +33,15 @@ exports.getSummary = async (req, res) => {
 
     const clauses = [];
     const req1 = req.dbPool.request();
-    if (p_from) { clauses.push('placed_at >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
-    if (p_to)   { clauses.push('placed_at <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
+    if (p_from) { clauses.push('PlacedAt >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
+    if (p_to)   { clauses.push('PlacedAt <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
     const ordersRes = await req1.query(`
-      SELECT TOP (5000) id, total, status, placed_at
+      SELECT *
       FROM dbo.orders
       ${where}
-      ORDER BY placed_at DESC
+      ORDER BY PlacedAt DESC
     `);
 
     const orders = ordersRes.recordset || [];
@@ -68,9 +68,9 @@ exports.getSummary = async (req, res) => {
       ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
 
       const itemsRes = await itemsReq.query(`
-        SELECT order_id, product_title, qty, line_total
-        FROM dbo.order_items
-        WHERE order_id IN (${inList})
+        SELECT OrderId, ProductTitle, qty, LineTotal
+        FROM dbo.OrderItems
+        WHERE OrderId IN (${inList})
       `);
 
       const map = new Map(); 
@@ -124,15 +124,15 @@ exports.getSales = async (req, res) => {
 
     const clauses = [];
     const req1 = req.dbPool.request();
-    if (p_from) { clauses.push('placed_at >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
-    if (p_to)   { clauses.push('placed_at <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
+    if (p_from) { clauses.push('PlacedAt >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
+    if (p_to)   { clauses.push('PlacedAt <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
     const rowsRes = await req1.query(`
-      SELECT placed_at, total
+      SELECT PlacedAt, total
       FROM dbo.orders
       ${where}
-      ORDER BY placed_at ASC
+      ORDER BY PlacedAt ASC
       OFFSET 0 ROWS FETCH NEXT 5000 ROWS ONLY
     `);
 
@@ -180,15 +180,15 @@ exports.getTopProducts = async (req, res) => {
     // limit to orders in window
     const clauses = [];
     const ordersReq = req.dbPool.request();
-    if (p_from) { clauses.push('placed_at >= @From'); ordersReq.input('From', sql.DateTime2, new Date(p_from)); }
-    if (p_to)   { clauses.push('placed_at <= @To');   ordersReq.input('To',   sql.DateTime2, new Date(p_to)); }
+    if (p_from) { clauses.push('PlacedAt >= @From'); ordersReq.input('From', sql.DateTime2, new Date(p_from)); }
+    if (p_to)   { clauses.push('PlacedAt <= @To');   ordersReq.input('To',   sql.DateTime2, new Date(p_to)); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
 
     const oRes = await ordersReq.query(`
-      SELECT TOP (5000) id, placed_at
+      SELECT *
       FROM dbo.orders
       ${where}
-      ORDER BY placed_at DESC
+      ORDER BY PlacedAt DESC
     `);
     const orders = oRes.recordset || [];
 
@@ -200,9 +200,9 @@ exports.getTopProducts = async (req, res) => {
       ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
 
       const iRes = await itemsReq.query(`
-        SELECT order_id, product_title, qty, line_total
-        FROM dbo.order_items
-        WHERE order_id IN (${inList})
+        SELECT OrderId, ProductTitle, qty, LineTotal
+        FROM dbo.OrderItems
+        WHERE OrderId IN (${inList})
       `);
 
       const map = new Map();
@@ -258,9 +258,9 @@ exports.getRecentOrders = async (req, res) => {
       .input('Limit', sql.Int, limit)
       .query(`
         SELECT TOP (@Limit)
-          id, order_number, placed_at, status, total, user_id, customer_name, customer_email
+          *
         FROM dbo.orders
-        ORDER BY placed_at DESC
+        ORDER BY PlacedAt DESC
       `);
 
     const rows = ordersRes.recordset || [];
@@ -273,7 +273,7 @@ exports.getRecentOrders = async (req, res) => {
       const uReq = req.dbPool.request();
       userIds.forEach((id, i) => uReq.input(`U${i}`, sql.Int, id));
       const uRes = await uReq.query(`
-        SELECT id, full_name, email
+        SELECT UserId, FullName, Email
         FROM dbo.users
         WHERE id IN (${inList})
       `);

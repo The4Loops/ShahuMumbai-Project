@@ -126,7 +126,7 @@ export default function Analytics() {
   const byHour = useMemo(() => {
     const hist = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}:00`, count: 0 }));
     events.forEach(ev => {
-      const d = new Date(ev.occurred_at);
+      const d = new Date(ev.OccurredAt);
       const h = d.getHours();
       hist[h].count += 1;
     });
@@ -466,8 +466,8 @@ export default function Analytics() {
                 const value = ev.props?.price || ev.props?.value || '';
                 const qty = ev.props?.quantity || '';
                 return (
-                  <tr key={ev.id} className="border-b last:border-0">
-                    <td className="py-2 pr-4">{new Date(ev.occurred_at).toLocaleString()}</td>
+                  <tr key={ev.AnalyticsEventId} className="border-b last:border-0">
+                    <td className="py-2 pr-4">{new Date(ev.OccurredAt).toLocaleString()}</td>
                     <td className="py-2 pr-4">{ev.name}</td>
                     <td className="py-2 pr-4">{ev.user_id || (ev.anon_id ? ev.anon_id.slice(0,8) : '')}</td>
                     <td className="py-2 pr-4 truncate max-w-[240px]" title={title}>{title}</td>

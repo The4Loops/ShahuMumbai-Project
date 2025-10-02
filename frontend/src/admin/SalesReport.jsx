@@ -92,13 +92,12 @@ const SalesReport = () => {
             >
               <img
                 src={
-                  product.image ||
-                  `${process.env.PUBLIC_URL || ""}/assets/images/placeholder.png`
+                  product.image
                 }
                 alt={product.name}
                 className="w-full h-44 object-cover"
                 onError={(e) => {
-                  e.currentTarget.src = `${process.env.PUBLIC_URL || ""}/assets/images/placeholder.png`;
+                  e.currentTarget.src = `${process.env.PUBLIC_URL || ""}`;
                 }}
               />
               <div className="p-4">
