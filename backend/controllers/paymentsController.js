@@ -1,27 +1,57 @@
-// controllers/paymentsController.js
 const crypto = require('crypto');
 const razorpay = require('../config/razorpay');
-const supabase = require('../config/supabaseClient');
+const sql = require('mssql');
 
 // Helper: merge jsonb meta (fetch row → shallow-merge → update)
 async function mergeOrderMetaById(orderId, metaPatch, otherFields = {}) {
-  const { data: rows, error: gErr } = await supabase
-    .from('orders')
-    .select('id, meta')
-    .eq('id', orderId)
-    .limit(1);
+  try {
+    const result = await req.dbPool.request()
+      .input('OrderId', sql.Int, orderId)
+      .query('SELECT Meta FROM orders WHERE OrderId = @OrderId');
 
-  if (gErr || !rows || rows.length === 0) return { error: gErr || 'order_not_found' };
+    if (!result.recordset[0]) return { error: 'order_not_found' };
 
-  const currentMeta = rows[0].meta || {};
-  const nextMeta = { ...currentMeta, ...(metaPatch || {}) };
+    const currentMeta = result.recordset[0].Meta ? JSON.parse(result.recordset[0].Meta) : {};
+    const nextMeta = { ...currentMeta, ...(metaPatch || {}) };
 
-  const { error: uErr } = await supabase
-    .from('orders')
-    .update({ meta: nextMeta, ...otherFields })
-    .eq('id', orderId);
+    let updateQuery = `
+      UPDATE orders
+      SET Meta = @Meta, UpdatedAt = @UpdatedAt
+      WHERE OrderId = @OrderId
+    `;
+    const parameters = [
+      { name: 'OrderId', type: sql.Int, value: orderId },
+      { name: 'Meta', type: sql.NVarChar, value: JSON.stringify(nextMeta) },
+      { name: 'UpdatedAt', type: sql.DateTime, value: new Date().toISOString() }
+    ];
 
-  return { error: uErr || null };
+    if (otherFields.PlacedAt) {
+      updateQuery += ', PlacedAt = @PlacedAt';
+      parameters.push({ name: 'PlacedAt', type: sql.DateTime, value: otherFields.PlacedAt });
+    }
+    if (otherFields.Status) {
+      updateQuery += ', Status = @Status';
+      parameters.push({ name: 'Status', type: sql.NVarChar, value: otherFields.Status });
+    }
+    if (otherFields.PaymentStatus) {
+      updateQuery += ', PaymentStatus = @PaymentStatus';
+      parameters.push({ name: 'PaymentStatus', type: sql.NVarChar, value: otherFields.PaymentStatus });
+    }
+
+    const request = req.dbPool.request();
+    parameters.forEach(param => request.input(param.name, param.type, param.value));
+
+    const updateResult = await request.query(updateQuery);
+
+    if (updateResult.rowsAffected[0] === 0) {
+      return { error: 'update_failed' };
+    }
+
+    return { error: null };
+  } catch (e) {
+    console.error('mergeOrderMetaById error:', e);
+    return { error: e.message };
+  }
 }
 
 exports.createRazorpayOrder = async (req, res) => {
@@ -30,18 +60,22 @@ exports.createRazorpayOrder = async (req, res) => {
     if (!order_number) return res.status(400).json({ message: 'missing_order_number' });
 
     // 1) Fetch order by order_number
-    const { data: order, error: orderErr } = await supabase
-      .from('orders')
-      .select('id, order_number, total, currency, meta, payment_status')
-      .eq('order_number', order_number)
-      .single();
+    const orderResult = await req.dbPool.request()
+      .input('OrderNumber', sql.NVarChar, order_number)
+      .query(`
+        SELECT 
+          OrderId, OrderNumber, Total, Currency, Meta, PaymentStatus
+        FROM orders
+        WHERE OrderNumber = @OrderNumber
+      `);
 
-    if (orderErr || !order) return res.status(404).json({ message: 'order_not_found' });
-    if (String(order.payment_status || '').toLowerCase() === 'paid') {
+    const order = orderResult.recordset[0];
+    if (!order) return res.status(404).json({ message: 'order_not_found' });
+    if (String(order.PaymentStatus || '').toLowerCase() === 'paid') {
       return res.status(409).json({ message: 'already_paid' });
     }
 
-    const amountPaise = Math.round(Number(order.total) * 100);
+    const amountPaise = Math.round(Number(order.Total) * 100);
     if (!Number.isFinite(amountPaise) || amountPaise <= 0) {
       return res.status(400).json({ message: 'invalid_amount' });
     }
@@ -49,27 +83,28 @@ exports.createRazorpayOrder = async (req, res) => {
     // 2) Create Razorpay Order
     const rzpOrder = await razorpay.orders.create({
       amount: amountPaise,
-      currency: order.currency || 'INR',
-      receipt: order.order_number,
-      notes: { order_number: order.order_number }
+      currency: order.Currency || 'INR',
+      receipt: order.OrderNumber,
+      notes: { order_number: order.OrderNumber }
     });
 
     // 3) Save in meta + mark payment_status pending
-    const { error: updErr } = await supabase
-      .from('orders')
-      .update({
-        meta: { ...(order.meta || {}), razorpay_order_id: rzpOrder.id, razorpay_amount: amountPaise },
-        payment_status: 'pending',
-        status: 'pending',
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', order.id);
+    const metaPatch = {
+      razorpay_order_id: rzpOrder.id,
+      razorpay_amount: amountPaise,
+    };
+    const patch = {
+      PaymentStatus: 'pending',
+      Status: 'pending',
+      UpdatedAt: new Date().toISOString(),
+    };
 
+    const { error: updErr } = await mergeOrderMetaById(order.OrderId, metaPatch, patch);
     if (updErr) return res.status(500).json({ message: 'failed_to_save_razorpay_order' });
 
     return res.json({
       key: process.env.RAZORPAY_KEY_ID,
-      orderNumber: order.order_number,
+      orderNumber: order.OrderNumber,
       rzp: { order_id: rzpOrder.id, amount: rzpOrder.amount, currency: rzpOrder.currency }
     });
   } catch (e) {
@@ -94,34 +129,40 @@ exports.verifyPayment = async (req, res) => {
     const ok = expected === razorpay_signature;
 
     // 2) Find our order by meta->razorpay_order_id
-    const { data: orders, error: findErr } = await supabase
-      .from('orders')
-      .select('id, order_number, placed_at')
-      .contains('meta', { razorpay_order_id });
+    const ordersResult = await req.dbPool.request()
+      .input('rzpOrderId', sql.NVarChar, razorpay_order_id)
+      .query(`
+        SELECT OrderId, OrderNumber, PlacedAt
+        FROM orders
+        WHERE JSON_VALUE(Meta, '$.razorpay_order_id') = @rzpOrderId
+      `);
 
-    if (findErr || !orders || orders.length === 0) {
+    const orders = ordersResult.recordset;
+    if (!orders || orders.length === 0) {
       return res.status(404).json({ ok: false, message: 'order_not_found' });
     }
     const row = orders[0];
 
     // 3) Merge meta + set payment_status
     const patch = {
-      payment_status: ok ? 'paid' : 'failed',
-      status: ok ? 'paid' : 'pending',
-      updated_at: new Date().toISOString(),
-      ...(ok && !row.placed_at ? { placed_at: new Date().toISOString() } : {}),
+      PaymentStatus: ok ? 'paid' : 'failed',
+      Status: ok ? 'paid' : 'pending',
+      UpdatedAt: new Date().toISOString(),
     };
+    if (ok && !row.PlacedAt) {
+      patch.PlacedAt = new Date().toISOString();
+    }
     const metaPatch = {
       razorpay_payment_id,
       razorpay_signature,
       verify_ok: ok,
     };
 
-    const { error: updErr } = await mergeOrderMetaById(row.id, metaPatch, patch);
+    const { error: updErr } = await mergeOrderMetaById(row.OrderId, metaPatch, patch);
     if (updErr) return res.status(500).json({ ok: false, message: 'update_failed' });
 
     if (!ok) return res.status(400).json({ ok: false, message: 'signature_mismatch' });
-    return res.json({ ok: true, order_number: row.order_number });
+    return res.json({ ok: true, order_number: row.OrderNumber });
   } catch (e) {
     console.error('payments.verifyPayment error:', e);
     return res.status(500).json({ ok: false, message: 'internal_error' });
@@ -136,21 +177,34 @@ exports.webhook = async (req, res) => {
       .update(req.rawBody)
       .digest('hex');
 
-    if (digest !== signature) return res.status(400).send('invalid_signature');
+    if (digest !== signature) {
+      console.error('Webhook signature mismatch');
+      return res.status(400).send('invalid_signature');
+    }
 
     const event = JSON.parse(req.rawBody.toString());
     const payment = event?.payload?.payment?.entity;
     const rzpOrderId = payment?.order_id;
 
-    if (!rzpOrderId) return res.json({ received: true });
+    if (!rzpOrderId) {
+      console.log('Webhook: No rzpOrderId, skipping');
+      return res.json({ received: true });
+    }
 
-    // Find order by rzp order id
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('id, order_number')
-      .contains('meta', { razorpay_order_id: rzpOrderId });
+    // Find order by meta->razorpay_order_id
+    const ordersResult = await req.dbPool.request()
+      .input('rzpOrderId', sql.NVarChar, rzpOrderId)
+      .query(`
+        SELECT OrderId, OrderNumber
+        FROM orders
+        WHERE JSON_VALUE(Meta, '$.razorpay_order_id') = @rzpOrderId
+      `);
 
-    if (!orders || orders.length === 0) return res.json({ received: true });
+    const orders = ordersResult.recordset;
+    if (!orders || orders.length === 0) {
+      console.log('Webhook: Order not found for rzpOrderId:', rzpOrderId);
+      return res.json({ received: true });
+    }
     const row = orders[0];
 
     let status, payment_status;
@@ -170,12 +224,12 @@ exports.webhook = async (req, res) => {
     };
 
     const patch = {
-      ...(status ? { status } : {}),
-      ...(payment_status ? { payment_status } : {}),
-      updated_at: new Date().toISOString(),
+      ...(status ? { Status: status } : {}),
+      ...(payment_status ? { PaymentStatus: payment_status } : {}),
+      UpdatedAt: new Date().toISOString(),
     };
 
-    const { error: updErr } = await mergeOrderMetaById(row.id, metaPatch, patch);
+    const { error: updErr } = await mergeOrderMetaById(row.OrderId, metaPatch, patch);
     if (updErr) console.error('webhook update error:', updErr);
 
     return res.json({ received: true });

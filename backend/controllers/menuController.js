@@ -1,40 +1,49 @@
-const jwt = require("jsonwebtoken");
-const supabase = require("../config/supabaseClient");
+const sql = require('mssql');
+const jwt = require('jsonwebtoken');
 
 // Verify Admin
 const verifyAdmin = (req) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return { error: "Unauthorized: Token missing" };
+  const token = req.headers.authorization?.split(' ')[1];
+  if (!token) return { error: 'Unauthorized: Token missing' };
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "Admin") return { error: "Forbidden: Admins only" };
+    if (decoded.role !== 'Admin') return { error: 'Forbidden: Admins only' };
     return { decoded };
   } catch (err) {
-    return { error: "Invalid Token" };
+    return { error: 'Invalid Token' };
   }
 };
 
 // Create Menu
 exports.createMenu = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { label, href, order_index } = req.body;
-    if (!label) return res.status(400).json({ error: "Menu label is required" });
+    if (!label) return res.status(400).json({ error: 'Menu label is required' });
 
-    const { data, error } = await supabase
-      .from("menus")
-      .insert([{ label, href: href || null, order_index: parseInt(order_index) || 0 }])
-      .select()
-      .single();
+    const result = await req.dbPool.request()
+      .input('Label', sql.NVarChar, label)
+      .input('Href', sql.NVarChar, href || null)
+      .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+      .input('CreatedAt', sql.DateTime, new Date())
+      .input('UpdatedAt', sql.DateTime, new Date())
+      .query(`
+        INSERT INTO menu (Label, Href, OrderIndex, CreatedAt, UpdatedAt)
+        OUTPUT INSERTED.*
+        VALUES (@Label, @Href, @OrderIndex, @CreatedAt, @UpdatedAt)
+      `);
 
-    if (error) return res.status(400).json({ error: error.message });
+    const data = result.recordset[0];
+    if (!data) {
+      return res.status(400).json({ error: 'Error creating menu' });
+    }
 
-    res.status(201).json({ message: "Menu created successfully", menu: data });
+    res.status(201).json({ message: 'Menu created successfully', menu: data });
   } catch (err) {
-    console.error("Error in createMenu:", err);
+    console.error('Error in createMenu:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -43,65 +52,109 @@ exports.createMenu = async (req, res) => {
 exports.getMenus = async (req, res) => {
   try {
     const { search, role } = req.query;
-    let query = supabase.from("menus").select("id, label, href, order_index, created_at, updated_at");
+    let query = `
+      SELECT 
+        m.MenuId AS id,
+        m.Label AS label,
+        m.Href AS href,
+        m.OrderIndex AS order_index,
+        m.CreatedAt AS created_at,
+        m.UpdatedAt AS updated_at
+      FROM menu m
+    `;
+    const parameters = [];
 
     if (search) {
-      query = query.ilike("label", `%${search}%`);
+      query += ` WHERE m.Label LIKE @search`;
+      parameters.push({ name: 'search', type: sql.NVarChar, value: `%${search}%` });
     }
 
-    if (role && role !== "All") {
-      query = query
-        .select("id, label, href, order_index, created_at, updated_at, roletag!inner(role_id)")
-        .eq("roletag.role_id", role);
+    if (role && role !== 'All') {
+      query += (search ? ' AND' : ' WHERE') + ` rt.RoleId = @role_id`;
+      const roleResult = await req.dbPool.request()
+        .input('role_label', sql.NVarChar, role)
+        .query('SELECT RoleId FROM roles WHERE Label = @role_label');
+      if (!roleResult.recordset[0]) {
+        return res.status(400).json({ error: `Role '${role}' not found` });
+      }
+      parameters.push({ name: 'role_id', type: sql.Int, value: roleResult.recordset[0].RoleId });
+      query = `
+        SELECT 
+          m.MenuId AS id,
+          m.Label AS label,
+          m.Href AS href,
+          m.OrderIndex AS order_index,
+          m.CreatedAt AS created_at,
+          m.UpdatedAt AS updated_at
+        FROM menu m
+        INNER JOIN roletags rt ON m.MenuId = rt.MenuId
+        ${search ? `WHERE m.Label LIKE @search` : ''}
+        ${search ? ' AND' : 'WHERE'} rt.RoleId = @role_id
+      `;
     }
 
-    const { data: menus, error } = await query.order("order_index", { ascending: true });
+    query += ' ORDER BY m.OrderIndex ASC';
 
-    if (error) return res.status(400).json({ error: error.message });
+    const request = req.dbPool.request();
+    parameters.forEach(param => request.input(param.name, param.type, param.value));
+    const menusResult = await request.query(query);
 
+    const menus = menusResult.recordset;
     const menuIds = menus.map(menu => menu.id);
 
-    const { data: roletags, error: roletagError } = await supabase
-      .from("roletag")
-      .select("menu_id, role_id, roles!roletag_role_id_fkey(label)")
-      .in("menu_id", menuIds);
+    const roletagsResult = await req.dbPool.request()
+      .query(`
+        SELECT rt.MenuId, rt.RoleId, r.Label
+        FROM roletags rt
+        INNER JOIN roles r ON rt.RoleId = r.RoleId
+        WHERE rt.MenuId IN (${menuIds.map(() => '?').join(',')})
+      `);
+    const roletags = roletagsResult.recordset;
+    const roletagMap = {};
+    roletags.forEach(rt => {
+      if (!roletagMap[rt.MenuId]) roletagMap[rt.MenuId] = [];
+      roletagMap[rt.MenuId].push(rt.Label);
+    });
 
-    const { data: menuItems, error: menuItemError } = await supabase
-      .from("menu_items")
-      .select("id, menu_id, label, href, order_index")
-      .in("menu_id", menuIds)
-      .order("order_index", { ascending: true });
+    const menuItemsResult = await req.dbPool.request()
+      .query(`
+        SELECT mi.MenuItemId AS id, mi.MenuId, mi.Label AS label, mi.Href AS href, mi.OrderIndex AS order_index
+        FROM menuitems mi
+        WHERE mi.MenuId IN (${menuIds.map(() => '?').join(',')})
+        ORDER BY mi.OrderIndex ASC
+      `);
+    const menuItems = menuItemsResult.recordset;
+    const menuItemIds = menuItems.map(item => item.id);
 
-    const menuItemIds = menuItems?.map(item => item.id) || [];
-    const { data: menuItemRoletags, error: menuItemRoletagError } = await supabase
-      .from("menu_item_roletag")
-      .select("menu_item_id, role_id, roles!menu_item_roletag_role_id_fkey(label)")
-      .in("menu_item_id", menuItemIds);
+    const menuItemRoletagsResult = await req.dbPool.request()
+      .query(`
+        SELECT mir.MenuItemId, mir.RoleId, r.Label
+        FROM menuitemroletag mir
+        INNER JOIN roles r ON mir.RoleId = r.RoleId
+        WHERE mir.MenuItemId IN (${menuItemIds.map(() => '?').join(',')})
+      `);
+    const menuItemRoletags = menuItemRoletagsResult.recordset;
+    const menuItemRoletagMap = {};
+    menuItemRoletags.forEach(mir => {
+      if (!menuItemRoletagMap[mir.MenuItemId]) menuItemRoletagMap[mir.MenuItemId] = [];
+      menuItemRoletagMap[mir.MenuItemId].push(mir.Label);
+    });
 
     const transformedMenus = menus.map(menu => ({
       ...menu,
-      roles: roletags
-        ?.filter(rt => rt.menu_id === menu.id)
-        .map(rt => rt.roles?.label || "Unknown")
-        || [],
+      roles: roletagMap[menu.id] || [],
       dropdown_items: menuItems
-        ?.filter(item => item.menu_id === menu.id)
+        .filter(item => item.MenuId === menu.id)
         .map(item => ({
-          id: item.id,
-          label: item.label,
-          href: item.href,
-          order_index: item.order_index,
-          roles: menuItemRoletags
-            ?.filter(mrt => mrt.menu_item_id === item.id)
-            .map(mrt => mrt.roles?.label || "Unknown")
-            || [],
+          ...item,
+          roles: menuItemRoletagMap[item.id] || [],
         }))
         || [],
     }));
 
     res.status(200).json({ menus: transformedMenus });
   } catch (err) {
-    console.error("Error in getMenus:", err);
+    console.error('Error in getMenus:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -110,19 +163,29 @@ exports.getMenus = async (req, res) => {
 exports.getAllMenus = async (req, res) => {
   try {
     const { search } = req.query;
-    let query = supabase.from("menus").select("id, label");
+    let query = 'SELECT MenuId AS id, Label AS label FROM menu';
 
     if (search) {
-      query = query.ilike("label", `%${search}%`);
+      query += ' WHERE Label LIKE @search';
     }
 
-    const { data: menus, error } = await query.order("label", { ascending: true });
+    query += ' ORDER BY Label ASC';
 
-    if (error) return res.status(400).json({ error: error.message });
+    const request = req.dbPool.request();
+    if (search) {
+      request.input('search', sql.NVarChar, `%${search}%`);
+    }
 
-    res.status(200).json({ menus });
+    const result = await request.query(query);
+
+    const data = result.recordset;
+    if (!data) {
+      return res.status(400).json({ error: 'Error fetching menus' });
+    }
+
+    res.status(200).json({ menus: data });
   } catch (err) {
-    console.error("Error in getAllMenus:", err);
+    console.error('Error in getAllMenus:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -130,26 +193,35 @@ exports.getAllMenus = async (req, res) => {
 // Update Menu
 exports.updateMenu = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { id } = req.params;
     const { label, href, order_index } = req.body;
 
-    if (!label) return res.status(400).json({ error: "Menu label is required" });
+    if (!label) return res.status(400).json({ error: 'Menu label is required' });
 
-    const { data, error } = await supabase
-      .from("menus")
-      .update({ label, href: href || null, order_index: parseInt(order_index) || 0, updated_at: new Date() })
-      .eq("id", id)
-      .select()
-      .single();
+    const result = await req.dbPool.request()
+      .input('MenuId', sql.Int, id)
+      .input('Label', sql.NVarChar, label)
+      .input('Href', sql.NVarChar, href || null)
+      .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+      .input('UpdatedAt', sql.DateTime, new Date())
+      .query(`
+        UPDATE menu
+        SET Label = @Label, Href = @Href, OrderIndex = @OrderIndex, UpdatedAt = @UpdatedAt
+        OUTPUT INSERTED.*
+        WHERE MenuId = @MenuId
+      `);
 
-    if (error) return res.status(400).json({ error: error.message });
+    const data = result.recordset[0];
+    if (!data) {
+      return res.status(400).json({ error: 'Menu not found' });
+    }
 
-    res.status(200).json({ message: "Menu updated successfully", menu: data });
+    res.status(200).json({ message: 'Menu updated successfully', menu: data });
   } catch (err) {
-    console.error("Error in updateMenu:", err);
+    console.error('Error in updateMenu:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -157,16 +229,25 @@ exports.updateMenu = async (req, res) => {
 // Delete Menu
 exports.deleteMenu = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { id } = req.params;
-    const { error } = await supabase.from("menus").delete().eq("id", id);
-    if (error) return res.status(400).json({ error: error.message });
 
-    res.status(200).json({ message: "Menu deleted successfully" });
+    const result = await req.dbPool.request()
+      .input('MenuId', sql.Int, id)
+      .query(`
+        DELETE FROM menu
+        WHERE MenuId = @MenuId
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(400).json({ error: 'Menu not found' });
+    }
+
+    res.status(200).json({ message: 'Menu deleted successfully' });
   } catch (err) {
-    console.error("Error in deleteMenu:", err);
+    console.error('Error in deleteMenu:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -174,35 +255,53 @@ exports.deleteMenu = async (req, res) => {
 // Create Menu Item
 exports.createMenuItem = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { menu_id, label, href, order_index, role_ids } = req.body;
     if (!menu_id || !label || !href) {
-      return res.status(400).json({ error: "Menu ID, label, and href are required" });
+      return res.status(400).json({ error: 'Menu ID, label, and href are required' });
     }
 
-    const { data: menuItem, error } = await supabase
-      .from("menu_items")
-      .insert([{ menu_id, label, href, order_index: parseInt(order_index) || 0 }])
-      .select()
-      .single();
+    const result = await req.dbPool.request()
+      .input('MenuId', sql.Int, menu_id)
+      .input('Label', sql.NVarChar, label)
+      .input('Href', sql.NVarChar, href)
+      .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+      .input('CreatedAt', sql.DateTime, new Date())
+      .query(`
+        INSERT INTO menuitems (MenuId, Label, Href, OrderIndex, CreatedAt)
+        OUTPUT INSERTED.*
+        VALUES (@MenuId, @Label, @Href, @OrderIndex, @CreatedAt)
+      `);
 
-    if (error) return res.status(400).json({ error: error.message });
+    const menuItem = result.recordset[0];
+    if (!menuItem) {
+      return res.status(400).json({ error: 'Error creating menu item' });
+    }
 
     if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
       const roletags = role_ids.map(role_id => ({
-        menu_item_id: menuItem.id,
-        role_id,
-        order_index: parseInt(order_index) || 0,
+        MenuItemId: menuItem.MenuItemId,
+        RoleId: role_id,
+        OrderIndex: parseInt(order_index) || 0,
       }));
-      const { error: roletagError } = await supabase.from("menu_item_roletag").insert(roletags);
-      if (roletagError) return res.status(400).json({ error: roletagError.message });
+
+      const roletagRequest = req.dbPool.request();
+      roletags.forEach(tag => {
+        roletagRequest.input('MenuItemId', sql.Int, tag.MenuItemId);
+        roletagRequest.input('RoleId', sql.Int, tag.RoleId);
+        roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
+      });
+      await roletagRequest.query(`
+        INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex)
+        VALUES (@MenuItemId, @RoleId, @OrderIndex)
+      `);
     }
 
-    res.status(201).json({ message: "Menu item created successfully", menu_item: menuItem });
+    res.status(201).json({ message: 'Menu item created successfully', menu_item: menuItem });
   } catch (err) {
-    console.error("Error in createMenuItem:", err);
+    console.error('Error in createMenuItem:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -210,41 +309,61 @@ exports.createMenuItem = async (req, res) => {
 // Update Menu Item
 exports.updateMenuItem = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { id } = req.params;
     const { label, href, order_index, role_ids } = req.body;
 
     if (!label || !href) {
-      return res.status(400).json({ error: "Label and href are required" });
+      return res.status(400).json({ error: 'Label and href are required' });
     }
 
-    const { data, error } = await supabase
-      .from("menu_items")
-      .update({ label, href, order_index: parseInt(order_index) || 0 })
-      .eq("id", id)
-      .select()
-      .single();
+    const result = await req.dbPool.request()
+      .input('MenuItemId', sql.Int, id)
+      .input('Label', sql.NVarChar, label)
+      .input('Href', sql.NVarChar, href)
+      .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+      .query(`
+        UPDATE menuitems
+        SET Label = @Label, Href = @Href, OrderIndex = @OrderIndex
+        OUTPUT INSERTED.*
+        WHERE MenuItemId = @MenuItemId
+      `);
 
-    if (error) return res.status(400).json({ error: error.message });
+    const data = result.recordset[0];
+    if (!data) {
+      return res.status(400).json({ error: 'Menu item not found' });
+    }
 
     if (role_ids && Array.isArray(role_ids)) {
-      await supabase.from("menu_item_roletag").delete().eq("menu_item_id", id);
+      await req.dbPool.request()
+        .input('MenuItemId', sql.Int, id)
+        .query('DELETE FROM menuitemroletag WHERE MenuItemId = @MenuItemId');
+
       if (role_ids.length > 0) {
         const roletags = role_ids.map(role_id => ({
-          menu_item_id: id,
-          role_id,
-          order_index: parseInt(order_index) || 0,
+          MenuItemId: id,
+          RoleId: role_id,
+          OrderIndex: parseInt(order_index) || 0,
         }));
-        const { error: roletagError } = await supabase.from("menu_item_roletag").insert(roletags);
-        if (roletagError) return res.status(400).json({ error: roletagError.message });
+
+        const roletagRequest = req.dbPool.request();
+        roletags.forEach(tag => {
+          roletagRequest.input('MenuItemId', sql.Int, tag.MenuItemId);
+          roletagRequest.input('RoleId', sql.Int, tag.RoleId);
+          roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
+        });
+        await roletagRequest.query(`
+          INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex)
+          VALUES (@MenuItemId, @RoleId, @OrderIndex)
+        `);
       }
     }
 
-    res.status(200).json({ message: "Menu item updated successfully", menu_item: data });
+    res.status(200).json({ message: 'Menu item updated successfully', menu_item: data });
   } catch (err) {
-    console.error("Error in updateMenuItem:", err);
+    console.error('Error in updateMenuItem:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -252,16 +371,25 @@ exports.updateMenuItem = async (req, res) => {
 // Delete Menu Item
 exports.deleteMenuItem = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { id } = req.params;
-    const { error } = await supabase.from("menu_items").delete().eq("id", id);
-    if (error) return res.status(400).json({ error: error.message });
 
-    res.status(200).json({ message: "Menu item deleted successfully" });
+    const result = await req.dbPool.request()
+      .input('MenuItemId', sql.Int, id)
+      .query(`
+        DELETE FROM menuitems
+        WHERE MenuItemId = @MenuItemId
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return res.status(400).json({ error: 'Menu item not found' });
+    }
+
+    res.status(200).json({ message: 'Menu item deleted successfully' });
   } catch (err) {
-    console.error("Error in deleteMenuItem:", err);
+    console.error('Error in deleteMenuItem:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -269,23 +397,26 @@ exports.deleteMenuItem = async (req, res) => {
 // Get Roletags
 exports.getRoletags = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { menu_ids } = req.query;
-    let query = supabase.from("roletag").select("menu_id, role_id, roles!roletag_role_id_fkey(label)");
+    let query = `
+      SELECT rt.MenuId, rt.RoleId, r.Label
+      FROM roletags rt
+      INNER JOIN roles r ON rt.RoleId = r.RoleId
+    `;
 
     if (menu_ids) {
-      query = query.in("menu_id", menu_ids.split(","));
+      query += ` WHERE rt.MenuId IN (${menu_ids.split(',').map(() => '?').join(',')})`;
     }
 
-    const { data, error } = await query;
-    console.log("Roletags fetched for /api/roletags:", data, "Error:", error);
-    if (error) return res.status(400).json({ error: error.message });
+    const result = await req.dbPool.request().query(query);
 
-    res.status(200).json(data);
+    console.log('Roletags fetched for /api/roletags:', result.recordset);
+    res.status(200).json(result.recordset);
   } catch (err) {
-    console.error("Error in getRoletags:", err);
+    console.error('Error in getRoletags:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -293,30 +424,42 @@ exports.getRoletags = async (req, res) => {
 // Assign Roles to Menu
 exports.assignRolesToMenu = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { menu_id, role_ids, order_index } = req.body;
 
     if (!menu_id || !role_ids || !Array.isArray(role_ids)) {
-      return res.status(400).json({ error: "Menu ID and role IDs (array) are required" });
+      return res.status(400).json({ error: 'Menu ID and role IDs (array) are required' });
     }
 
-    await supabase.from("roletag").delete().eq("menu_id", menu_id);
+    await req.dbPool.request()
+      .input('MenuId', sql.Int, menu_id)
+      .query('DELETE FROM roletags WHERE MenuId = @MenuId');
 
     const roletags = role_ids.map(role_id => ({
-      menu_id,
-      role_id,
-      order_index: parseInt(order_index) || 0,
+      MenuId: menu_id,
+      RoleId: role_id,
+      OrderIndex: parseInt(order_index) || 0,
+      CreatedAt: new Date(),
     }));
 
-    const { data, error } = await supabase.from("roletag").insert(roletags).select();
-    console.log("Roletags assigned:", data, "Error:", error);
-    if (error) return res.status(400).json({ error: error.message });
+    const roletagRequest = req.dbPool.request();
+    roletags.forEach(tag => {
+      roletagRequest.input('MenuId', sql.Int, tag.MenuId);
+      roletagRequest.input('RoleId', sql.Int, tag.RoleId);
+      roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
+      roletagRequest.input('CreatedAt', sql.DateTime, tag.CreatedAt);
+    });
+    const result = await roletagRequest.query(`
+      INSERT INTO roletags (MenuId, RoleId, OrderIndex, CreatedAt)
+      VALUES (@MenuId, @RoleId, @OrderIndex, @CreatedAt)
+    `);
 
-    res.status(200).json({ message: "Roles assigned successfully", roletags: data });
+    console.log('Roletags assigned:', result.recordset);
+    res.status(200).json({ message: 'Roles assigned successfully', roletags: result.recordset });
   } catch (err) {
-    console.error("Error in assignRolesToMenu:", err);
+    console.error('Error in assignRolesToMenu:', err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -324,30 +467,39 @@ exports.assignRolesToMenu = async (req, res) => {
 // Assign Roles to Menu Item
 exports.assignRolesToMenuItem = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: "Admin access required" });
+  if (authError) return res.status(403).json({ error: 'Admin access required' });
 
   try {
     const { menu_item_id, role_ids, order_index } = req.body;
 
     if (!menu_item_id || !role_ids || !Array.isArray(role_ids)) {
-      return res.status(400).json({ error: "Menu item ID and role IDs (array) are required" });
+      return res.status(400).json({ error: 'Menu item ID and role IDs (array) are required' });
     }
 
-    await supabase.from("menu_item_roletag").delete().eq("menu_item_id", menu_item_id);
+    await req.dbPool.request()
+      .input('MenuItemId', sql.Int, menu_item_id)
+      .query('DELETE FROM menuitemroletag WHERE MenuItemId = @MenuItemId');
 
     const roletags = role_ids.map(role_id => ({
-      menu_item_id,
-      role_id,
-      order_index: parseInt(order_index) || 0,
+      MenuItemId: menu_item_id,
+      RoleId: role_id,
+      OrderIndex: parseInt(order_index) || 0,
     }));
 
-    const { data, error } = await supabase.from("menu_item_roletag").insert(roletags).select();
-    
-    if (error) return res.status(400).json({ error: error.message });
+    const roletagRequest = req.dbPool.request();
+    roletags.forEach(tag => {
+      roletagRequest.input('MenuItemId', sql.Int, tag.MenuItemId);
+      roletagRequest.input('RoleId', sql.Int, tag.RoleId);
+      roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
+    });
+    const result = await roletagRequest.query(`
+      INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex)
+      VALUES (@MenuItemId, @RoleId, @OrderIndex)
+    `);
 
-    res.status(200).json({ message: "Roles assigned successfully", roletags: data });
+    res.status(200).json({ message: 'Roles assigned successfully', roletags: result.recordset });
   } catch (err) {
-    console.error("Error in assignRolesToMenuItem:", err);
+    console.error('Error in assignRolesToMenuItem:', err);
     res.status(500).json({ error: err.message });
   }
 };
