@@ -104,7 +104,7 @@ function UpcomingCarousel() {
   };
 
   const getHeroImage = (product) => {
-    const heroImage = product.product_images?.find((img) => img.is_hero);
+    const heroImage = product.product_images?.find((img) => img.is_hero ==='Y' ? true : false);
     return heroImage?.image_url || product.product_images?.[0]?.image_url || placeholder;
   };
 
@@ -141,21 +141,21 @@ function UpcomingCarousel() {
               <div className="relative bg-white rounded-xl shadow-md overflow-hidden group">
                 <img
                   src={getHeroImage(product)}
-                  alt={product.name}
+                  alt={product.Name}
                   className="w-full h-52 object-cover"
                 />
 
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
                   <h3 className="text-lg font-semibold mb-2">{product.name}</h3>
                   <p className="mb-3 text-sm">
-                    Launching on: {formatDateTime(product.launchingdate)}
+                    Launching on: {formatDateTime(product.LaunchingDate)}
                   </p>
                   <button
                     onClick={() => handleWaitlistClick(product)}
                     className="bg-[#E3BDB4] text-[#4B2C20] px-4 py-2 rounded-lg font-medium hover:bg-[#d3a99f] transition"
-                    disabled={waitlist.includes(product.id)}
+                    disabled={waitlist.includes(product.ProductId)}
                   >
-                    {waitlist.includes(product.id)
+                    {waitlist.includes(product.ProductId)
                       ? "In Waitlist"
                       : "Join Waitlist"}
                   </button>
@@ -187,14 +187,14 @@ function UpcomingCarousel() {
             <div className="bg-white border border-[#E3BDB4] rounded-xl p-4 mb-4 shadow-sm">
               <p className="mb-2 text-[#4B2C20]">
                 Product:{" "}
-                <span className="font-semibold">{selectedProduct.name}</span>
+                <span className="font-semibold">{selectedProduct.Name}</span>
               </p>
               <p className="mb-2 text-[#4B2C20]">
                 Price:{" "}
-                <span className="font-semibold">₹{selectedProduct.price}</span>
+                <span className="font-semibold">₹{selectedProduct.Price}</span>
               </p>
               <p className="text-green-800 font-bold text-lg">
-                Pay 50% Now: ₹{selectedProduct.price / 2}
+                Pay 50% Now: ₹{selectedProduct.Price / 2}
               </p>
             </div>
 

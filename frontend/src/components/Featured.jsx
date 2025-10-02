@@ -53,13 +53,13 @@ function Featured() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
           {products.map((product, i) => (
             <motion.div
-              key={product.id}
+              key={product.ProductId}
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.2, duration: 0.6 }}
               whileHover={{ y: -8, scale: 1.02 }}
               className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer "
-              onClick={()=>navigate(`/products/${product.id}`)}
+              onClick={()=>navigate(`/products/${product.ProductId}`)}
             >
               {/* Tag */}
               {product.is_new && (
@@ -72,22 +72,22 @@ function Featured() {
               <div className="w-28 h-28 mx-auto mb-6 flex items-center justify-center rounded-full bg-[#F1E6E1] shadow-inner overflow-hidden">
                 <img
                   src={
-                    product.product_images?.find(img => img.is_hero)?.image_url ||
+                    product.product_images?.find(img => img.is_hero === 'Y' ? true : false)?.image_url ||
                     placeholderImg
                   }
-                  alt={product.name}
+                  alt={product.Name}
                   className="w-full h-full object-cover"
                 />
               </div>
 
               {/* Title */}
               <h3 className="text-lg font-semibold text-[#4B2C20] mb-2">
-                {product.name}
+                {product.Name}
               </h3>
 
               {/* Price */}
               <p className="text-[#4B2C20] font-semibold text-base">
-                ${product.price}{" "}
+                {product.Price}{" "}
                 {product.old_price && (
                   <span className="text-sm text-[#4B2C20]/50 line-through ml-1">
                     ${product.old_price}

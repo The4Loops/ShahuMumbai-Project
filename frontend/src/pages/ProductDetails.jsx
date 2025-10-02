@@ -45,7 +45,7 @@ const pickImageUrl = (img) =>
 const categoryName = (p) =>
   p?.categories?.name ||
   get(p, ["category", "name"]) ||
-  get(p, ["categories", 0, "name"]) ||
+  get(p, ["categories", 0, "Name"]) ||
   "N/A";
 
 // Carousel Arrows
@@ -140,8 +140,8 @@ const ProductDetails = () => {
   const [selectedColor, setSelectedColor] = useState(null);
 
   // Check if product is upcoming
-  const isUpcoming = product?.launchingdate
-    ? new Date(product.launchingdate) > new Date()
+  const isUpcoming = product?.LaunchingDate
+    ? new Date(product.LaunchingDate) > new Date()
     : false;
 
   useEffect(() => {
@@ -150,7 +150,7 @@ const ProductDetails = () => {
         setLoading(true);
         const { data: p } = await api.get(`/api/products/${id}`);
         setProduct(p);
-        setSelectedColor(Array.isArray(p?.colors) ? p.colors[0] || null : null);
+        setSelectedColor(Array.isArray(p?.Colors) ? p.Colors[0] || null : null);
 
         const cat = categoryName(p);
         const { data: rel } = await api.get(
@@ -164,12 +164,12 @@ const ProductDetails = () => {
 
         try {
           Ecom.viewItem({
-            id: p.id,
-            title: p.name,
+            id: p.ProductId,
+            title: p.Name,
             category: cat,
-            price: Number(p.price) - (Number(p.discountprice || 0) || 0),
+            price: Number(p.Price) - (Number(p.DiscountPrice || 0) || 0),
             quantity: 1,
-            color: Array.isArray(p?.colors) ? p.colors[0] || null : null,
+            color: Array.isArray(p?.Colors) ? p.Colors[0] || null : null,
           });
         } catch {}
       } catch (err) {
@@ -244,10 +244,10 @@ const ProductDetails = () => {
           toast.success('Removed from wishlist');
           try {
             Ecom.removeFromWishlist({
-              id: product.id,
-              title: product.name,
+              id: product.ProductId,
+              title: product.Name,
               category: categoryName(product),
-              price: Number(product.price) - (Number(product.discountprice || 0) || 0),
+              price: Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
             });
           } catch {}
         }
@@ -257,10 +257,10 @@ const ProductDetails = () => {
         toast.success(response.data.message);
         try {
           Ecom.addToWishlist({
-            id: product.id,
-            title: product.name,
+            id: product.ProductId,
+            title: product.Name,
             category: categoryName(product),
-            price: Number(product.price) - (Number(product.discountprice || 0) || 0),
+            price: Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
           });
         } catch {}
       }
@@ -314,25 +314,25 @@ const ProductDetails = () => {
       setCartSubmitting(true);
       const payload = {
         user_id: userid,
-        product_id: product.id,
+        product_id: product.ProductId,
         quantity: qty,
         color: selectedColor || null,
       };
       await api.post("/api/cart", payload);
       toast.dismiss();
       toast.success(
-        `${product.name}${
+        `${product.Name}${
           payload.color ? ` (${payload.color})` : ""
         } added to cart!`
       );
 
       try {
         Ecom.addToCart({
-          id: product.id,
-          title: product.name,
+          id: product.ProductId,
+          title: product.Name,
           category: categoryName(product),
           price:
-            Number(product.price) - (Number(product.discountprice || 0) || 0),
+            Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
           quantity: qty,
           color: payload.color,
         });
@@ -359,10 +359,10 @@ const ProductDetails = () => {
       <Layout>
         {/* Basic SEO (indexable or not — you can choose to index) */}
         <Helmet>
-          <title>{`${product.name} — Coming Soon | Shahu Mumbai`}</title>
+          <title>{`${product.Name} — Coming Soon | Shahu Mumbai`}</title>
           <meta
             name="description"
-            content={`Coming soon: ${product.name} from Shahu Mumbai.`}
+            content={`Coming soon: ${product.Name} from Shahu Mumbai.`}
           />
           <link
             rel="canonical"
@@ -372,7 +372,7 @@ const ProductDetails = () => {
                 : "https://www.shahumumbai.com"
             }/products/${id}`}
           />
-          <meta property="og:title" content={`${product.name} — Coming Soon`} />
+          <meta property="og:title" content={`${product.Name} — Coming Soon`} />
           <meta property="og:description" content="Launching soon at Shahu Mumbai." />
         </Helmet>
 
@@ -382,10 +382,10 @@ const ProductDetails = () => {
               Coming Soon
             </h1>
             <p className="text-lg text-[#3E2C23]">
-              {product.name} will be available soon!
+              {product.Name} will be available soon!
             </p>
             <p className="text-sm text-[#3E2C23] mt-2">
-              Launching on: {new Date(product.launchingdate).toLocaleString("en-IN", {
+              Launching on: {new Date(product.LaunchingDate).toLocaleString("en-IN", {
                 dateStyle: "medium",
                 timeStyle: "short",
                 timeZone: "Asia/Kolkata",
@@ -421,12 +421,12 @@ const ProductDetails = () => {
     images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
 
   const hasDiscount =
-    product.discountprice &&
-    Number(product.discountprice) < Number(product.price);
+    product.DiscountPrice &&
+    Number(product.DiscountPrice) < Number(product.Price);
   const salePrice = hasDiscount
-    ? Number(product.price) - Number(product.discountprice)
-    : Number(product.price);
-  const mrp = Number(product.price);
+    ? Number(product.Price) - Number(product.DiscountPrice)
+    : Number(product.Price);
+  const mrp = Number(product.Price);
   const discountPercentage = hasDiscount
     ? Math.round(((mrp - salePrice) / mrp) * 100)
     : 0;
@@ -448,19 +448,19 @@ const ProductDetails = () => {
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
-    name: product.name,
+    name: product.Name,
     description: metaDescription,
     image: images.length ? images : [hero],
-    sku: String(product.id),
+    sku: String(product.ProductId),
     category: categoryName(product),
-    brand: product.branddesigner ? { "@type": "Brand", name: product.branddesigner } : undefined,
+    brand: product.branddesigner ? { "@type": "Brand", name: product.BrandDesigner } : undefined,
     offers: {
       "@type": "Offer",
       url: canonical,
       priceCurrency: "INR",
       price: Number(salePrice).toFixed(2),
       availability:
-        Number(product.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        Number(product.Stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
     },
     aggregateRating:
@@ -487,13 +487,13 @@ const ProductDetails = () => {
     <Layout>
       <Helmet>
         {/* Core SEO */}
-        <title>{`${product.name} — Shahu Mumbai`}</title>
+        <title>{`${product.Name} — Shahu Mumbai`}</title>
         <meta name="description" content={metaDescription} />
         <meta name="robots" content="index,follow,max-image-preview:large" />
         <meta
           name="keywords"
           content={[
-            product.name,
+            product.Name,
             categoryName(product),
             "Shahu Mumbai",
             "handwoven sarees",
@@ -511,11 +511,11 @@ const ProductDetails = () => {
         <meta property="og:type" content="product" />
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
-        <meta property="og:title" content={`${product.name} — Shahu Mumbai`} />
+        <meta property="og:title" content={`${product.Name} — Shahu Mumbai`} />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={images[0] || hero} />
-        <meta property="og:image:alt" content={`${product.name} — product image`} />
+        <meta property="og:image:alt" content={`${product.Name} — product image`} />
 
         {/* Twitter */}
         {/* <meta name="twitter:card" content="summary_large_image" /> */}
@@ -534,24 +534,24 @@ const ProductDetails = () => {
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Product",
-            name: product.name,
+            name: product.Name,
             description: metaDescription,
             image: images.length ? images : [hero],
-            sku: String(product.id),
+            sku: String(product.ProductId),
             ...(product.gtin ? { gtin: String(product.gtin) } : {}),
             category: categoryName(product),
-            ...(product.branddesigner && {
-              brand: { "@type": "Brand", name: product.branddesigner }
+            ...(product.BrandDesigner && {
+              brand: { "@type": "Brand", name: product.BrandDesigner }
             }),
-            ...(Array.isArray(product.colors) && product.colors.length
-              ? { color: product.colors.join(", ") }
+            ...(Array.isArray(product.Colors) && product.Colors.length
+              ? { color: product.Colors.join(", ") }
               : {}),
             additionalProperty: [
-              ...(Array.isArray(product.colors) && product.colors.length
+              ...(Array.isArray(product.Colors) && product.Colors.length
                 ? [{
                     "@type": "PropertyValue",
                     name: "Color options",
-                    value: product.colors.join(", ")
+                    value: product.Colors.join(", ")
                   }]
                 : []),
               {
@@ -566,11 +566,11 @@ const ProductDetails = () => {
               priceCurrency: "INR",
               price: Number(salePrice).toFixed(2),
               availability:
-                Number(product.stock) > 0
+                Number(product.Stock) > 0
                   ? "https://schema.org/InStock"
                   : "https://schema.org/OutOfStock",
               itemCondition: "https://schema.org/NewCondition",
-              ...(product.stock != null ? { inventoryLevel: { "@type": "QuantitativeValue", value: Number(product.stock) } } : {})
+              ...(product.Stock != null ? { inventoryLevel: { "@type": "QuantitativeValue", value: Number(product.Stock) } } : {})
             },
             ...(reviewCount > 0
               ? {
@@ -626,9 +626,9 @@ const ProductDetails = () => {
             </li>
             <li
               className="text-[#3E2C23] truncate max-w-[60%]"
-              title={product.name}
+              title={product.Name}
             >
-              {product.name}
+              {product.Name}
             </li>
           </ol>
         </nav>
@@ -648,7 +648,7 @@ const ProductDetails = () => {
                   >
                     <img
                       src={img}
-                      alt={`${product.name} thumbnail ${idx + 1}`}
+                      alt={`${product.Name} thumbnail ${idx + 1}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
                         e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
@@ -671,7 +671,7 @@ const ProductDetails = () => {
                     <div key={index} className="px-2">
                       <img
                         src={img}
-                        alt={`${product.name} view ${index + 1}`}
+                        alt={`${product.Name} view ${index + 1}`}
                         className="h-[560px] w-full object-cover rounded-md border border-[#D4A5A5] shadow-sm bg-white"
                         onError={(e) => {
                           e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
@@ -682,7 +682,7 @@ const ProductDetails = () => {
                 ) : (
                   <img
                     src={hero}
-                    alt={`${product.name}`}
+                    alt={`${product.Name}`}
                     className="h-[560px] w-full object-cover rounded-md"
                   />
                 )}
@@ -716,7 +716,7 @@ const ProductDetails = () => {
             <div className="lg:sticky lg:top-24 flex flex-col gap-4">
               <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-5">
                 <h1 className="text-2xl font-bold text-[#6B4226] mb-1">
-                  {product.name}
+                  {product.Name}
                 </h1>
                 <div className="flex items-center gap-2 mt-1">
                   <StarRating value={avgRating} />
@@ -786,13 +786,13 @@ const ProductDetails = () => {
 
                 <div className="mt-5 flex items-center gap-3">
                   <QuantitySelect
-                    max={Math.min(10, Number(product.stock) || 10)}
+                    max={Math.min(10, Number(product.Stock) || 10)}
                     value={qty}
                     onChange={setQty}
                   />
-                  {Number(product.stock) > 0 ? (
+                  {Number(product.Stock) > 0 ? (
                     <p className="text-sm text-[#A3B18A]">
-                      In Stock: {product.stock}
+                      In Stock: {product.Stock}
                     </p>
                   ) : (
                     <p className="text-sm text-red-500">Out of Stock</p>
@@ -802,24 +802,24 @@ const ProductDetails = () => {
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
                     className={`bg-black hover:bg-slate-600 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0 || cartSubmitting
+                      Number(product.Stock) === 0 || cartSubmitting
                         ? "opacity-50 cursor-not-allowed"
                         : ""
                     }`}
                     aria-label="Add this product to your shopping cart"
-                    disabled={Number(product.stock) === 0 || cartSubmitting}
+                    disabled={Number(product.Stock) === 0 || cartSubmitting}
                     onClick={handleAddToCart}
                   >
                     {cartSubmitting ? "Adding..." : "Add to Cart"}
                   </button>
                   <button
                     className={`bg-black hover:bg-slate-600 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.stock) === 0
+                      Number(product.Stock) === 0
                         ? "opacity-50 cursor-not-allowed"
                         : ""
                     }`}
                     aria-label="Buy now"
-                    disabled={Number(product.stock) === 0}
+                    disabled={Number(product.Stock) === 0}
                     onClick={() =>
                       console.log("Buy now", { id, qty, color: selectedColor })
                     }
@@ -848,7 +848,7 @@ const ProductDetails = () => {
                       type="button"
                       className="flex-1 bg-black hover:bg-slate-600 text-white px-4 py-3 rounded-md font-semibold shadow transition"
                       aria-label="Join waitlist"
-                      onClick={() => console.log("Add to Waitlist", product.id)}
+                      onClick={() => console.log("Add to Waitlist", product.ProductId)}
                     >
                       Join Waitlist
                     </button>
@@ -862,8 +862,8 @@ const ProductDetails = () => {
                   About this item
                 </h3>
                 <ul className="list-disc list-inside text-sm text-[#3E2C23] space-y-1">
-                  {product.shortdescription ? (
-                    product.shortdescription
+                  {product.ShortDescription ? (
+                    product.ShortDescription
                       .split(/\.|\n|\r/)
                       .map((s) => s.trim())
                       .filter(Boolean)
@@ -886,11 +886,11 @@ const ProductDetails = () => {
                 Product Description
               </h2>
               <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                {product.description || "No additional description provided."}
+                {product.Description || "No additional description provided."}
               </p>
               <div className="mt-4 text-md text-[#6B4226]">
                 Designer:{" "}
-                <span className="font-semibold">{product.branddesigner}</span>
+                <span className="font-semibold">{product.BrandDesigner}</span>
               </div>
             </div>
           </div>
@@ -911,7 +911,7 @@ const ProductDetails = () => {
                 <div className="flex justify-between">
                   <dt>Stock</dt>
                   <dd className="font-medium">
-                    {Number(product.stock) > 0 ? product.stock : "Out of stock"}
+                    {Number(product.Stock) > 0 ? product.Stock : "Out of stock"}
                   </dd>
                 </div>
               </dl>
@@ -1054,17 +1054,17 @@ const ProductDetails = () => {
                 ? related.product_images
                 : [];
               const relatedOrdered = [
-                ...rImgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
-                ...rImgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
+                ...rImgs.filter((i) => asBool(i?.is_hero === 'Y' ? true : false)).map(pickImageUrl),
+                ...rImgs.filter((i) => !asBool(i?.is_hero === 'Y' ? true : false)).map(pickImageUrl),
               ].filter(Boolean);
               const relatedImage =
                 relatedOrdered[0] || "/assets/images/placeholder.png";
               const relatedHasDiscount =
-                related.discountprice &&
-                Number(related.discountprice) < Number(related.price);
+                related.DiscountPrice &&
+                Number(related.DiscountPrice) < Number(related.Price);
               const relatedSalePrice = relatedHasDiscount
-                ? Number(related.price) - Number(related.discountprice)
-                : Number(related.price);
+                ? Number(related.Price) - Number(related.DiscountPrice)
+                : Number(related.Price);
 
               return (
                 <div key={related.id} className="w-[260px]">

@@ -40,9 +40,9 @@ exports.addToCart = async (req, res) => {
       .input('UserId', sql.NVarChar(128), String(owner))
       .input('ProductId', sql.Int, product_id)
       .query(`
-        SELECT id, quantity
+        SELECT CartId, quantity
         FROM dbo.carts
-        WHERE user_id = @UserId AND product_id = @ProductId
+        WHERE UserId = @UserId AND ProductId = @ProductId
       `);
 
     const existing = sel.recordset?.[0];
@@ -57,24 +57,22 @@ exports.addToCart = async (req, res) => {
         .query(`
           UPDATE dbo.carts
           SET quantity = @Qty, updated_at = @UpdatedAt
-          OUTPUT INSERTED.id, INSERTED.user_id, INSERTED.product_id, INSERTED.quantity, INSERTED.created_at, INSERTED.updated_at
-          WHERE id = @Id AND user_id = @UserId
+          OUTPUT INSERTED.CartId, INSERTED.UserId, INSERTED.ProductId, INSERTED.quantity, INSERTED.CreatedAt, INSERTED.UpdatedAt
+          WHERE CartId = @Id AND UserId = @UserId
         `);
 
       const row = upd.recordset?.[0];
       return res.json(row);
     } else {
-      const id = crypto.randomUUID();
       const ins = await req.dbPool.request()
-        .input('Id', sql.NVarChar(50), id)
         .input('UserId', sql.NVarChar(128), String(owner))
         .input('ProductId', sql.Int, product_id)
         .input('Qty', sql.Int, qty)
         .input('CreatedAt', sql.DateTime2, now())
         .input('UpdatedAt', sql.DateTime2, now())
         .query(`
-          INSERT INTO dbo.carts (id, user_id, product_id, quantity, created_at, updated_at)
-          OUTPUT INSERTED.id, INSERTED.user_id, INSERTED.product_id, INSERTED.quantity, INSERTED.created_at, INSERTED.updated_at
+          INSERT INTO dbo.carts (UserId, ProductId, quantity, CreatedAt, UpdatedAt)
+          OUTPUT INSERTED.CartId, INSERTED.UserId, INSERTED.ProductId, INSERTED.quantity, INSERTED.CreatedAt, INSERTED.UpdatedAt
           VALUES (@Id, @UserId, @ProductId, @Qty, @CreatedAt, @UpdatedAt)
         `);
 
@@ -119,23 +117,23 @@ exports.getCartItems = async (req, res) => {
       .input('UserId', sql.NVarChar(128), String(owner))
       .query(`
         SELECT
-          c.id, c.user_id, c.product_id, c.quantity, c.created_at, c.updated_at,
+          c.CartId AS id, c.UserId AS user_id, c.ProductId AS product_id, c.Quantity AS quantity, c.CreatedAt AS created_at, c.UpdatedAt updated_at,
           p.ProductId       AS prod_id,
           p.Name            AS prod_name,
           p.Price           AS prod_price,
           p.DiscountPrice   AS prod_discount,
           p.Stock           AS prod_stock,
           pi.id             AS img_id,
-          pi.image_url      AS img_url,
-          pi.is_hero        AS img_is_hero,
+          pi.ImageUrl      AS img_url,
+          pi.isHero        AS img_is_hero,
           c2.CategoryId     AS cat_id,
           c2.Name           AS cat_name
         FROM dbo.carts c
-        INNER JOIN dbo.products p ON p.ProductId = c.product_id
-        LEFT JOIN dbo.product_images pi ON pi.product_id = p.ProductId AND pi.is_hero = 1
-        LEFT JOIN dbo.categories c2 ON c2.CategoryId = p.CategoryId
-        WHERE c.user_id = @UserId
-        ORDER BY c.created_at DESC
+        INNER JOIN dbo.products p ON p.ProductId = c.ProductId
+        LEFT JOIN dbo.ProductImages pi ON pi.ProductId = p.ProductId AND pi.IsHero ='Y'
+        LEFT JOIN dbo.Categories c2 ON c2.CategoryId = p.CategoryId
+        WHERE c.UserId = @UserId
+        ORDER BY c.CreatedAt DESC
       `);
 
     
@@ -195,15 +193,15 @@ exports.updateCartItem = async (req, res) => {
     }
 
     const r = await req.dbPool.request()
-      .input('Id', sql.NVarChar(50), id)
+      .input('CartId', sql.NVarChar(50), id)
       .input('UserId', sql.NVarChar(128), String(owner))
-      .input('Qty', sql.Int, qty)
+      .input('Quantity', sql.Int, qty)
       .input('UpdatedAt', sql.DateTime2, now())
       .query(`
         UPDATE dbo.carts
-        SET quantity = @Qty, updated_at = @UpdatedAt
-        OUTPUT INSERTED.id, INSERTED.user_id, INSERTED.product_id, INSERTED.quantity, INSERTED.created_at, INSERTED.updated_at
-        WHERE id = @Id AND user_id = @UserId
+        SET quantity = @Qty, UpdatedAt = @UpdatedAt
+        OUTPUT INSERTED.CartId, INSERTED.UserId, INSERTED.ProductId, INSERTED.quantity, INSERTED.CreatedAt, INSERTED.UpdatedAt
+        WHERE CartId = @Id AND UserId = @UserId
       `);
 
     const row = r.recordset?.[0];
@@ -228,12 +226,12 @@ exports.deleteCartItem = async (req, res) => {
     }
 
     const r = await req.dbPool.request()
-      .input('Id', sql.NVarChar(50), id)
-      .input('UserId', sql.NVarChar(128), String(owner))
+      .input('Id', sql.Int, id)
+      .input('UserId', sql.Int, parseInt(owner))
       .query(`
         DELETE FROM dbo.carts
         OUTPUT DELETED.id
-        WHERE id = @Id AND user_id = @UserId
+        WHERE Cartid = @Id AND UserId = @UserId
       `);
 
     if (!r.recordset?.length) return res.status(404).json({ error: 'Cart item not found' });

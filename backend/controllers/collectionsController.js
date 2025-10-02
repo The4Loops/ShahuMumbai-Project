@@ -1,6 +1,6 @@
 const sql = require('mssql');
 
-const uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const intRe = /^\d+$/;
 const now = () => new Date();
 const dbReady = (req) => req.dbPool && req.dbPool.connected;
 const devFakeAllowed = () => process.env.ALLOW_FAKE === '1';
@@ -31,7 +31,7 @@ exports.listCollections = async (req, res) => {
     if (!dbReady(req) && devFakeAllowed()) {
       const fake = [
         {
-          id: '11111111-1111-1111-1111-111111111111',
+          id: 1,
           title: 'Festive Edit',
           slug: 'festive-edit',
           description: 'Handpicked looks',
@@ -41,7 +41,7 @@ exports.listCollections = async (req, res) => {
           created_at: now(),
           updated_at: now(),
           product_count: 3,
-          categoryids: ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+          categoryids: [1],
         },
       ];
       return res.json({ collections: fake, total: fake.length });
@@ -59,8 +59,8 @@ exports.listCollections = async (req, res) => {
       clauses.push('Status = @Status');
     }
     if (is_active !== undefined && is_active !== '') {
-      const b = parseBoolStr(is_active) ? 1 : 0;
-      reqst.input('IsActive', sql.Bit, b);
+      const b = parseBoolStr(is_active) ? 'Y' : 'N';
+      reqst.input('IsActive', sql.Char(1), b);
       clauses.push('IsActive = @IsActive');
     }
 
@@ -68,7 +68,7 @@ exports.listCollections = async (req, res) => {
 
     const countRes = await reqst.query(`
       SELECT COUNT(*) AS total
-      FROM dbo.collections
+      FROM Collections
       ${whereSql}
     `);
     const total = countRes.recordset?.[0]?.total || 0;
@@ -77,14 +77,14 @@ exports.listCollections = async (req, res) => {
     if (q) pageReq.input('Q', sql.NVarChar(400), `%${q}%`);
     if (status) pageReq.input('Status', sql.NVarChar(30), String(status).toUpperCase());
     if (is_active !== undefined && is_active !== '') {
-      pageReq.input('IsActive', sql.Bit, parseBoolStr(is_active) ? 1 : 0);
+      pageReq.input('IsActive', sql.Char(1), parseBoolStr(is_active) ? 'Y' : 'N');
     }
     pageReq.input('Limit', sql.Int, limit);
     pageReq.input('Offset', sql.Int, offset);
 
     const pageRes = await pageReq.query(`
       SELECT
-        c.Id           AS id,
+        c.CollectionId           AS id,
         c.Title        AS title,
         c.Slug         AS slug,
         c.Description  AS description,
@@ -97,8 +97,8 @@ exports.listCollections = async (req, res) => {
       FROM dbo.collections c
       OUTER APPLY (
         SELECT COUNT(*) AS ProductsCount
-        FROM dbo.products p
-        WHERE p.CollectionId = c.Id
+        FROM Products p
+        WHERE p.CollectionId = c.CollectionId
       ) pc
       ${whereSql}
       ORDER BY c.CreatedAt DESC
@@ -111,12 +111,12 @@ exports.listCollections = async (req, res) => {
     const ids = rows.map(r => r.id);
     const inList = ids.map((_, i) => `@C${i}`).join(',');
     const catReq = req.dbPool.request();
-    ids.forEach((val, i) => catReq.input(`C${i}`, sql.UniqueIdentifier, val));
+    ids.forEach((val, i) => catReq.input(`C${i}`, sql.Int, val));
 
     const catsRes = await catReq.query(`
-      SELECT collection_id, category_id
-      FROM dbo.collection_categories
-      WHERE collection_id IN (${inList})
+      SELECT CollectionId AS collection_id,CategoryId AS category_id
+      FROM CollectionCategories
+      WHERE CollectionId IN (${inList})
     `);
     const cats = catsRes.recordset || [];
     const byCollection = cats.reduce((acc, r) => {
@@ -126,7 +126,7 @@ exports.listCollections = async (req, res) => {
 
     const formatted = rows.map(r => ({
       ...r,
-      is_active: r.is_active === true || r.is_active === 1,
+      is_active: r.is_active == 'Y' ? true : false,
       categoryids: byCollection[r.id] || [],
     }));
 
@@ -141,13 +141,13 @@ exports.listCollections = async (req, res) => {
 exports.getCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!uuidRe.test(id)) {
+    if (!intRe.test(id)) {
       return res.status(400).json({ error: 'Invalid collection id format' });
     }
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.json({
-        id,
+        id: parseInt(id),
         title: 'Festive Edit',
         slug: 'festive-edit',
         description: 'Handpicked looks',
@@ -156,15 +156,15 @@ exports.getCollection = async (req, res) => {
         is_active: true,
         created_at: now(),
         updated_at: now(),
-        categoryids: ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+        categoryids: [1],
       });
     }
 
     const r = await req.dbPool.request()
-      .input('Id', sql.UniqueIdentifier, id)
+      .input('Id', sql.Int, parseInt(id))
       .query(`
         SELECT
-          Id          AS id,
+         CollectionId          AS id,
           Title       AS title,
           Slug        AS slug,
           Description AS description,
@@ -174,24 +174,24 @@ exports.getCollection = async (req, res) => {
           CreatedAt   AS created_at,
           UpdatedAt   AS updated_at
         FROM dbo.collections
-        WHERE Id = @Id
+        WHERE CollectionId = @Id
       `);
 
     const data = r.recordset?.[0];
     if (!data) return res.status(404).json({ error: 'Collection not found' });
 
     const map = await req.dbPool.request()
-      .input('Id', sql.UniqueIdentifier, id)
+      .input('Id', sql.Int, parseInt(id))
       .query(`
-        SELECT category_id
-        FROM dbo.collection_categories
-        WHERE collection_id = @Id
+        SELECT CategoryId AS category_id
+        FROM CollectionCategories
+        WHERE CollectionId = @Id
       `);
 
     const categoryids = (map.recordset || []).map(x => x.category_id);
     return res.json({
       ...data,
-      is_active: data.is_active === true || data.is_active === 1,
+      is_active: data.is_active =='Y' ? true : false,
       categoryids,
     });
   } catch (e) {
@@ -216,14 +216,14 @@ exports.createCollection = async (req, res) => {
       return res.status(400).json({ error: 'Slug must contain only lowercase letters, numbers, and hyphens' });
     }
     for (const cid of categoryids) {
-      if (!uuidRe.test(cid)) {
+      if (!intRe.test(cid)) {
         return res.status(400).json({ error: `Invalid category ID format: ${cid}` });
       }
     }
 
     if (!dbReady(req) && devFakeAllowed()) {
-      const fake = {
-        id: '22222222-2222-2222-2222-222222222222',
+      const fake = { 
+        id: 1,
         title,
         slug: String(slug).trim().toLowerCase(),
         description: description ?? null,
@@ -240,36 +240,34 @@ exports.createCollection = async (req, res) => {
     const tx = new sql.Transaction(req.dbPool);
     await tx.begin();
     try {
-      const id = crypto.randomUUID();
-
       const insertReq = new sql.Request(tx);
       insertReq
-        .input('Id', sql.UniqueIdentifier, id)
         .input('Title', sql.NVarChar(255), String(title))
         .input('Slug', sql.NVarChar(255), String(slug).trim().toLowerCase())
         .input('Description', sql.NVarChar(sql.MAX), description ?? null)
         .input('Cover', sql.NVarChar(1024), cover_image ?? null)
         .input('Status', sql.NVarChar(30), String(status).toUpperCase())
-        .input('Active', sql.Bit, !!is_active ? 1 : 0)
+        .input('Active', sql.Char(1), !!is_active ? 'Y' : 'N')
         .input('CreatedAt', sql.DateTime2, now())
         .input('UpdatedAt', sql.DateTime2, now());
 
       const ins = await insertReq.query(`
         INSERT INTO dbo.collections
-          (Id, Title, Slug, Description, CoverImage, Status, IsActive, CreatedAt, UpdatedAt)
+          (Title, Slug, Description, CoverImage, Status, IsActive, CreatedAt, UpdatedAt)
         OUTPUT INSERTED.*
         VALUES
-          (@Id, @Title, @Slug, @Description, @Cover, @Status, @Active, @CreatedAt, @UpdatedAt)
+          (@Title, @Slug, @Description, @Cover, @Status, @Active, @CreatedAt, @UpdatedAt)
       `);
       const coll = ins.recordset?.[0];
+      const id = coll.CollectionId;
 
       for (const cid of categoryids) {
         const j = new sql.Request(tx);
         await j
-          .input('Coll', sql.UniqueIdentifier, id)
-          .input('Cat', sql.UniqueIdentifier, cid)
+          .input('Coll', sql.Int, id)
+          .input('Cat', sql.Int, parseInt(cid))
           .query(`
-            INSERT INTO dbo.collection_categories (collection_id, category_id)
+            INSERT INTO CollectionCategories (CollectionId, CategoryId)
             VALUES (@Coll, @Cat)
           `);
       }
@@ -279,13 +277,13 @@ exports.createCollection = async (req, res) => {
       return res.status(201).json({
         message: 'Collection created successfully',
         collection: {
-          id: coll.Id,
+          id: coll.CollectionId,
           title: coll.Title,
           slug: coll.Slug,
           description: coll.Description,
           cover_image: coll.CoverImage,
           status: coll.Status,
-          is_active: coll.IsActive === true || coll.IsActive === 1,
+          is_active: coll.IsActive == 'Y' ? true : false,
           created_at: coll.CreatedAt,
           updated_at: coll.UpdatedAt,
           categoryids: [...categoryids],
@@ -313,9 +311,10 @@ exports.createCollection = async (req, res) => {
 exports.updateCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!uuidRe.test(id)) {
+    if (!intRe.test(id)) {
       return res.status(400).json({ error: 'Invalid collection id format' });
     }
+    const intId = parseInt(id);
 
     const { title, slug, description, cover_image, status, is_active, categoryids } = req.body || {};
 
@@ -338,7 +337,7 @@ exports.updateCollection = async (req, res) => {
         return res.status(400).json({ error: 'categoryids must be a non-empty array' });
       }
       for (const cid of categoryids) {
-        if (!uuidRe.test(cid)) {
+        if (!intRe.test(cid)) {
           return res.status(400).json({ error: `Invalid category ID format: ${cid}` });
         }
       }
@@ -352,7 +351,7 @@ exports.updateCollection = async (req, res) => {
       return res.status(200).json({
         message: 'Collection updated successfully',
         collection: {
-          id,
+          id: intId,
           title: updates.Title ?? 'Sample',
           slug: updates.Slug ?? 'sample',
           description: updates.Description ?? null,
@@ -361,7 +360,7 @@ exports.updateCollection = async (req, res) => {
           is_active: updates.IsActive ?? true,
           created_at: now(),
           updated_at: now(),
-          categoryids: categoryids ?? ['aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'],
+          categoryids: categoryids ?? [1],
         },
       });
     }
@@ -373,7 +372,7 @@ exports.updateCollection = async (req, res) => {
       if (Object.keys(updates).length) {
         const sets = ['UpdatedAt = @UpdatedAt'];
         const reqst = new sql.Request(tx)
-          .input('Id', sql.UniqueIdentifier, id)
+          .input('Id', sql.Int, intId)
           .input('UpdatedAt', sql.DateTime2, now());
 
         if ('Title' in updates) { sets.push('Title=@Title'); reqst.input('Title', sql.NVarChar(255), updates.Title); }
@@ -381,13 +380,13 @@ exports.updateCollection = async (req, res) => {
         if ('Description' in updates) { sets.push('Description=@Description'); reqst.input('Description', sql.NVarChar(sql.MAX), updates.Description ?? null); }
         if ('CoverImage' in updates)  { sets.push('CoverImage=@CoverImage'); reqst.input('CoverImage', sql.NVarChar(1024), updates.CoverImage ?? null); }
         if ('Status' in updates)      { sets.push('Status=@Status'); reqst.input('Status', sql.NVarChar(30), updates.Status); }
-        if ('IsActive' in updates)    { sets.push('IsActive=@IsActive'); reqst.input('IsActive', sql.Bit, updates.IsActive ? 1 : 0); }
+        if ('IsActive' in updates)    { sets.push('IsActive=@IsActive'); reqst.input('IsActive', sql.Char(1), updates.IsActive ? 'Y' : 'N'); }
 
         const up = await reqst.query(`
           UPDATE dbo.collections
           SET ${sets.join(', ')}
           OUTPUT INSERTED.*
-          WHERE Id = @Id
+          WHERE CollectionId = @Id
         `);
         updatedRow = up.recordset?.[0];
         if (!updatedRow) {
@@ -396,8 +395,8 @@ exports.updateCollection = async (req, res) => {
         }
       } else {
         const cur = await new sql.Request(tx)
-          .input('Id', sql.UniqueIdentifier, id)
-          .query(`SELECT * FROM dbo.collections WHERE Id=@Id`);
+          .input('Id', sql.Int, intId)
+          .query(`SELECT * FROM dbo.collections WHERE CollectionId=@Id`);
         updatedRow = cur.recordset?.[0];
         if (!updatedRow) {
           await tx.rollback();
@@ -407,13 +406,13 @@ exports.updateCollection = async (req, res) => {
 
       if (categoryids !== undefined) {
         await new sql.Request(tx)
-          .input('Id', sql.UniqueIdentifier, id)
+          .input('Id', sql.Int, intId)
           .query(`DELETE FROM dbo.collection_categories WHERE collection_id=@Id`);
 
         for (const cid of categoryids) {
           await new sql.Request(tx)
-            .input('Coll', sql.UniqueIdentifier, id)
-            .input('Cat', sql.UniqueIdentifier, cid)
+            .input('Coll', sql.Int, intId)
+            .input('Cat', sql.Int, parseInt(cid))
             .query(`
               INSERT INTO dbo.collection_categories (collection_id, category_id)
               VALUES (@Coll, @Cat)
@@ -422,7 +421,7 @@ exports.updateCollection = async (req, res) => {
       }
 
       const cats = await new sql.Request(tx)
-        .input('Id', sql.UniqueIdentifier, id)
+        .input('Id', sql.Int, intId)
         .query(`
           SELECT category_id
           FROM dbo.collection_categories
@@ -434,13 +433,13 @@ exports.updateCollection = async (req, res) => {
       return res.status(200).json({
         message: 'Collection updated successfully',
         collection: {
-          id: updatedRow.Id,
+          id: updatedRow.CollectionId,
           title: updatedRow.Title,
           slug: updatedRow.Slug,
           description: updatedRow.Description,
           cover_image: updatedRow.CoverImage,
           status: updatedRow.Status,
-          is_active: updatedRow.IsActive === true || updatedRow.IsActive === 1,
+          is_active: updatedRow.IsActive == 'Y',
           created_at: updatedRow.CreatedAt,
           updated_at: updatedRow.UpdatedAt,
           categoryids: (cats.recordset || []).map(x => x.category_id),
@@ -468,9 +467,10 @@ exports.updateCollection = async (req, res) => {
 exports.deleteCollection = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!uuidRe.test(id)) {
+    if (!intRe.test(id)) {
       return res.status(400).json({ error: 'Invalid collection id format' });
     }
+    const intId = parseInt(id);
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.status(204).send();
@@ -480,15 +480,15 @@ exports.deleteCollection = async (req, res) => {
     await tx.begin();
     try {
       await new sql.Request(tx)
-        .input('Id', sql.UniqueIdentifier, id)
+        .input('Id', sql.Int, intId)
         .query(`DELETE FROM dbo.collection_categories WHERE collection_id=@Id`);
 
       const del = await new sql.Request(tx)
-        .input('Id', sql.UniqueIdentifier, id)
+        .input('Id', sql.Int, intId)
         .query(`
           DELETE FROM dbo.collections
-          OUTPUT DELETED.Id
-          WHERE Id=@Id
+          OUTPUT DELETED.CollectionId
+          WHERE CollectionId=@Id
         `);
 
       if (!del.recordset?.[0]) {

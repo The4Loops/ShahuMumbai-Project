@@ -15,7 +15,7 @@ const asBool = (v) => v === true || v === "true" || v === 1 || v === "1";
 const categoryName = (p) =>
   p?.categories?.name ||
   (p?.category && p.category.name) ||
-  (Array.isArray(p?.categories) ? p.categories[0]?.name : null) ||
+  (Array.isArray(p?.categories) ? p.categories[0]?.Name : null) ||
   "Uncategorized";
 
 const IMAGE_BASE =
@@ -85,10 +85,10 @@ const Products = () => {
         ].filter(Boolean);
 
         return {
-          id: p.id,
-          name: p.name,
-          description: p.description || "No description available",
-          price: Number(p.price || 0),
+          id: p.ProductId,
+          name: p.Name,
+          description: p.Description || "No description available",
+          price: Number(p.Price || 0),
           category: categoryName(p),
           image: ordered[0] || "/assets/images/placeholder.png",
         };
