@@ -110,20 +110,9 @@ app.use(express.json());
 const connectSrc = [
   "'self'",
   ...allowed,
-  process.env.API_ORIGIN,
+  process.env.API_ORIGIN || "http://localhost:5000",
   "https://api.razorpay.com",
   "https://*.razorpay.com",
-  "https://yourdomain.com",  // Add your domain
-  "https://*.supabase.co",  // For Supabase
-  "https://res.cloudinary.com",  // For Cloudinary
-];
-
-const imgSrc = [
-  "'self'", 
-  "data:", 
-  "https://*.razorpay.com",
-  "https://res.cloudinary.com",  // Add Cloudinary
-  "https://yourdomain.com",  // Your domain
 ];
 
 app.use(
@@ -133,7 +122,7 @@ app.use(
       scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://checkout.razorpay.com"],
       styleSrc: ["'self'", "https://fonts.googleapis.com"],
       fontSrc: ["https://fonts.gstatic.com"],
-      imgSrc,
+      imgSrc: ["'self'", "data:", "https://*.razorpay.com"],
       connectSrc,
       frameSrc: ["'self'", "https://*.razorpay.com"],
       objectSrc: ["'none'"],
@@ -180,18 +169,6 @@ app.use('/api', wishlistRoutes);
 app.use('/api/payments', paymentsRoutes);
 app.use('/api', heritageRoutes);
 app.use('/api', standaloneRoutes); // <-- public subscribe endpoint
-
-if (process.env.NODE_ENV === 'production') {
-  const path = require('path');
-  app.use(express.static(path.join(__dirname, 'client-build')));  // Upload frontend build to /client-build folder
-
-  // Handle SPA routing (for React/Vue/etc.)
-  app.get('*', (req, res) => {
-    if (!req.path.startsWith('/api')) {
-      res.sendFile(path.join(__dirname, 'client-build', 'index.html'));
-    }
-  });
-}
 
 // Start server
 const PORT = process.env.PORT || 5000;
