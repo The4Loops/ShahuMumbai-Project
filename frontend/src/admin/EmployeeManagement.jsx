@@ -15,30 +15,30 @@ function EmployeeManagement() {
   const [actionMenuUserId, setActionMenuUserId] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [newUser, setNewUser] = useState({
-    name: "",
-    email: "",
-    password: "",
-    role: "Editor",
-    status: "active",
+    FullName: "",
+    Email: "",
+    Password: "",
+    role: "Users",
+    Active: true,
   });
 
   // Store refs for each action menu
   const actionMenuRefs = useRef({});
 
   const badgeColors = {
-    admin: "bg-red-100 text-red-600",
-    manager: "bg-blue-100 text-blue-600",
-    editor: "bg-green-100 text-green-600",
-    user: "bg-gray-100 text-gray-600",
+    Admin: "bg-red-100 text-red-600",
+    Manager: "bg-blue-100 text-blue-600",
+    Editor: "bg-green-100 text-green-600",
+    Users: "bg-gray-100 text-gray-600",
     active: "bg-green-100 text-green-600",
     inactive: "bg-red-100 text-red-600",
   };
 
   const avatarColors = {
-    admin: "bg-red-500 text-white",
-    manager: "bg-blue-500 text-white",
-    editor: "bg-green-500 text-white",
-    user: "bg-gray-500 text-white",
+    Admin: "bg-red-500 text-white",
+    Manager: "bg-blue-500 text-white",
+    Editor: "bg-green-500 text-white",
+    Users: "bg-gray-500 text-white",
   };
 
   // Fetch users from API
@@ -54,10 +54,13 @@ function EmployeeManagement() {
         },
       });
       const transformedUsers = response.data.users.map(user => ({
-        ...user,
-        active: user.active === true || user.active === "Y", // Handle both boolean and "Y"/"N"
-        joined: user.joined || "N/A",
-        last_login: user.last_login || "Never",
+        UserId: user.UserId,
+        FullName: user.FullName,
+        Email: user.Email,
+        role: user.Label,
+        Active: user.Active,
+        Joined: user.Joined || "N/A",
+        LastLogin: user.LastLogin || "Never",
       }));
       setUsers(transformedUsers);
     } catch (error) {
@@ -73,7 +76,7 @@ function EmployeeManagement() {
 
   useEffect(() => {
     debouncedFetchUsers();
-  }, [search, roleFilter, statusFilter]);
+  }, [debouncedFetchUsers]);
 
   // Close action menu on outside click
   useEffect(() => {
@@ -99,12 +102,12 @@ function EmployeeManagement() {
   }, []);
 
   const handleAddOrEditUser = async () => {
-    if (!newUser.name || !newUser.email) {
+    if (!newUser.FullName || !newUser.Email) {
       toast.dismiss();
       toast.error("Name and Email are required!");
       return;
     }
-    if (editingUserId === null && (!newUser.password || newUser.password.length < 8)) {
+    if (editingUserId === null && (!newUser.Password || newUser.Password.length < 8)) {
       toast.dismiss();
       toast.error("Password is required and must be at least 8 characters!");
       return;
@@ -113,21 +116,21 @@ function EmployeeManagement() {
     try {
       if (editingUserId !== null) {
         await api.put(`/api/users/${editingUserId}`, {
-          full_name: newUser.name,
-          email: newUser.email,
-          password: newUser.password || undefined,
+          FullName: newUser.FullName,
+          Email: newUser.Email,
+          Password: newUser.Password || undefined,
           role: newUser.role,
-          active: newUser.status === "active",
+          Active: newUser.Active,
         });
         toast.dismiss();
         toast.success("User updated successfully");
       } else {
         await api.post("/api/users", {
-          full_name: newUser.name,
-          email: newUser.email,
-          password: newUser.password,
+          FullName: newUser.FullName,
+          Email: newUser.Email,
+          Password: newUser.Password,
           role: newUser.role,
-          active: newUser.status === "active",
+          Active: newUser.Active,
         });
         toast.dismiss();
         toast.success("User created successfully");
@@ -141,14 +144,14 @@ function EmployeeManagement() {
   };
 
   const handleEdit = (userId) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find(u => u.UserId === userId);
     if (!user) return;
     setNewUser({
-      name: user.full_name,
-      email: user.email,
-      password: "",
+      FullName: user.FullName,
+      Email: user.Email,
+      Password: "",
       role: user.role,
-      status: user.active ? "active" : "inactive",
+      Active: user.Active,
     });
     setEditingUserId(userId);
     setShowModal(true);
@@ -156,11 +159,11 @@ function EmployeeManagement() {
   };
 
   const handleDelete = async (userId) => {
-    const user = users.find(u => u.id === userId);
+    const user = users.find(u => u.UserId === userId);
     if (!user) return;
-    if (window.confirm(`Are you sure you want to delete ${user.full_name}?`)) {
+    if (window.confirm(`Are you sure you want to delete ${user.FullName}?`)) {
       try {
-        await api.delete(`/api/users/${user.id}`);
+        await api.delete(`/api/users/${user.UserId}`);
         toast.dismiss();
         toast.success("User deleted successfully");
         fetchUsers();
@@ -174,11 +177,11 @@ function EmployeeManagement() {
 
   const resetForm = () => {
     setNewUser({
-      name: "",
-      email: "",
-      password: "",
-      role: "user",
-      status: "active",
+      FullName: "",
+      Email: "",
+      Password: "",
+      role: "Users",
+      Active: true,
     });
     setEditingUserId(null);
     setShowModal(false);
@@ -188,10 +191,10 @@ function EmployeeManagement() {
     return (
       <div
         className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium ${
-          avatarColors[user.role] || avatarColors.user
+          avatarColors[user.role] || avatarColors.Users
         }`}
       >
-        {user.full_name?.charAt(0) || "?"}
+        {user.FullName?.charAt(0) || "?"}
       </div>
     );
   };
@@ -221,6 +224,7 @@ function EmployeeManagement() {
               <option>Admin</option>
               <option>Manager</option>
               <option>Editor</option>
+              <option>Users</option>
             </select>
             <select
               className="border rounded-lg px-3 py-2"
@@ -228,8 +232,8 @@ function EmployeeManagement() {
               onChange={(e) => setStatusFilter(e.target.value)}
             >
               <option>All</option>
-              <option>Active</option>
-              <option>Inactive</option>
+              <option>active</option>
+              <option>inactive</option>
             </select>
             <button
               onClick={() => {
@@ -268,7 +272,6 @@ function EmployeeManagement() {
         <div className="text-center py-4">Loading...</div>
       ) : users.length === 0 ? (
         <div className="text-center py-4 text-gray-500">No users found.</div>
-
       ) : view === "table" ? (
         <div className="mt-6 border rounded-lg overflow-x-auto shadow-sm">
           <table className="min-w-full bg-white">
@@ -283,12 +286,12 @@ function EmployeeManagement() {
             </thead>
             <tbody>
               {users.map((user) => (
-                <tr key={user.id} className="border-b hover:bg-gray-50 relative">
+                <tr key={user.UserId} className="border-b hover:bg-gray-50 relative">
                   <td className="py-3 px-4 flex items-center gap-3">
                     {renderAvatar(user)}
                     <div>
-                      <div className="font-medium">{user.full_name}</div>
-                      <div className="text-sm text-gray-500">{user.email}</div>
+                      <div className="font-medium">{user.FullName}</div>
+                      <div className="text-sm text-gray-500">{user.Email}</div>
                     </div>
                   </td>
                   <td className="py-3 px-4">
@@ -299,34 +302,34 @@ function EmployeeManagement() {
                   <td className="py-3 px-4">
                     <span
                       className={`px-2 py-1 rounded-full text-xs font-medium ${
-                        badgeColors[user.active ? "active" : "inactive"]
+                        badgeColors[user.Active ? "active" : "inactive"]
                       }`}
                     >
-                      {user.active ? "Active" : "Inactive"}
+                      {user.Active ? "Active" : "Inactive"}
                     </span>
                   </td>
                   <td className="py-3 px-4 text-sm text-gray-600">
-                    {user.joined}
-                    <div className="text-xs text-gray-400">Last: {user.last_login}</div>
+                    {user.Joined}
+                    <div className="text-xs text-gray-400">Last: {user.LastLogin}</div>
                   </td>
                   <td className="py-3 px-4 text-right relative">
-                    <div ref={(el) => (actionMenuRefs.current[user.id] = el)}>
+                    <div ref={(el) => (actionMenuRefs.current[user.UserId] = el)}>
                       <button
-                        onClick={() => setActionMenuUserId(actionMenuUserId === user.id ? null : user.id)}
+                        onClick={() => setActionMenuUserId(actionMenuUserId === user.UserId ? null : user.UserId)}
                         className="px-2 py-1 rounded hover:bg-gray-100"
                       >
                         ⋮
                       </button>
-                      {actionMenuUserId === user.id && (
+                      {actionMenuUserId === user.UserId && (
                         <div className="absolute right-4 mt-1 bg-white border rounded shadow-lg text-sm z-10">
                           <button
-                            onClick={() => handleEdit(user.id)}
+                            onClick={() => handleEdit(user.UserId)}
                             className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
                           >
                             Edit
                           </button>
                           <button
-                            onClick={() => handleDelete(user.id)}
+                            onClick={() => handleDelete(user.UserId)}
                             className="block px-4 py-2 hover:bg-gray-100 w-full text-left text-red-600"
                           >
                             Delete
@@ -344,32 +347,32 @@ function EmployeeManagement() {
         <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {users.map((user) => (
             <div
-              key={user.id}
+              key={user.UserId}
               className="border rounded-lg p-4 bg-white flex flex-col gap-2 shadow-sm hover:shadow-md transition relative"
             >
               <div className="flex items-center gap-3">
                 {renderAvatar(user)}
                 <div>
-                  <div className="font-medium">{user.full_name}</div>
-                  <div className="text-sm text-gray-500">{user.email}</div>
+                  <div className="font-medium">{user.FullName}</div>
+                  <div className="text-sm text-gray-500">{user.Email}</div>
                 </div>
-                <div ref={(el) => (actionMenuRefs.current[user.id] = el)}>
+                <div ref={(el) => (actionMenuRefs.current[user.UserId] = el)}>
                   <button
-                    onClick={() => setActionMenuUserId(actionMenuUserId === user.id ? null : user.id)}
+                    onClick={() => setActionMenuUserId(actionMenuUserId === user.UserId ? null : user.UserId)}
                     className="ml-auto px-2 py-1 rounded hover:bg-gray-100"
                   >
                     ⋮
                   </button>
-                  {actionMenuUserId === user.id && (
+                  {actionMenuUserId === user.UserId && (
                     <div className="absolute right-4 top-10 bg-white border rounded shadow-lg text-sm z-10">
                       <button
-                        onClick={() => handleEdit(user.id)}
+                        onClick={() => handleEdit(user.UserId)}
                         className="block px-4 py-2 hover:bg-gray-100 w-full text-left"
                       >
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(user.id)}
+                        onClick={() => handleDelete(user.UserId)}
                         className="block px-4 py-2 hover:bg-gray-100 w-full text-left text-red-600"
                       >
                         Delete
@@ -379,19 +382,19 @@ function EmployeeManagement() {
                 </div>
               </div>
               <div className="flex gap-2">
-                <span className={`px-2 py-1 rounded-full text-xs font- medium ${badgeColors[user.role]}`}>
+                <span className={`px-2 py-1 rounded-full text-xs font-medium ${badgeColors[user.role]}`}>
                   {user.role}
                 </span>
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    badgeColors[user.active ? "active" : "inactive"]
+                    badgeColors[user.Active ? "active" : "inactive"]
                   }`}
                 >
-                  {user.active ? "Active" : "Inactive"}
+                  {user.Active ? "Active" : "Inactive"}
                 </span>
               </div>
-              <div className="text-sm text-gray-600">Joined: {user.joined}</div>
-              <div className="text-xs text-gray-400">Last Login: {user.last_login}</div>
+              <div className="text-sm text-gray-600">Joined: {user.Joined}</div>
+              <div className="text-xs text-gray-400">Last Login: {user.LastLogin}</div>
             </div>
           ))}
         </div>
@@ -408,22 +411,22 @@ function EmployeeManagement() {
             <input
               type="text"
               placeholder="Full Name"
-              value={newUser.name}
-              onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+              value={newUser.FullName}
+              onChange={(e) => setNewUser({ ...newUser, FullName: e.target.value })}
               className="border rounded-lg px-3 py-2 w-full mb-3"
             />
             <input
               type="email"
               placeholder="Email Address"
-              value={newUser.email}
-              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+              value={newUser.Email}
+              onChange={(e) => setNewUser({ ...newUser, Email: e.target.value })}
               className="border rounded-lg px-3 py-2 w-full mb-3"
             />
             <input
               type="password"
               placeholder="Password"
-              value={newUser.password}
-              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+              value={newUser.Password}
+              onChange={(e) => setNewUser({ ...newUser, Password: e.target.value })}
               className="border rounded-lg px-3 py-2 w-full mb-3"
             />
 
@@ -439,8 +442,8 @@ function EmployeeManagement() {
                 <option value="Admin">Admin</option>
               </select>
               <select
-                value={newUser.status}
-                onChange={(e) => setNewUser({ ...newUser, status: e.target.value })}
+                value={newUser.Active ? "active" : "inactive"}
+                onChange={(e) => setNewUser({ ...newUser, Active: e.target.value === "active" })}
                 className="border rounded-lg px-3 py-2 w-1/2"
               >
                 <option value="active">Active</option>
