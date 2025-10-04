@@ -3,7 +3,7 @@ const razorpay = require('../config/razorpay');
 const sql = require('mssql');
 
 // Helper: merge jsonb meta (fetch row → shallow-merge → update)
-async function mergeOrderMetaById(orderId, metaPatch, otherFields = {}) {
+async function mergeOrderMetaById(dbPool, orderId, metaPatch, otherFields = {}) {
   try {
     const result = await req.dbPool.request()
       .input('OrderId', sql.Int, orderId)
