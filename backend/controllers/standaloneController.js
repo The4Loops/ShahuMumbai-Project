@@ -2,6 +2,8 @@ const sql = require('mssql');
 const sqlConfig = require('../config/db');
 const { getModuleTemplate, renderTemplate, htmlToText } = require('../db/moduleRepo');
 const { sendMail } = require('../utils/mailer'); // keep this path if your mailer lives in utils/
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcrypt');
 
 exports.subscribeAndWelcome = async (req, res) => {
   try {
@@ -69,5 +71,114 @@ exports.subscribeAndWelcome = async (req, res) => {
   } catch (e) {
     console.error('[standaloneController.subscribeAndWelcome]', e);
     return res.status(500).json({ ok: false, error: e.message || 'Internal error' });
+  }
+};
+
+exports.login = async (req, res) => {
+  try {
+    const { Email, Password } = req.body;
+
+    // Validate input
+    if (!Email || !Password) {
+      return res.status(400).json({ error: 'Email and password are required' });
+    }
+
+    // Fetch user by email with role information
+    const userResult = await req.dbPool.request()
+      .input('email', sql.NVarChar, Email)
+      .query(`
+        SELECT 
+          u.UserId, 
+          u.FullName, 
+          u.Email, 
+          u.Password, 
+          r.Label
+        FROM users u
+        INNER JOIN roles r ON u.RoleId = r.RoleId
+        WHERE u.Email = @email
+      `);
+    
+    const user = userResult.recordset[0];
+
+    if (!user) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Validate password
+    const isPasswordValid = await bcrypt.compare(Password, user.Password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ error: 'Invalid email or password' });
+    }
+
+    // Check if user has Admin role
+    if (user.Label !== 'Admin') {
+      return res.status(403).json({ error: 'Access denied: Admin role required' });
+    }
+
+    // Generate JWT
+    const token = jwt.sign(
+      {
+        id: user.UserId,
+        fullname: user.FullName,
+        email: user.Email,
+        role: user.Label,
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '2h' }
+    );
+
+    res.status(200).json({
+      message: 'Login successful',
+      token,
+    });
+  } catch (err) {
+    console.error('Error in login:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+};
+
+exports.getInviteRequests = async (req, res) => {
+  try {
+    // Verify JWT token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Unauthorized: No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(401).json({ error: 'Unauthorized: Invalid token' });
+    }
+
+    // Check if user has Admin role
+    if (decoded.role !== 'Admin') {
+      return res.status(403).json({ error: 'Access denied: Admin role required' });
+    }
+
+    // Fetch all records from InviteRequests table
+    const result = await req.dbPool.request().query(`
+      SELECT 
+        Id,
+        Email,
+        FullName,
+        Source,
+        Status,
+        Note,
+        CreatedAt,
+        UpdatedAt,
+        LastEmailAt,
+        InvitedAt
+      FROM InviteRequests
+    `);
+
+    res.status(200).json({
+      inviteRequests: result.recordset,
+    });
+  } catch (err) {
+    console.error('Error fetching invite requests:', err);
+    res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
