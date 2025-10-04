@@ -30,7 +30,6 @@ const verifyUser = (req) => {
     return { error: 'Invalid Token' };
   }
 };
-
 // ADMIN API: Create User
 exports.adminCreateUser = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
@@ -64,30 +63,14 @@ exports.adminCreateUser = async (req, res) => {
       .input('UpdatedAt', sql.DateTime, new Date())
       .query(`
         INSERT INTO users (FullName, Email, Password, RoleId, Active, Joined, UpdatedAt)
-        OUTPUT 
-          INSERTED.UserId, 
-          INSERTED.FullName, 
-          INSERTED.Email, 
-          INSERTED.Password, 
-          INSERTED.RoleId, 
-          INSERTED.Active, 
-          INSERTED.Joined, 
-          r.Label
-        FROM users u
-        INNER JOIN roles r ON u.RoleId = r.RoleId
-        WHERE u.UserId = INSERTED.UserId
+        VALUES (@FullName, @Email, @Password, @RoleId, @Active, @Joined, @UpdatedAt)
       `);
 
-    if (!result.recordset[0]) {
+    if (result.rowsAffected[0] === 0) {
       return res.status(400).json({ error: 'Failed to create user' });
     }
 
-    const data = result.recordset[0];
-    data.Active = data.Active === 'Y';
-    data.roles = { Label: data.Label };
-    delete data.Label;
-
-    res.status(201).json({ message: 'User created successfully', user: data });
+    res.status(201).json({ message: 'User created successfully' });
   } catch (err) {
     console.error('Error in adminCreateUser:', err);
     res.status(500).json({ error: err.message || 'Internal server error' });
