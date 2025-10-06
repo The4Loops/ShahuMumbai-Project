@@ -198,12 +198,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
     };
   }, [selectedImages]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleImageChange = (e) => {
-    const files = Array.from(e.target.files || []);
-    setSelectedImages(files);
-    setHeroImageIndex(null);
-  };
-
   const price = watch("price");
   const discountprice = watch("discountprice");
   const categoryid = watch("categoryid");
@@ -258,7 +252,13 @@ const AddProduct = ({ editId = null, onSaved }) => {
         try {
           const uploadResponse = await api.post(
             "/api/upload/multiple",
-            formData
+            formData,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+              },
+              transformRequest: [(data) => data], // Prevent JSON transformation
+            }
           );
           imageUrls = extractImageUrls(uploadResponse);
 
@@ -296,28 +296,28 @@ const AddProduct = ({ editId = null, onSaved }) => {
       }
 
       const payload = {
-        name: form.name,
-        description: form.description,
-        shortdescription: form.shortdescription,
-        categoryid: form.categoryid,
-        branddesigner: form.branddesigner,
-        price: Number(form.price),
-        discountprice: form.discountprice ? Number(form.discountprice) : null,
-        stock: Number(form.stock),
-        isactive: !!form.isactive,
-        isfeatured: !!form.isfeatured,
-        collection_id: form.collection_id || null,
-        colors: Array.isArray(form.colors) ? form.colors : [],
-        launchingdate: form.launchingdate
+        Name: form.name,
+        Description: form.description,
+        ShortDescription: form.shortdescription,
+        CategoryId: form.categoryid,
+        BrandDesigner: form.branddesigner,
+        Price: Number(form.price),
+        DiscountPrice: form.discountprice ? Number(form.discountprice) : null,
+        Stock: Number(form.stock),
+        IsActive: !!form.isactive,
+        IsFeatured: !!form.isfeatured,
+        CollectionId: form.collection_id || null,
+        Colors: Array.isArray(form.colors) ? form.colors : [],
+        LaunchingDate: form.launchingdate
           ? new Date(form.launchingdate).toISOString()
           : new Date().toISOString(), // Added launchingdate
       };
 
       // include uploaded date (if provided) as ISO string
       if (form.uploadeddate) {
-        payload.uploadeddate = new Date(form.uploadeddate).toISOString();
+        payload.UploadedDate = new Date(form.uploadeddate).toISOString();
       } else {
-        payload.uploadeddate = new Date().toISOString();
+        payload.UploadedDate = new Date().toISOString();
       }
 
       if (!editId) {
@@ -755,34 +755,45 @@ const AddProduct = ({ editId = null, onSaved }) => {
           <label className="block text-sm font-medium text-[#6B4226] mb-1">
             Images {editId ? "(optional)" : "*"}
           </label>
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            className={`w-full ${
-              errors.images ? "border-red-500 ring-red-200" : ""
-            } file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-white file:font-semibold file:bg-[#D4A5A5] file:hover:bg-[#C39898] file:transition`}
-            {...register("images", {
-              required: editId ? false : "At least one image is required",
+          <Controller
+            name="images"
+            control={control}
+            rules={{
               validate: {
-                fileType: (files) =>
-                  Array.from(files || []).every((f) =>
-                    f.type?.startsWith("image/")
-                  ) || "Please select image files only",
-                ...(editId
-                  ? {}
-                  : {
-                      minCount: (files) =>
-                        (files?.length || 0) >= 1 ||
-                        "At least one image is required",
-                    }),
+                required: editId
+                  ? () => true
+                  : (v) =>
+                      (Array.isArray(v) ? v.length : 0) > 0 ||
+                      "At least one image is required",
+                fileType: (v) => {
+                  const fileArray = Array.isArray(v) ? v : Array.from(v || []);
+                  return fileArray.every((f) => f?.type?.startsWith("image/")) || "Please select image files only";
+                },
               },
-            })}
-            onChange={handleImageChange}
+            }}
+            render={({ field: { onChange, ref }, fieldState: { error } }) => (
+              <>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  ref={ref}
+                  className={`w-full ${
+                    error ? "border-red-500 ring-red-200" : ""
+                  } file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-white file:font-semibold file:bg-[#D4A5A5] file:hover:bg-[#C39898] file:transition`}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files || []);
+                    setSelectedImages(files);
+                    setHeroImageIndex(null);
+                    onChange(files);
+                  }}
+                />
+                {error && (
+                  <p className="text-red-600 text-xs mt-1">{error.message}</p>
+                )}
+              </>
+            )}
           />
-          {errors.images && (
-            <p className="text-red-600 text-xs mt-1">{errors.images.message}</p>
-          )}
         </div>
 
         {/* Previews + Hero picker */}

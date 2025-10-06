@@ -13,10 +13,10 @@ const InventoryTracker = () => {
     try {
       const response = await api.get("/api/products");
       const fetchedProducts = response.data.map(product => ({
-        id: product.id,
-        name: product.name,
-        quantity: product.stock || 0, // Ensure quantity is defined
-        category: product.categories?.name || "N/A",
+        id: product.ProductId,
+        name: product.Name,
+        quantity: product.Stock || 0, // Ensure quantity is defined
+        category: product.categories?.map(cat => cat.Name).join(', ') || "N/A",
         image: product.product_images?.find(img => img.is_hero)?.image_url || "",
       }));
       setProducts(fetchedProducts);

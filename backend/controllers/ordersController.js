@@ -13,7 +13,26 @@ exports.listOrders = async (req, res) => {
     const limit = Math.min(Math.max(parseInt(limitStr, 10) || 50, 1), 100);
     const offset = Math.max(parseInt(offsetStr, 10) || 0, 0);
 
-    let query = `
+    const parameters = [];
+    const whereConditions = [];
+
+    if (status && status !== 'All') {
+      const normalizedStatus = status.toLowerCase();
+      if (!['pending', 'shipped', 'delivered'].includes(normalizedStatus)) {
+        return res.status(400).json({ error: 'invalid_status' });
+      }
+      whereConditions.push('FulFillmentStatus = @status');
+      parameters.push({ name: 'status', type: sql.NVarChar, value: normalizedStatus });
+    }
+
+    if (q) {
+      whereConditions.push('(OrderNumber LIKE @q OR CustomerName LIKE @q)');
+      parameters.push({ name: 'q', type: sql.NVarChar, value: `%${q}%` });
+    }
+
+    const whereClause = whereConditions.length > 0 ? ' WHERE ' + whereConditions.join(' AND ') : '';
+
+    const query = `
       SELECT 
         OrderNumber,
         CustomerName,
@@ -21,26 +40,10 @@ exports.listOrders = async (req, res) => {
         FulFillmentStatus,
         PlacedAt
       FROM orders
+      ${whereClause}
       ORDER BY PlacedAt DESC
+      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
     `;
-    const parameters = [];
-
-    if (status && status !== 'All') {
-      const normalizedStatus = status.toLowerCase();
-      if (!['pending', 'shipped', 'delivered'].includes(normalizedStatus)) {
-        return res.status(400).json({ error: 'invalid_status' });
-      }
-      query += (q ? ' AND' : ' WHERE') + ' FulFillmentStatus = @status';
-      parameters.push({ name: 'status', type: sql.NVarChar, value: normalizedStatus });
-    }
-
-    if (q) {
-      query += (status && status !== 'All' ? ' AND' : ' WHERE') + ' (OrderNumber LIKE @q OR CustomerName LIKE @q)';
-      parameters.push({ name: 'q', type: sql.NVarChar, value: `%${q}%` });
-    }
-
-    // Pagination
-    query += ` OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY`;
 
     const request = req.dbPool.request();
     parameters.forEach(param => request.input(param.name, param.type, param.value));
@@ -49,23 +52,13 @@ exports.listOrders = async (req, res) => {
 
     const result = await request.query(query);
 
-    // Get total count
-    let countQuery = 'SELECT COUNT(*) AS total FROM orders';
-    if (status && status !== 'All') {
-      countQuery += ' WHERE FulFillmentStatus = @status';
-    }
-    if (q && status && status !== 'All') {
-      countQuery += ' AND (OrderNumber LIKE @q OR CustomerName LIKE @q)';
-    } else if (q) {
-      countQuery += ' WHERE (OrderNumber LIKE @q OR CustomerName LIKE @q)';
-    }
+    const countQuery = `SELECT COUNT(*) AS total FROM orders${whereClause}`;
 
     const countRequest = req.dbPool.request();
     parameters.forEach(param => countRequest.input(param.name, param.type, param.value));
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
 
-    // Map to minimal shape the UI expects
     const orders = result.recordset.map(o => ({
       id: o.OrderNumber,
       customer: o.CustomerName || o.CustomerEmail || 'Guest',

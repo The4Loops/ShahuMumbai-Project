@@ -102,23 +102,24 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ message: 'Error inserting product' });
     }
 
-    const imageRecords = images.map((img) => ({
-      product_id: product.ProductId,
-      image_url: img.url,
-      is_hero: img.is_hero,
-    }));
+    let totalImagesInserted = 0;
+    for (const img of images) {
+      const imageRequest = req.dbPool.request()
+        .input('product_id', sql.Int, product.ProductId)
+        .input('image_url', sql.NVarChar, img.url)
+        .input('is_hero', sql.Char(1), img.is_hero == true ? 'Y' : 'N')
+        .query(`
+          INSERT INTO ProductImages (ProductId, ImageUrl, isHero)
+          VALUES (@product_id, @image_url, @is_hero)
+        `);
+      const imageResult = await imageRequest;
+      if (imageResult.rowsAffected[0] !== 1) {
+        return res.status(400).json({ message: 'Error inserting images' });
+      }
+      totalImagesInserted++;
+    }
 
-    const imageInsert = await req.dbPool.request();
-    imageRecords.forEach((img) => {
-      imageInsert.input('product_id', sql.Int, img.product_id);
-      imageInsert.input('image_url', sql.NVarChar, img.image_url);
-      imageInsert.input('is_hero', sql.Char(1), img.is_hero == true ? 'Y' : 'N');
-    });
-    const imageResult = await imageInsert.query(`
-      INSERT INTO ProductImages (ProductId, ImageUrl, isHero)
-      VALUES (@product_id, @image_url, @is_hero)
-    `);
-    if (imageResult.rowsAffected[0] !== images.length) {
+    if (totalImagesInserted !== images.length) {
       return res.status(400).json({ message: 'Error inserting images' });
     }
 
@@ -138,7 +139,6 @@ exports.getAllProducts = async (req, res) => {
         pi.ProductImageid AS image_id,
         pi.ImageUrl AS image_url,
         pi.IsHero AS is_hero,
-        c.CategoryId,
         c.Name AS category_name
       FROM products p
       LEFT JOIN ProductImages pi ON p.ProductId = pi.ProductId
@@ -177,6 +177,8 @@ exports.getAllProducts = async (req, res) => {
         };
         delete acc[productId].image_id;
         delete acc[productId].category_name;
+        delete acc[productId].image_url;
+        delete acc[productId].is_hero;
       }
       if (row.image_url) {
         acc[productId].product_images.push({

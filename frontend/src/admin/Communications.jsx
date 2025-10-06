@@ -66,13 +66,13 @@ export default function Communications() {
     const base = q
       ? items.filter(
           (m) =>
-            m.name?.toLowerCase().includes(q) ||
-            m.email?.toLowerCase().includes(q) ||
-            m.message?.toLowerCase().includes(q) ||
-            m.subject?.toLowerCase().includes(q)
+            m.Name?.toLowerCase().includes(q) ||
+            m.Email?.toLowerCase().includes(q) ||
+            m.Message?.toLowerCase().includes(q) ||
+            m.Subject?.toLowerCase().includes(q)
         )
       : items;
-    return base.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    return base.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt));
   }, [items, query]);
 
   // Pagination
@@ -86,7 +86,7 @@ export default function Communications() {
     setActionLoading(true);
     try {
       const { data } = await api.put(`/api/contacts/${id}`, { status: 'read' });
-      setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: data.status } : m)));
+      setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: data.Status } : m)));
       toast.success('Message marked as read.');
     } catch (e) {
       toast.error('Failed to mark message as read.');
@@ -98,8 +98,8 @@ export default function Communications() {
     setActionLoading(true);
     try {
       const { data } = await api.put(`/api/contacts/${id}`, { status });
-      setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: data.status } : m)));
-      setSelected((sel) => (sel && sel.id === id ? { ...sel, status: data.status } : sel));
+      setItems((prev) => prev.map((m) => (m.id === id ? { ...m, status: data.Status } : m)));
+      setSelected((sel) => (sel && sel.id === id ? { ...sel, status: data.Status } : sel));
       toast.success(`Message marked as ${status}.`);
     } catch (e) {
       toast.error(`Failed to mark message as ${status}.`);
@@ -143,29 +143,29 @@ export default function Communications() {
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-semibold text-[#6B4226] truncate">{m.name || 'Customer'}</span>
-                      <span className="text-xs text-gray-500 truncate">&lt;{m.email}&gt;</span>
-                      <StatusBadge status={m.status} />
+                      <span className="font-semibold text-[#6B4226] truncate">{m.Name || 'Customer'}</span>
+                      <span className="text-xs text-gray-500 truncate">&lt;{m.Email}&gt;</span>
+                      <StatusBadge status={m.Status} />
                     </div>
-                    <p className="text-sm text-gray-700 truncate mt-1">{m.subject || 'No Subject'}</p>
-                    <p className="text-sm text-gray-700 line-clamp-2 mt-1 whitespace-pre-line">{m.message}</p>
+                    <p className="text-sm text-gray-700 truncate mt-1">{m.Subject || 'No Subject'}</p>
+                    <p className="text-sm text-gray-700 line-clamp-2 mt-1 whitespace-pre-line">{m.Message}</p>
                     <div className="text-xs text-gray-500 mt-1 flex items-center gap-1">
-                      <FaClock /> {fmt(m.created_at)}
+                      <FaClock /> {fmt(m.CreatedAt)}
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 shrink-0">
-                    {m.status === 'pending' && (
+                    {m.Status === 'pending' && (
                       <button
-                        onClick={() => markRead(m.id)}
+                        onClick={() => markRead(m.ContactUsId)}
                         disabled={actionLoading}
                         className="px-3 py-1.5 text-sm rounded border border-[#D4A5A5] hover:bg-[#f3dede] disabled:opacity-50"
                       >
                         Mark Read
                       </button>
                     )}
-                    {m.status !== 'resolved' ? (
+                    {m.Status !== 'resolved' ? (
                       <button
-                        onClick={() => setStatus(m.id, 'resolved')}
+                        onClick={() => setStatus(m.ContactUsId, 'resolved')}
                         disabled={actionLoading}
                         className="px-3 py-1.5 text-sm rounded bg-green-600 text-white hover:bg-green-700 disabled:opacity-50 inline-flex items-center gap-1"
                       >
@@ -173,7 +173,7 @@ export default function Communications() {
                       </button>
                     ) : (
                       <button
-                        onClick={() => setStatus(m.id, 'pending')}
+                        onClick={() => setStatus(m.ContactUsId, 'pending')}
                         disabled={actionLoading}
                         className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50"
                       >
@@ -184,7 +184,7 @@ export default function Communications() {
                       onClick={() => {
                         setSelected(m);
                         // auto-mark read when opened
-                        if (m.status === 'pending') markRead(m.id);
+                        if (m.Status === 'pending') markRead(m.ContactUsId);
                       }}
                       className="px-3 py-1.5 text-sm rounded bg-black text-white hover:bg-gray-800"
                     >
@@ -226,7 +226,7 @@ export default function Communications() {
         <AdminMessageModal
           item={selected}
           onClose={() => setSelected(null)}
-          onResolve={() => setStatus(selected.id, 'resolved')}
+          onResolve={() => setStatus(selected.ContactUsId, 'resolved')}
         />
       )}
     </div>
@@ -260,17 +260,17 @@ function AdminMessageModal({ item, onClose, onResolve }) {
             <div className="bg-gray-50 rounded-xl shadow p-6 text-center">
               <FaUser className="mx-auto text-3xl text-gray-700 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Name</h3>
-              <p className="text-gray-700 break-words">{item.name || '—'}</p>
+              <p className="text-gray-700 break-words">{item.Name || '—'}</p>
             </div>
             <div className="bg-gray-50 rounded-xl shadow p-6 text-center">
               <FaEnvelope className="mx-auto text-3xl text-gray-700 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Email</h3>
-              <p className="text-gray-700 break-words">{item.email || '—'}</p>
+              <p className="text-gray-700 break-words">{item.Email || '—'}</p>
             </div>
             <div className="bg-gray-50 rounded-xl shadow p-6 text-center">
               <FaClock className="mx-auto text-3xl text-gray-700 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Submitted</h3>
-              <p className="text-gray-700">{fmt(item.created_at)}</p>
+              <p className="text-gray-700">{fmt(item.CreatedAt)}</p>
             </div>
           </div>
 
@@ -279,19 +279,19 @@ function AdminMessageModal({ item, onClose, onResolve }) {
             <div>
               <label className="block text-sm font-medium text-gray-700">Subject</label>
               <div className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-3 bg-white">
-                {item.subject || 'No Subject'}
+                {item.Subject || 'No Subject'}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Message</label>
               <div className="mt-1 w-full border border-gray-300 rounded-lg px-3 py-3 bg-white whitespace-pre-wrap">
-                {item.message}
+                {item.Message || 'No Message'}
               </div>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700">Status</label>
               <div className="mt-1">
-                <StatusBadge status={item.status} />
+                <StatusBadge status={item.Status} />
               </div>
             </div>
 

@@ -42,7 +42,7 @@ exports.getAllContact = async (req, res) => {
     const offset = Math.max(parseInt(offsetStr, 10) || 0, 0);
 
     let query = `
-      SELECT Id, Name, Email, Subject, Message, Status, CreatedAt
+      SELECT ContactUsId, Name, Email, Subject, Message, Status, CreatedAt
       FROM ContactUs
       WHERE 1=1
     `;
@@ -113,7 +113,7 @@ exports.updateContact = async (req, res) => {
       UPDATE ContactUs
       SET ${updateFields.join(", ")}, UpdatedAt = GETDATE()
       OUTPUT INSERTED.*
-      WHERE Id = @Id
+      WHERE ContactUsId = @Id
     `;
 
     const request = req.dbPool.request().input("Id", sql.Int, id);
