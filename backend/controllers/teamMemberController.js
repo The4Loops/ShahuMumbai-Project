@@ -90,17 +90,17 @@ exports.listTeamMembers = async (req, res) => {
 // Create a new team member
 exports.createTeamMember = async (req, res) => {
   try {
-    const { Name, Role, Description, Color, TeamType } = req.body;
-    if (!Name || !Role || !TeamType) {
+    const { name, role, description, color, team_type } = req.body;
+    if (!name || !role || !team_type) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
     const result = await req.dbPool.request()
-      .input('Name', sql.NVarChar, Name)
-      .input('Role', sql.NVarChar, Role)
-      .input('Description', sql.NVarChar, Description || null)
-      .input('Color', sql.NVarChar, Color || 'bg-pink-500')
-      .input('TeamType', sql.NVarChar, TeamType)
+      .input('Name', sql.NVarChar, name)
+      .input('Role', sql.NVarChar, role)
+      .input('Description', sql.NVarChar, description || null)
+      .input('Color', sql.NVarChar, color || 'bg-pink-500')
+      .input('TeamType', sql.NVarChar, team_type)
       .input('CreatedAt', sql.DateTime, new Date())
       .query(`
         INSERT INTO TeamMembers (Name, Role, Description, Color, TeamType, CreatedAt)
@@ -166,14 +166,14 @@ exports.getTeamMember = async (req, res) => {
 exports.updateTeamMember = async (req, res) => {
   try {
     const { id } = req.params;
-    const { Name, Role, Description, Color, TeamType } = req.body;
+    const { name, role, description, color, team_type } = req.body;
 
     const updates = {};
-    if (Name !== undefined) updates.Name = Name;
-    if (Role !== undefined) updates.Role = Role;
-    if (Description !== undefined) updates.Description = Description;
-    if (Color !== undefined) updates.Color = Color;
-    if (TeamType !== undefined) updates.TeamType = TeamType;
+    if (name !== undefined) updates.Name = name;
+    if (role !== undefined) updates.Role = role;
+    if (description !== undefined) updates.Description = description;
+    if (color !== undefined) updates.Color = color;
+    if (team_type !== undefined) updates.TeamType = team_type;
 
     if (Object.keys(updates).length === 0) {
       return res.status(400).json({ error: 'No fields to update' });

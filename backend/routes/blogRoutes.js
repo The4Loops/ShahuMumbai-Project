@@ -3,8 +3,8 @@ const router = express.Router();
 const blogController = require('../controllers/blogController');
 
 // Create / Update
-router.post('/blogs', blogController.createOrUpdateBlog);
-router.put('/blogs/:id', blogController.createOrUpdateBlog);
+router.post('/admin/blogs', blogController.createOrUpdateBlog);
+router.put('/admin/blogs/:id', blogController.createOrUpdateBlog);
 
 // Reset draft
 router.patch('/blogs/:id/reset', blogController.resetBlog);

@@ -80,13 +80,25 @@ exports.getRoles = async (req, res) => {
     const roles = rolesResult.recordset;
     const roleIds = roles.map(role => role.id);
 
-    const roletagsResult = await req.dbPool.request()
-      .query(`
-        SELECT rt.RoleId, rt.MenuId, m.Label AS menu_label
-        FROM roletag rt
-        INNER JOIN menu m ON rt.MenuId = m.MenuId
-        WHERE rt.RoleId IN (${roleIds.map(() => '?').join(',')})
-      `);
+    // Handle empty roleIds
+    if (roleIds.length === 0) {
+      return res.status(200).json({ roles: [] });
+    }
+
+    // For roletags query: use named parameters for IN clause
+    const roletagsRequest = req.dbPool.request();
+    const roletagsInClause = roleIds.map((_, index) => `@role${index}`).join(',');
+    const roletagsQuery = `
+      SELECT rt.RoleId, rt.MenuId, m.Label AS menu_label
+      FROM roletag rt
+      INNER JOIN menu m ON rt.MenuId = m.MenuId
+      WHERE rt.RoleId IN (${roletagsInClause})
+    `;
+    roleIds.forEach((id, index) => {
+      roletagsRequest.input(`role${index}`, sql.Int, id); // Assuming RoleId is INT
+    });
+    const roletagsResult = await roletagsRequest.query(roletagsQuery);
+
     const roletags = roletagsResult.recordset;
     const roletagMap = {};
     roletags.forEach(rt => {
@@ -94,12 +106,19 @@ exports.getRoles = async (req, res) => {
       roletagMap[rt.RoleId].push({ id: rt.MenuId, label: rt.menu_label });
     });
 
-    const usersResult = await req.dbPool.request()
-      .query(`
-        SELECT u.UserId AS id, u.Email AS email, u.RoleId
-        FROM users u
-        WHERE u.RoleId IN (${roleIds.map(() => '?').join(',')})
-      `);
+    // For users query: use named parameters for IN clause
+    const usersRequest = req.dbPool.request();
+    const usersInClause = roleIds.map((_, index) => `@role${index}`).join(',');
+    const usersQuery = `
+      SELECT u.UserId AS id, u.Email AS email, u.RoleId
+      FROM users u
+      WHERE u.RoleId IN (${usersInClause})
+    `;
+    roleIds.forEach((id, index) => {
+      usersRequest.input(`role${index}`, sql.Int, id); // Assuming RoleId is INT
+    });
+    const usersResult = await usersRequest.query(usersQuery);
+
     const users = usersResult.recordset;
     const userMap = {};
     users.forEach(user => {

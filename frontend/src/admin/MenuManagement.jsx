@@ -13,6 +13,7 @@ function MenuManagement() {
   const [roleFilter, setRoleFilter] = useState("All");
   const [isLoading, setIsLoading] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [modalMode, setModalMode] = useState("menu"); // "menu" or "menuItem"
   const [editingMenuId, setEditingMenuId] = useState(null);
   const [editingMenuItemId, setEditingMenuItemId] = useState(null);
   const [actionMenuId, setActionMenuId] = useState(null);
@@ -27,7 +28,7 @@ function MenuManagement() {
     label: "",
     href: "",
     order_index: 0,
-    role_ids: [], // Added for menu item roles
+    role_ids: [],
   });
 
   const actionMenuRefs = useRef({});
@@ -72,7 +73,7 @@ function MenuManagement() {
 
   useEffect(() => {
     debouncedFetchData();
-  }, [search, roleFilter]);
+  }, [search, roleFilter, debouncedFetchData]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -103,17 +104,19 @@ function MenuManagement() {
     }
 
     try {
+      const commonHeaders = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+
       if (editingMenuId !== null) {
-        await api.put(`/api/navbar/menus/${editingMenuId}`, {
+        await api.put(`/api/menus/${editingMenuId}`, {
           label: newMenu.label,
           href: newMenu.href || null,
           order_index: parseInt(newMenu.order_index) || 0,
-        });
-        await api.post("/api/roletags", {
+        }, { headers: commonHeaders });
+        await api.post("/api/menu-roles", {
           menu_id: editingMenuId,
           role_ids: newMenu.role_ids,
           order_index: parseInt(newMenu.order_index) || 0,
-        });
+        }, { headers: commonHeaders });
         toast.dismiss();
         toast.success("Menu updated successfully");
       } else {
@@ -121,13 +124,13 @@ function MenuManagement() {
           label: newMenu.label,
           href: newMenu.href || null,
           order_index: parseInt(newMenu.order_index) || 0,
-        });
+        }, { headers: commonHeaders });
         if (newMenu.role_ids.length > 0) {
-          await api.post("/api/roletags", {
-            menu_id: menu.id,
+          await api.post("/api/menu-roles", {
+            menu_id: menu.menu.MenuId,
             role_ids: newMenu.role_ids,
             order_index: parseInt(newMenu.order_index) || 0,
-          });
+          }, { headers: commonHeaders });
         }
         toast.dismiss();
         toast.success("Menu created successfully");
@@ -148,34 +151,36 @@ function MenuManagement() {
     }
 
     try {
+      const commonHeaders = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+
       if (editingMenuItemId !== null) {
-        await api.put(`/api/navbar/menu-items/${editingMenuItemId}`, {
+        await api.put(`/api/menu-items/${editingMenuItemId}`, {
           label: newMenuItem.label,
           href: newMenuItem.href,
           order_index: parseInt(newMenuItem.order_index) || 0,
           role_ids: newMenuItem.role_ids,
-        });
-        await api.post("/api/menu-items/roles", {
+        }, { headers: commonHeaders });
+        await api.post("/api/menu-item-roles", {
           menu_item_id: editingMenuItemId,
           role_ids: newMenuItem.role_ids,
           order_index: parseInt(newMenuItem.order_index) || 0,
-        });
+        }, { headers: commonHeaders });
         toast.dismiss();
         toast.success("Menu item updated successfully");
       } else {
-        const { data: menuItem } = await api.post("/api/navbar/menu-items", {
+        const { data: menuItem } = await api.post("/api/menu-items", {
           menu_id: newMenuItem.menu_id,
           label: newMenuItem.label,
           href: newMenuItem.href,
           order_index: parseInt(newMenuItem.order_index) || 0,
           role_ids: newMenuItem.role_ids,
-        });
+        }, { headers: commonHeaders });
         if (newMenuItem.role_ids.length > 0) {
-          await api.post("/api/menu-items/roles", {
+          await api.post("/api/menu-item-roles", {
             menu_item_id: menuItem.id,
             role_ids: newMenuItem.role_ids,
             order_index: parseInt(newMenuItem.order_index) || 0,
-          });
+          }, { headers: commonHeaders });
         }
         toast.dismiss();
         toast.success("Menu item created successfully");
@@ -191,7 +196,7 @@ function MenuManagement() {
   const handleDeleteMenu = async (menuId) => {
     if (window.confirm(`Are you sure you want to delete this menu?`)) {
       try {
-        await api.delete(`/api/navbar/menus/${menuId}`, {
+        await api.delete(`/api/menus/${menuId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         toast.dismiss();
@@ -208,7 +213,7 @@ function MenuManagement() {
   const handleDeleteMenuItem = async (menuItemId) => {
     if (window.confirm(`Are you sure you want to delete this menu item?`)) {
       try {
-        await api.delete(`/api/navbar/menu-items/${menuItemId}`, {
+        await api.delete(`/api/menu-items/${menuItemId}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
         toast.dismiss();
@@ -219,7 +224,6 @@ function MenuManagement() {
         toast.error(error.response?.data?.error || "Failed to delete menu item");
       }
     }
-    setActionMenuId(null);
   };
 
   const resetForm = () => {
@@ -238,6 +242,7 @@ function MenuManagement() {
     });
     setEditingMenuId(null);
     setEditingMenuItemId(null);
+    setModalMode("menu");
     setShowModal(false);
   };
 
@@ -276,16 +281,17 @@ function MenuManagement() {
             >
               <option value="All">All Roles</option>
               {roles.map((role) => (
-                <option key={role.id} value={role.id}>
+                <option key={role.id} value={role.label}>
                   {role.label}
                 </option>
               ))}
             </select>
             <button
               onClick={() => {
-                setShowModal(true);
+                setModalMode("menu");
                 setEditingMenuId(null);
                 setEditingMenuItemId(null);
+                setShowModal(true);
               }}
               className="bg-black text-white px-4 py-2 rounded-lg hover:bg-gray-800"
             >
@@ -339,7 +345,7 @@ function MenuManagement() {
                       <div className="text-sm text-gray-500">{menu.href || "No link"}</div>
                     </td>
                     <td className="py-3 px-4">
-                      <div className="flex gap-2">
+                      <div className="flex gap-2 flex-wrap">
                         {menu.roles.map((role) => (
                           <span
                             key={role}
@@ -352,12 +358,12 @@ function MenuManagement() {
                     </td>
                     <td className="py-3 px-4">
                       {menu.dropdown_items?.length > 0 ? (
-                        <ul className="text-sm text-gray-600">
+                        <ul className="text-sm text-gray-600 space-y-1">
                           {menu.dropdown_items.map((item) => (
-                            <li key={item.id} className="flex justify-between items-center">
-                              <span>
-                                {item.label} ({item.href})
-                                <div className="flex gap-2 mt-1">
+                            <li key={item.id} className="flex justify-between items-start">
+                              <span className="flex-1">
+                                <div>{item.label} ({item.href})</div>
+                                <div className="flex gap-1 mt-1 flex-wrap">
                                   {item.roles.map((role) => (
                                     <span
                                       key={role}
@@ -368,25 +374,34 @@ function MenuManagement() {
                                   ))}
                                 </div>
                               </span>
-                              <button
-                                onClick={() => {
-                                  setNewMenuItem({
-                                    menu_id: menu.id,
-                                    label: item.label,
-                                    href: item.href,
-                                    order_index: item.order_index,
-                                    role_ids: roles
-                                      .filter((role) => item.roles.includes(role.label))
-                                      .map((role) => role.id),
-                                  });
-                                  setEditingMenuItemId(item.id);
-                                  setShowModal(true);
-                                  setActionMenuId(null);
-                                }}
-                                className="text-blue-600 hover:underline text-xs"
-                              >
-                                Edit
-                              </button>
+                              <div className="flex gap-2 ml-2">
+                                <button
+                                  onClick={() => {
+                                    setModalMode("menuItem");
+                                    setNewMenuItem({
+                                      menu_id: menu.id,
+                                      label: item.label,
+                                      href: item.href,
+                                      order_index: item.order_index,
+                                      role_ids: roles
+                                        .filter((role) => item.roles.includes(role.label))
+                                        .map((role) => role.id),
+                                    });
+                                    setEditingMenuItemId(item.id);
+                                    setShowModal(true);
+                                    setActionMenuId(null);
+                                  }}
+                                  className="text-blue-600 hover:underline text-xs"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteMenuItem(item.id)}
+                                  className="text-red-600 hover:underline text-xs"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </li>
                           ))}
                         </ul>
@@ -403,9 +418,10 @@ function MenuManagement() {
                           ⋮
                         </button>
                         {actionMenuId === menu.id && (
-                          <div className="absolute right-4 mt-1 bg-white border rounded shadow-lg text-sm z-10">
+                          <div className="absolute right-0 mt-1 bg-white border rounded shadow-lg text-sm z-10 w-48">
                             <button
                               onClick={() => {
+                                setModalMode("menu");
                                 setNewMenu({
                                   label: menu.label,
                                   href: menu.href,
@@ -430,7 +446,14 @@ function MenuManagement() {
                             </button>
                             <button
                               onClick={() => {
-                                setNewMenuItem({ menu_id: menu.id, label: "", href: "", order_index: 0, role_ids: [] });
+                                setModalMode("menuItem");
+                                setNewMenuItem({ 
+                                  menu_id: menu.id, 
+                                  label: "", 
+                                  href: "", 
+                                  order_index: 0, 
+                                  role_ids: [] 
+                                });
                                 setEditingMenuItemId(null);
                                 setShowModal(true);
                                 setActionMenuId(null);
@@ -469,9 +492,10 @@ function MenuManagement() {
                     ⋮
                   </button>
                   {actionMenuId === menu.id && (
-                    <div className="absolute right-4 top-10 bg-white border rounded shadow-lg text-sm z-10">
+                    <div className="absolute right-0 top-full mt-1 bg-white border rounded shadow-lg text-sm z-10 w-48">
                       <button
                         onClick={() => {
+                          setModalMode("menu");
                           setNewMenu({
                             label: menu.label,
                             href: menu.href,
@@ -496,7 +520,14 @@ function MenuManagement() {
                       </button>
                       <button
                         onClick={() => {
-                          setNewMenuItem({ menu_id: menu.id, label: "", href: "", order_index: 0, role_ids: [] });
+                          setModalMode("menuItem");
+                          setNewMenuItem({ 
+                            menu_id: menu.id, 
+                            label: "", 
+                            href: "", 
+                            order_index: 0, 
+                            role_ids: [] 
+                          });
                           setEditingMenuItemId(null);
                           setShowModal(true);
                           setActionMenuId(null);
@@ -509,7 +540,7 @@ function MenuManagement() {
                   )}
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1 flex-wrap">
                 {menu.roles.map((role) => (
                   <span
                     key={role}
@@ -521,12 +552,12 @@ function MenuManagement() {
               </div>
               <div className="text-sm text-gray-600">
                 {menu.dropdown_items?.length > 0 ? (
-                  <ul>
+                  <ul className="space-y-1">
                     {menu.dropdown_items.map((item) => (
-                      <li key={item.id} className="flex justify-between items-center">
-                        <span>
-                          {item.label} ({item.href})
-                          <div className="flex gap-2 mt-1">
+                      <li key={item.id} className="flex justify-between items-start">
+                        <span className="flex-1">
+                          <div>{item.label} ({item.href})</div>
+                          <div className="flex gap-1 mt-1 flex-wrap">
                             {item.roles.map((role) => (
                               <span
                                 key={role}
@@ -537,25 +568,33 @@ function MenuManagement() {
                             ))}
                           </div>
                         </span>
-                        <button
-                          onClick={() => {
-                            setNewMenuItem({
-                              menu_id: menu.id,
-                              label: item.label,
-                              href: item.href,
-                              order_index: item.order_index,
-                              role_ids: roles
-                                .filter((role) => item.roles.includes(role.label))
-                                .map((role) => role.id),
-                            });
-                            setEditingMenuItemId(item.id);
-                            setShowModal(true);
-                            setActionMenuId(null);
-                          }}
-                          className="text-blue-600 hover:underline text-xs"
-                        >
-                          Edit
-                        </button>
+                        <div className="flex gap-2 ml-2">
+                          <button
+                            onClick={() => {
+                              setModalMode("menuItem");
+                              setNewMenuItem({
+                                menu_id: menu.id,
+                                label: item.label,
+                                href: item.href,
+                                order_index: item.order_index,
+                                role_ids: roles
+                                  .filter((role) => item.roles.includes(role.label))
+                                  .map((role) => role.id),
+                              });
+                              setEditingMenuItemId(item.id);
+                              setShowModal(true);
+                            }}
+                            className="text-blue-600 hover:underline text-xs"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteMenuItem(item.id)}
+                            className="text-red-600 hover:underline text-xs"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -571,7 +610,10 @@ function MenuManagement() {
       {showModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg w-full max-w-md p-6 relative">
-            <button onClick={resetForm} className="absolute top-3 right-3 text-gray-500 hover:text-black">
+            <button
+              onClick={resetForm}
+              className="absolute top-3 right-3 text-gray-500 hover:text-black"
+            >
               <FiX size={20} />
             </button>
             <h2 className="text-xl font-semibold mb-4">
@@ -579,10 +621,12 @@ function MenuManagement() {
                 ? "Edit Menu"
                 : editingMenuItemId !== null
                 ? "Edit Dropdown Item"
-                : "Add New Menu"}
+                : modalMode === "menu"
+                ? "Add New Menu"
+                : "Add Dropdown Item"}
             </h2>
 
-            {editingMenuItemId !== null || (showModal && !editingMenuId) ? (
+            {modalMode === "menuItem" ? (
               <>
                 <select
                   value={newMenuItem.menu_id}
@@ -633,7 +677,7 @@ function MenuManagement() {
                       role_ids: Array.from(e.target.selectedOptions, (option) => option.value),
                     })
                   }
-                  className="border rounded-lg px-3 py-2 w-full mb-3"
+                  className="border rounded-lg px-3 py-2 w-full mb-3 h-32"
                 >
                   {roles.map((role) => (
                     <option key={role.id} value={role.id}>
@@ -680,7 +724,7 @@ function MenuManagement() {
                       role_ids: Array.from(e.target.selectedOptions, (option) => option.value),
                     })
                   }
-                  className="border rounded-lg px-3 py-2 w-full mb-3"
+                  className="border rounded-lg px-3 py-2 w-full mb-3 h-32"
                 >
                   {roles.map((role) => (
                     <option key={role.id} value={role.id}>

@@ -72,19 +72,19 @@ const AddBlogPost = () => {
   }, [id, editingBlog]);
 
   const prefillForm = (blog) => {
-    setSelectedDraftId(blog.id);
-    setTitle(blog.title || "");
-    setSlug(blog.slug || "");
+    setSelectedDraftId(blog.BlogId);
+    setTitle(blog.Title || "");
+    setSlug(blog.Slug || "");
     setSlugTouched(true);
-    setExcerpt(blog.excerpt || "");
-    setContent(blog.content || "");
-    setCoverPreview(blog.cover_image || null);
-    setCategory(blog.category || "");
-    setTags(blog.tags ? blog.tags.join(", ") : "");
-    setStatus(blog.status || "DRAFT");
-    setPublishAt(blog.publish_at || "");
-    setMetaTitle(blog.meta_title || "");
-    setMetaDescription(blog.meta_description || "");
+    setExcerpt(blog.Excerpt || "");
+    setContent(blog.Content || "");
+    setCoverPreview(blog.CoverImage || null);
+    setCategory(blog.Category || "");
+    setTags(blog.Tags ? blog.Tags.join(", ") : "");
+    setStatus(blog.Status || "DRAFT");
+    setPublishAt(blog.PublishAt || "");
+    setMetaTitle(blog.MetaTitle || "");
+    setMetaDescription(blog.MetaDescription || "");
   };
 
   useEffect(() => {
@@ -371,12 +371,12 @@ const AddBlogPost = () => {
           <h3 className="font-bold mb-2">Load Draft</h3>
           <ul className="space-y-2">
             {drafts.map((d) => (
-              <li key={d.id}>
+              <li key={d.BlogId}>
                 <button
                   className="underline text-blue-600"
                   onClick={() => loadDraft(d)}
                 >
-                  {d.title}
+                  {d.Title}
                 </button>
               </li>
             ))}

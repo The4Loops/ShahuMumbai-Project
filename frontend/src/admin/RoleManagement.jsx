@@ -427,8 +427,8 @@ function RoleManagement() {
             >
               <option value="">Select User</option>
               {users.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.email} ({user.full_name || "No name"})
+                <option key={user.UserId} value={user.UserId}>
+                  {user.Email} ({user.FullName || "No name"})
                 </option>
               ))}
             </select>

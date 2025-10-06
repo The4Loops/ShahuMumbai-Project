@@ -70,14 +70,14 @@ exports.getMenus = async (req, res) => {
     }
 
     if (role && role !== 'All') {
-      query += (search ? ' AND' : ' WHERE') + ` rt.RoleId = @role_id`;
       const roleResult = await req.dbPool.request()
         .input('role_label', sql.NVarChar, role)
         .query('SELECT RoleId FROM roles WHERE Label = @role_label');
       if (!roleResult.recordset[0]) {
         return res.status(400).json({ error: `Role '${role}' not found` });
       }
-      parameters.push({ name: 'role_id', type: sql.Int, value: roleResult.recordset[0].RoleId });
+      const roleIdValue = roleResult.recordset[0].RoleId;
+      parameters.push({ name: 'role_id', type: sql.Int, value: roleIdValue });
       query = `
         SELECT 
           m.MenuId AS id,
@@ -87,7 +87,7 @@ exports.getMenus = async (req, res) => {
           m.CreatedAt AS created_at,
           m.UpdatedAt AS updated_at
         FROM menu m
-        INNER JOIN roletags rt ON m.MenuId = rt.MenuId
+        INNER JOIN roletag rt ON m.MenuId = rt.MenuId
         ${search ? `WHERE m.Label LIKE @search` : ''}
         ${search ? ' AND' : 'WHERE'} rt.RoleId = @role_id
       `;
@@ -102,13 +102,24 @@ exports.getMenus = async (req, res) => {
     const menus = menusResult.recordset;
     const menuIds = menus.map(menu => menu.id);
 
-    const roletagsResult = await req.dbPool.request()
-      .query(`
-        SELECT rt.MenuId, rt.RoleId, r.Label
-        FROM roletags rt
-        INNER JOIN roles r ON rt.RoleId = r.RoleId
-        WHERE rt.MenuId IN (${menuIds.map(() => '?').join(',')})
-      `);
+    if (menuIds.length === 0) {
+      return res.status(200).json({ menus: [] });
+    }
+
+    // For roletags query: use named parameters for IN clause
+    const roletagsRequest = req.dbPool.request();
+    const roletagsInClause = menuIds.map((_, index) => `@menu${index}`).join(',');
+    const roletagsQuery = `
+      SELECT rt.MenuId, rt.RoleId, r.Label
+      FROM roletag rt
+      INNER JOIN roles r ON rt.RoleId = r.RoleId
+      WHERE rt.MenuId IN (${roletagsInClause})
+    `;
+    menuIds.forEach((id, index) => {
+      roletagsRequest.input(`menu${index}`, sql.Int, id); // Assuming MenuId is INT
+    });
+    const roletagsResult = await roletagsRequest.query(roletagsQuery);
+
     const roletags = roletagsResult.recordset;
     const roletagMap = {};
     roletags.forEach(rt => {
@@ -116,29 +127,45 @@ exports.getMenus = async (req, res) => {
       roletagMap[rt.MenuId].push(rt.Label);
     });
 
-    const menuItemsResult = await req.dbPool.request()
-      .query(`
-        SELECT mi.MenuItemId AS id, mi.MenuId, mi.Label AS label, mi.Href AS href, mi.OrderIndex AS order_index
-        FROM menuitems mi
-        WHERE mi.MenuId IN (${menuIds.map(() => '?').join(',')})
-        ORDER BY mi.OrderIndex ASC
-      `);
+    // For menuItems query: use named parameters for IN clause
+    const menuItemsRequest = req.dbPool.request();
+    const menuItemsInClause = menuIds.map((_, index) => `@menu${index}`).join(',');
+    const menuItemsQuery = `
+      SELECT mi.MenuItemId AS id, mi.MenuId, mi.Label AS label, mi.Href AS href, mi.OrderIndex AS order_index
+      FROM menuitems mi
+      WHERE mi.MenuId IN (${menuItemsInClause})
+      ORDER BY mi.OrderIndex ASC
+    `;
+    menuIds.forEach((id, index) => {
+      menuItemsRequest.input(`menu${index}`, sql.Int, id); // Assuming MenuId is INT
+    });
+    const menuItemsResult = await menuItemsRequest.query(menuItemsQuery);
+
     const menuItems = menuItemsResult.recordset;
     const menuItemIds = menuItems.map(item => item.id);
 
-    const menuItemRoletagsResult = await req.dbPool.request()
-      .query(`
+    let menuItemRoletagMap = {};
+    if (menuItemIds.length > 0) {
+      // For menuItemRoletags query: use named parameters for IN clause
+      const menuItemRoletagsRequest = req.dbPool.request();
+      const menuItemRoletagsInClause = menuItemIds.map((_, index) => `@item${index}`).join(',');
+      const menuItemRoletagsQuery = `
         SELECT mir.MenuItemId, mir.RoleId, r.Label
         FROM menuitemroletag mir
         INNER JOIN roles r ON mir.RoleId = r.RoleId
-        WHERE mir.MenuItemId IN (${menuItemIds.map(() => '?').join(',')})
-      `);
-    const menuItemRoletags = menuItemRoletagsResult.recordset;
-    const menuItemRoletagMap = {};
-    menuItemRoletags.forEach(mir => {
-      if (!menuItemRoletagMap[mir.MenuItemId]) menuItemRoletagMap[mir.MenuItemId] = [];
-      menuItemRoletagMap[mir.MenuItemId].push(mir.Label);
-    });
+        WHERE mir.MenuItemId IN (${menuItemRoletagsInClause})
+      `;
+      menuItemIds.forEach((id, index) => {
+        menuItemRoletagsRequest.input(`item${index}`, sql.Int, id); // Assuming MenuItemId is INT
+      });
+      const menuItemRoletagsResult = await menuItemRoletagsRequest.query(menuItemRoletagsQuery);
+
+      const menuItemRoletags = menuItemRoletagsResult.recordset;
+      menuItemRoletags.forEach(mir => {
+        if (!menuItemRoletagMap[mir.MenuItemId]) menuItemRoletagMap[mir.MenuItemId] = [];
+        menuItemRoletagMap[mir.MenuItemId].push(mir.Label);
+      });
+    }
 
     const transformedMenus = menus.map(menu => ({
       ...menu,
@@ -148,8 +175,7 @@ exports.getMenus = async (req, res) => {
         .map(item => ({
           ...item,
           roles: menuItemRoletagMap[item.id] || [],
-        }))
-        || [],
+        })) || [],
     }));
 
     res.status(200).json({ menus: transformedMenus });
@@ -234,6 +260,15 @@ exports.deleteMenu = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // Delete associated roletags and menuitems first (to avoid FK issues)
+    await req.dbPool.request()
+      .input('MenuId', sql.Int, id)
+      .query('DELETE FROM roletag WHERE MenuId = @MenuId');
+
+    await req.dbPool.request()
+      .input('MenuId', sql.Int, id)
+      .query('DELETE FROM menuitems WHERE MenuId = @MenuId');
+
     const result = await req.dbPool.request()
       .input('MenuId', sql.Int, id)
       .query(`
@@ -281,22 +316,18 @@ exports.createMenuItem = async (req, res) => {
     }
 
     if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
-      const roletags = role_ids.map(role_id => ({
-        MenuItemId: menuItem.MenuItemId,
-        RoleId: role_id,
-        OrderIndex: parseInt(order_index) || 0,
-      }));
-
-      const roletagRequest = req.dbPool.request();
-      roletags.forEach(tag => {
-        roletagRequest.input('MenuItemId', sql.Int, tag.MenuItemId);
-        roletagRequest.input('RoleId', sql.Int, tag.RoleId);
-        roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
-      });
-      await roletagRequest.query(`
-        INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex)
-        VALUES (@MenuItemId, @RoleId, @OrderIndex)
-      `);
+      for (const role_id of role_ids) {
+        const roletagRequest = req.dbPool.request()
+          .input('MenuItemId', sql.Int, menuItem.MenuItemId)
+          .input('RoleId', sql.Int, role_id)
+          .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+          .input('CreatedAt', sql.DateTime, new Date())
+          .query(`
+            INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex, CreatedAt)
+            VALUES (@MenuItemId, @RoleId, @OrderIndex, @CreatedAt)
+          `);
+        await roletagRequest;
+      }
     }
 
     res.status(201).json({ message: 'Menu item created successfully', menu_item: menuItem });
@@ -319,49 +350,47 @@ exports.updateMenuItem = async (req, res) => {
       return res.status(400).json({ error: 'Label and href are required' });
     }
 
-    const result = await req.dbPool.request()
+    // First, update the menu item
+    const updateResult = await req.dbPool.request()
       .input('MenuItemId', sql.Int, id)
       .input('Label', sql.NVarChar, label)
       .input('Href', sql.NVarChar, href)
       .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+      .input('UpdatedAt', sql.DateTime, new Date())
       .query(`
         UPDATE menuitems
-        SET Label = @Label, Href = @Href, OrderIndex = @OrderIndex
+        SET Label = @Label, Href = @Href, OrderIndex = @OrderIndex, UpdatedAt = @UpdatedAt
         OUTPUT INSERTED.*
         WHERE MenuItemId = @MenuItemId
       `);
 
-    const data = result.recordset[0];
-    if (!data) {
+    const menuItem = updateResult.recordset[0];
+    if (!menuItem) {
       return res.status(400).json({ error: 'Menu item not found' });
     }
 
-    if (role_ids && Array.isArray(role_ids)) {
-      await req.dbPool.request()
-        .input('MenuItemId', sql.Int, id)
-        .query('DELETE FROM menuitemroletag WHERE MenuItemId = @MenuItemId');
+    // Delete existing role associations
+    await req.dbPool.request()
+      .input('MenuItemId', sql.Int, id)
+      .query('DELETE FROM menuitemroletag WHERE MenuItemId = @MenuItemId');
 
-      if (role_ids.length > 0) {
-        const roletags = role_ids.map(role_id => ({
-          MenuItemId: id,
-          RoleId: role_id,
-          OrderIndex: parseInt(order_index) || 0,
-        }));
-
-        const roletagRequest = req.dbPool.request();
-        roletags.forEach(tag => {
-          roletagRequest.input('MenuItemId', sql.Int, tag.MenuItemId);
-          roletagRequest.input('RoleId', sql.Int, tag.RoleId);
-          roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
-        });
-        await roletagRequest.query(`
-          INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex)
-          VALUES (@MenuItemId, @RoleId, @OrderIndex)
-        `);
+    // Insert new role associations if provided
+    if (role_ids && Array.isArray(role_ids) && role_ids.length > 0) {
+      for (const role_id of role_ids) {
+        const roletagRequest = req.dbPool.request()
+          .input('MenuItemId', sql.Int, menuItem.MenuItemId)
+          .input('RoleId', sql.Int, role_id)
+          .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+          .input('CreatedAt', sql.DateTime, new Date())
+          .query(`
+            INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex, CreatedAt)
+            VALUES (@MenuItemId, @RoleId, @OrderIndex, @CreatedAt)
+          `);
+        await roletagRequest;
       }
     }
 
-    res.status(200).json({ message: 'Menu item updated successfully', menu_item: data });
+    res.status(200).json({ message: 'Menu item updated successfully', menu_item: menuItem });
   } catch (err) {
     console.error('Error in updateMenuItem:', err);
     res.status(500).json({ error: err.message });
@@ -375,6 +404,11 @@ exports.deleteMenuItem = async (req, res) => {
 
   try {
     const { id } = req.params;
+
+    // Delete associated roletags first
+    await req.dbPool.request()
+      .input('MenuItemId', sql.Int, id)
+      .query('DELETE FROM menuitemroletag WHERE MenuItemId = @MenuItemId');
 
     const result = await req.dbPool.request()
       .input('MenuItemId', sql.Int, id)
@@ -394,33 +428,6 @@ exports.deleteMenuItem = async (req, res) => {
   }
 };
 
-// Get Roletags
-exports.getRoletags = async (req, res) => {
-  const { error: authError } = verifyAdmin(req);
-  if (authError) return res.status(403).json({ error: 'Admin access required' });
-
-  try {
-    const { menu_ids } = req.query;
-    let query = `
-      SELECT rt.MenuId, rt.RoleId, r.Label
-      FROM roletags rt
-      INNER JOIN roles r ON rt.RoleId = r.RoleId
-    `;
-
-    if (menu_ids) {
-      query += ` WHERE rt.MenuId IN (${menu_ids.split(',').map(() => '?').join(',')})`;
-    }
-
-    const result = await req.dbPool.request().query(query);
-
-    console.log('Roletags fetched for /api/roletags:', result.recordset);
-    res.status(200).json(result.recordset);
-  } catch (err) {
-    console.error('Error in getRoletags:', err);
-    res.status(500).json({ error: err.message });
-  }
-};
-
 // Assign Roles to Menu
 exports.assignRolesToMenu = async (req, res) => {
   const { error: authError } = verifyAdmin(req);
@@ -433,31 +440,29 @@ exports.assignRolesToMenu = async (req, res) => {
       return res.status(400).json({ error: 'Menu ID and role IDs (array) are required' });
     }
 
+    // Delete existing role associations
     await req.dbPool.request()
       .input('MenuId', sql.Int, menu_id)
-      .query('DELETE FROM roletags WHERE MenuId = @MenuId');
+      .query('DELETE FROM roletag WHERE MenuId = @MenuId');
 
-    const roletags = role_ids.map(role_id => ({
-      MenuId: menu_id,
-      RoleId: role_id,
-      OrderIndex: parseInt(order_index) || 0,
-      CreatedAt: new Date(),
-    }));
+    // Insert new role associations
+    const insertedRoletags = [];
+    for (const role_id of role_ids) {
+      const roletagRequest = req.dbPool.request()
+        .input('MenuId', sql.Int, menu_id)
+        .input('RoleId', sql.Int, role_id)
+        .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+        .input('CreatedAt', sql.DateTime, new Date());
+      const result = await roletagRequest.query(`
+        INSERT INTO roletag (MenuId, RoleId, OrderIndex, CreatedAt)
+        OUTPUT INSERTED.*
+        VALUES (@MenuId, @RoleId, @OrderIndex, @CreatedAt)
+      `);
+      insertedRoletags.push(result.recordset[0]);
+    }
 
-    const roletagRequest = req.dbPool.request();
-    roletags.forEach(tag => {
-      roletagRequest.input('MenuId', sql.Int, tag.MenuId);
-      roletagRequest.input('RoleId', sql.Int, tag.RoleId);
-      roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
-      roletagRequest.input('CreatedAt', sql.DateTime, tag.CreatedAt);
-    });
-    const result = await roletagRequest.query(`
-      INSERT INTO roletags (MenuId, RoleId, OrderIndex, CreatedAt)
-      VALUES (@MenuId, @RoleId, @OrderIndex, @CreatedAt)
-    `);
-
-    console.log('Roletags assigned:', result.recordset);
-    res.status(200).json({ message: 'Roles assigned successfully', roletags: result.recordset });
+    console.log('Roletags assigned:', insertedRoletags);
+    res.status(200).json({ message: 'Roles assigned successfully', roletags: insertedRoletags });
   } catch (err) {
     console.error('Error in assignRolesToMenu:', err);
     res.status(500).json({ error: err.message });
@@ -476,28 +481,29 @@ exports.assignRolesToMenuItem = async (req, res) => {
       return res.status(400).json({ error: 'Menu item ID and role IDs (array) are required' });
     }
 
+    // Delete existing role associations
     await req.dbPool.request()
       .input('MenuItemId', sql.Int, menu_item_id)
       .query('DELETE FROM menuitemroletag WHERE MenuItemId = @MenuItemId');
 
-    const roletags = role_ids.map(role_id => ({
-      MenuItemId: menu_item_id,
-      RoleId: role_id,
-      OrderIndex: parseInt(order_index) || 0,
-    }));
+    // Insert new role associations
+    const insertedRoletags = [];
+    for (const role_id of role_ids) {
+      const roletagRequest = req.dbPool.request()
+        .input('MenuItemId', sql.Int, menu_item_id)
+        .input('RoleId', sql.Int, role_id)
+        .input('OrderIndex', sql.Int, parseInt(order_index) || 0)
+        .input('CreatedAt', sql.DateTime, new Date());
+      const result = await roletagRequest.query(`
+        INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex, CreatedAt)
+        OUTPUT INSERTED.*
+        VALUES (@MenuItemId, @RoleId, @OrderIndex, @CreatedAt)
+      `);
+      insertedRoletags.push(result.recordset[0]);
+    }
 
-    const roletagRequest = req.dbPool.request();
-    roletags.forEach(tag => {
-      roletagRequest.input('MenuItemId', sql.Int, tag.MenuItemId);
-      roletagRequest.input('RoleId', sql.Int, tag.RoleId);
-      roletagRequest.input('OrderIndex', sql.Int, tag.OrderIndex);
-    });
-    const result = await roletagRequest.query(`
-      INSERT INTO menuitemroletag (MenuItemId, RoleId, OrderIndex)
-      VALUES (@MenuItemId, @RoleId, @OrderIndex)
-    `);
-
-    res.status(200).json({ message: 'Roles assigned successfully', roletags: result.recordset });
+    console.log('Roletags assigned:', insertedRoletags);
+    res.status(200).json({ message: 'Roles assigned successfully', roletags: insertedRoletags });
   } catch (err) {
     console.error('Error in assignRolesToMenuItem:', err);
     res.status(500).json({ error: err.message });

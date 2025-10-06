@@ -112,9 +112,7 @@ exports.createOrUpdateBlog = async (req, res) => {
       return res.status(200).json(data);
     } else {
       // INSERT
-      const id = crypto.randomUUID();
       const r = await req.dbPool.request()
-        .input('Id', sql.NVarChar(36), id)
         .input('Title', sql.NVarChar(255), blogData.title)
         .input('Slug', sql.NVarChar(255), blogData.slug)
         .input('CoverImage', sql.NVarChar(1024), blogData.cover_image)
@@ -131,11 +129,11 @@ exports.createOrUpdateBlog = async (req, res) => {
         .input('UpdatedAt', sql.DateTime2, now())
         .query(`
           INSERT INTO dbo.blogs
-            (id, title, slug, coverimage, category, excerpt, tags, content, status,
+            (title, slug, coverimage, category, excerpt, tags, content, status,
              Publishat, MetaTitle, MetaDescription, IsActive, CreatedAt, UpdatedAt)
           OUTPUT INSERTED.*
           VALUES
-            (@Id, @Title, @Slug, @CoverImage, @Category, @Excerpt, @Tags, @Content, @Status,
+            (@Title, @Slug, @CoverImage, @Category, @Excerpt, @Tags, @Content, @Status,
              @PublishAt, @MetaTitle, @MetaDesc, @IsActive, @CreatedAt, @UpdatedAt)
         `);
 
@@ -323,10 +321,30 @@ exports.getUserDrafts = async (_req, res) => {
 
     const r = await _req.dbPool.request().query(`
       SELECT * FROM dbo.blogs
-      WHERE status='DRAFT' AND is_active='Y'
+      WHERE Status='DRAFT' AND IsActive='Y'
       ORDER BY UpdatedAt DESC
     `);
 
+    const processedRecords = (r.recordset || []).map(record => {
+      let tagsStr = record.Tags; // Use 'Tags' to match DB column casing
+      if (tagsStr && typeof tagsStr === 'string') {
+        try {
+          // Convert {a,b} to [a,b] for valid JSON array if needed
+          if (tagsStr.startsWith('{') && tagsStr.endsWith('}')) {
+            tagsStr = '[' + tagsStr.slice(1, -1) + ']';
+          }
+          // Now parse as JSON array
+          record.Tags = JSON.parse(tagsStr);
+        } catch (parseErr) {
+          console.warn('Failed to parse Tags for BlogId:', record.BlogId, parseErr, 'Raw value:', tagsStr);
+          record.Tags = []; // Fallback to empty array
+        }
+      } else {
+        record.Tags = []; // Handle null/empty/non-string
+      }
+      return record;
+    });
+    r.recordset = processedRecords;
     res.status(200).json(r.recordset || []);
   } catch (err) {
     console.error('Error in getUserDrafts:', err);
