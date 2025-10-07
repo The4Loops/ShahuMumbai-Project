@@ -177,7 +177,7 @@ function MenuManagement() {
         }, { headers: commonHeaders });
         if (newMenuItem.role_ids.length > 0) {
           await api.post("/api/menu-item-roles", {
-            menu_item_id: menuItem.id,
+            menu_item_id: menuItem.menu_item.MenuItemId,
             role_ids: newMenuItem.role_ids,
             order_index: parseInt(newMenuItem.order_index) || 0,
           }, { headers: commonHeaders });
