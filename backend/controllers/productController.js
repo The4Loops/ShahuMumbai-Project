@@ -227,30 +227,56 @@ exports.getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Group images and categories
+    // Group product data, images, and categories
     const product = result.recordset.reduce((acc, row) => {
+      // Initialize product object on first row
       if (!acc.ProductId) {
         acc = {
           ...row,
           product_images: [],
-          categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : [],
-          colors: Array.isArray(JSON.parse(row.Colors || '[]')) ? JSON.parse(row.Colors) : [],
+          categories: [],
+          colors: [],
         };
+        // Parse Colors safely
+        try {
+          acc.colors = row.Colors ? JSON.parse(row.Colors) : [];
+          if (!Array.isArray(acc.colors)) {
+            acc.colors = [];
+          }
+        } catch (parseError) {
+          console.error('Error parsing Colors:', parseError);
+          acc.colors = [];
+        }
+        // Remove fields not needed in final response
         delete acc.image_id;
+        delete acc.image_url;
+        delete acc.is_hero;
         delete acc.category_name;
+        delete acc.CategoryId;
+        delete acc.Colors; // Remove raw Colors string
       }
-      if (row.image_url) {
+
+      // Add image if it exists and isn't already included
+      if (row.image_url && !acc.product_images.some(img => img.id === row.image_id)) {
         acc.product_images.push({
           id: row.image_id,
           image_url: row.image_url,
-          is_hero: row.is_hero == 'Y' ? true : false,
+          is_hero: row.is_hero === 'Y',
         });
       }
+
+      // Add category if it exists and isn't already included
+      if (row.CategoryId && !acc.categories.some(cat => cat.CategoryId === row.CategoryId)) {
+        acc.categories.push({
+          CategoryId: row.CategoryId, // Single value, not an array
+          Name: row.category_name,
+        });
+      }
+
       return acc;
     }, {});
 
-    const normalized = { ...product, colors: Array.isArray(product.colors) ? product.colors : [] };
-    return res.status(200).json(normalized);
+    return res.status(200).json(product);
   } catch (error) {
     console.error('getProductById:', error);
     return res.status(500).json({ message: 'Server error', error: error.message });

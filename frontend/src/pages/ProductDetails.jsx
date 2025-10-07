@@ -188,7 +188,7 @@ const ProductDetails = () => {
         setReviews(list);
         const count = list.length;
         const avg = count
-          ? list.reduce((s, r) => s + Number(r.rating || 0), 0) / count
+          ? list.reduce((s, r) => s + Number(r.Rating || 0), 0) / count
           : 0;
         setReviewCount(count);
         setAvgRating(Number(avg.toFixed(1)));
@@ -902,7 +902,7 @@ const ProductDetails = () => {
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Color</dt>
-                  <dd className="font-medium">{selectedColor || "—"}</dd>
+                  <dd className="font-medium">{product.colors.length > 0 ? product.colors.join(", ") : "—"}</dd>
                 </div>
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Category</dt>
@@ -948,24 +948,24 @@ const ProductDetails = () => {
                 <ul className="space-y-4">
                   {reviews.map((r) => (
                     <li
-                      key={r.id}
+                      key={r.ReviewId}
                       className="border border-[#F1E7E5] rounded-lg p-4"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <StarRating value={Number(r.rating) || 0} />
+                          <StarRating value={Number(r.Rating) || 0} />
                           <span className="text-sm text-[#6B4226] font-semibold">
-                            {r.users?.full_name || "Anonymous"}
+                            {r.FullName || "Anonymous"}
                           </span>
                         </div>
                         <time className="text-xs text-[#3E2C23] opacity-70">
-                          {r.created_at
-                            ? new Date(r.created_at).toLocaleDateString("en-IN")
+                          {r.CreatedAt
+                            ? new Date(r.CreatedAt).toLocaleDateString("en-IN")
                             : ""}
                         </time>
                       </div>
                       <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                        {r.comment}
+                        {r.Comment}
                       </p>
                     </li>
                   ))}

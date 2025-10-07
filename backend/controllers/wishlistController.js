@@ -20,14 +20,14 @@ exports.addToWishlist = async (req, res) => {
   if (error) return res.status(401).json({ error });
 
   try {
-    const { ProductId } = req.body;
-    if (!ProductId) {
+    const { product_id } = req.body;
+    if (!product_id) {
       return res.status(400).json({ error: 'Product ID is required' });
     }
 
     // Check if product exists
     const productResult = await req.dbPool.request()
-      .input('ProductId', sql.Int, ProductId)
+      .input('ProductId', sql.Int, product_id)
       .query('SELECT ProductId FROM products WHERE ProductId = @ProductId');
     if (!productResult.recordset[0]) {
       return res.status(404).json({ error: 'Product not found' });
@@ -36,7 +36,7 @@ exports.addToWishlist = async (req, res) => {
     // Check if item is already in wishlist
     const existingItemResult = await req.dbPool.request()
       .input('UserId', sql.Int, decoded.id)
-      .input('ProductId', sql.Int, ProductId)
+      .input('ProductId', sql.Int, product_id)
       .query('SELECT WishListId FROM wishlist WHERE UserId = @UserId AND ProductId = @ProductId');
     if (existingItemResult.recordset[0]) {
       return res.status(400).json({ error: 'Item already in wishlist' });
@@ -45,7 +45,7 @@ exports.addToWishlist = async (req, res) => {
     // Add to wishlist
     const insertResult = await req.dbPool.request()
       .input('UserId', sql.Int, decoded.id)
-      .input('ProductId', sql.Int, ProductId)
+      .input('ProductId', sql.Int, product_id)
       .query(`
         INSERT INTO wishlist (UserId, ProductId, CreatedAt, UpdatedAt)
         OUTPUT INSERTED.WishListId, INSERTED.UserId, INSERTED.ProductId, INSERTED.CreatedAt, INSERTED.UpdatedAt

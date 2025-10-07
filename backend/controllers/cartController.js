@@ -73,7 +73,7 @@ exports.addToCart = async (req, res) => {
         .query(`
           INSERT INTO dbo.carts (UserId, ProductId, quantity, CreatedAt, UpdatedAt)
           OUTPUT INSERTED.CartId, INSERTED.UserId, INSERTED.ProductId, INSERTED.quantity, INSERTED.CreatedAt, INSERTED.UpdatedAt
-          VALUES (@Id, @UserId, @ProductId, @Qty, @CreatedAt, @UpdatedAt)
+          VALUES (@UserId, @ProductId, @Qty, @CreatedAt, @UpdatedAt)
         `);
 
       const row = ins.recordset?.[0];

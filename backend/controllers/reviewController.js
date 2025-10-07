@@ -21,25 +21,25 @@ exports.createReview = async (req, res) => {
     const { error: authError, decoded } = verifyUser(req);
     if (authError) return res.status(401).json({ message: authError });
 
-    const { UserId, ProductId, Rating, Comment } = req.body;
+    const { userid, productid, rating, comment } = req.body;
 
     // Validate required fields
-    if (!UserId || !ProductId || !Rating) {
+    if (!userid || !productid || !rating) {
       return res.status(400).json({ message: 'User ID, Product ID, and Rating are required' });
     }
-    if (Rating < 1 || Rating > 5) {
+    if (rating < 1 || rating > 5) {
       return res.status(400).json({ message: 'Rating must be between 1 and 5' });
     }
 
     // Ensure the user is creating a review for themselves
-    if (UserId !== decoded.id) {
+    if (userid !== decoded.id) {
       return res.status(403).json({ message: 'Forbidden: You can only create reviews for yourself' });
     }
 
     // Check if a review already exists for this user and product
     const existingReviewResult = await req.dbPool.request()
-      .input('UserId', sql.Int, UserId)
-      .input('ProductId', sql.Int, ProductId)
+      .input('UserId', sql.Int, userid)
+      .input('ProductId', sql.Int, productid)
       .query(`
         SELECT ReviewId
         FROM reviews
@@ -54,10 +54,10 @@ exports.createReview = async (req, res) => {
 
     // Insert review
     const insertResult = await req.dbPool.request()
-      .input('UserId', sql.Int, UserId)
-      .input('ProductId', sql.Int, ProductId)
-      .input('Rating', sql.Int, parseInt(Rating))
-      .input('Comment', sql.NVarChar, Comment)
+      .input('UserId', sql.Int, userid)
+      .input('ProductId', sql.Int, productid)
+      .input('Rating', sql.Int, parseInt(rating))
+      .input('Comment', sql.NVarChar, comment)
       .input('CreatedAt', sql.DateTime, new Date())
       .input('UpdatedAt', sql.DateTime, new Date())
       .query(`
@@ -81,10 +81,10 @@ exports.createReview = async (req, res) => {
 // Get Reviews by Product ID
 exports.getReviewsByProductId = async (req, res) => {
   try {
-    const { ProductId } = req.params;
+    const { id } = req.params;
 
     const result = await req.dbPool.request()
-      .input('ProductId', sql.Int, ProductId)
+      .input('ProductId', sql.Int, id)
       .query(`
         SELECT 
           r.ReviewId,
