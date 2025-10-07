@@ -476,7 +476,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
         setTopProducts(
           (tp || []).map((t, i) => ({
             id: i + 1,
-            name: t.product_title,
+            name: t.ProductTitle,
             sales: Number(t.qty || t.purchases || 0),
           }))
         );
@@ -588,8 +588,8 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
                     <div className="w-7 h-7 rounded bg-[#fff7f7] text-[#6B4226] flex items-center justify-center text-xs">
                       #{i + 1}
                     </div>
-                    <div className="text-sm text-[#6B4226]">{p.name}</div>
                   </div>
+                  <div className="text-sm text-[#6B4226]">{p.name}</div>
                   <div className="text-sm text-gray-600">{p.sales}</div>
                 </li>
               ))

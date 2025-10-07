@@ -16,21 +16,6 @@ exports.getSummary = async (req, res) => {
     const p_to   = toEnd(to);
     const topLimit = Math.min(Number(req.query.top_limit || 5), 20);
 
-    if (!dbReady(req) && devFakeAllowed()) {
-      return res.json({
-        kpis: {
-          revenue_30d: 123456,
-          orders_30d: 42,
-          avg_order_value: 2939.43,
-          refund_rate_pct: 2.38,
-        },
-        topProducts: [
-          { product_title: 'Sample Lehenga', qty: 28, revenue: 56000, purchases: 15 },
-          { product_title: 'Banarasi Saree', qty: 20, revenue: 40000, purchases: 12 },
-        ].slice(0, topLimit),
-      });
-    }
-
     const clauses = [];
     const req1 = req.dbPool.request();
     if (p_from) { clauses.push('PlacedAt >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
@@ -50,8 +35,8 @@ exports.getSummary = async (req, res) => {
     let revenue = 0;
     let refundCount = 0;
     for (const o of orders) {
-      revenue += Number(o.total || 0);
-      if (String(o.status).toLowerCase() === 'refunded') refundCount += 1;
+      revenue += Number(o.Total || 0);
+      if (String(o.Status).toLowerCase() === 'refunded') refundCount += 1;
     }
     const kpis = {
       revenue_30d: revenue,
@@ -62,7 +47,7 @@ exports.getSummary = async (req, res) => {
 
     let topProducts = [];
     if (orders.length) {
-      const ids = orders.map(o => o.id);
+      const ids = orders.map(o => o.OrderId);
       const inList = ids.map((_, i) => `@O${i}`).join(',');
       const itemsReq = req.dbPool.request();
       ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
@@ -76,14 +61,14 @@ exports.getSummary = async (req, res) => {
       const map = new Map(); 
       const purchasesByTitle = new Map(); 
       for (const it of (itemsRes.recordset || [])) {
-        const t = it.product_title || 'Unknown';
-        const cur = map.get(t) || { product_title: t, qty: 0, revenue: 0, purchases: 0 };
+        const t = it.ProductTitle || 'Unknown';
+        const cur = map.get(t) || { ProductTitle: t, qty: 0, revenue: 0, purchases: 0 };
         cur.qty += Number(it.qty || 0);
-        cur.revenue += Number(it.line_total || 0);
+        cur.revenue += Number(it.LineTotal || 0);
         map.set(t, cur);
 
         if (!purchasesByTitle.has(t)) purchasesByTitle.set(t, new Set());
-        purchasesByTitle.get(t).add(it.order_id);
+        purchasesByTitle.get(t).add(it.OrderId);
       }
       for (const [t, set] of purchasesByTitle.entries()) {
         const cur = map.get(t);
@@ -111,17 +96,6 @@ exports.getSales = async (req, res) => {
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    /* Dev fallback */
-    if (!dbReady(req) && devFakeAllowed()) {
-      return res.json({
-        data: [
-          { day: '2025-09-01', value: 5 },
-          { day: '2025-09-02', value: 7 },
-          { day: '2025-09-03', value: 3 },
-        ],
-      });
-    }
-
     const clauses = [];
     const req1 = req.dbPool.request();
     if (p_from) { clauses.push('PlacedAt >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
@@ -139,7 +113,7 @@ exports.getSales = async (req, res) => {
     const rows = rowsRes.recordset || [];
     const byDay = new Map(); // YYYY-MM-DD -> value
     for (const r of rows) {
-      const day = String(r.placed_at).slice(0, 10);
+      const day = String(r.PlacedAt).slice(0, 10);
       if (!byDay.has(day)) byDay.set(day, 0);
       if (metric === 'revenue') {
         byDay.set(day, byDay.get(day) + Number(r.total || 0));
@@ -194,7 +168,7 @@ exports.getTopProducts = async (req, res) => {
 
     let itemsOut = [];
     if (orders.length) {
-      const ids = orders.map(o => o.id);
+      const ids = orders.map(o => o.OrderId);
       const inList = ids.map((_, i) => `@O${i}`).join(',');
       const itemsReq = req.dbPool.request();
       ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
@@ -208,14 +182,14 @@ exports.getTopProducts = async (req, res) => {
       const map = new Map();
       const purchasesByTitle = new Map();
       for (const it of (iRes.recordset || [])) {
-        const t = it.product_title || 'Unknown';
-        const cur = map.get(t) || { product_title: t, qty: 0, revenue: 0, purchases: 0 };
+        const t = it.ProductTitle || 'Unknown';
+        const cur = map.get(t) || { ProductTitle: t, qty: 0, revenue: 0, purchases: 0 };
         cur.qty += Number(it.qty || 0);
-        cur.revenue += Number(it.line_total || 0);
+        cur.revenue += Number(it.LineTotal || 0);
         map.set(t, cur);
 
         if (!purchasesByTitle.has(t)) purchasesByTitle.set(t, new Set());
-        purchasesByTitle.get(t).add(it.order_id);
+        purchasesByTitle.get(t).add(it.OrderId);
       }
       for (const [t, set] of purchasesByTitle.entries()) {
         const cur = map.get(t); if (cur) cur.purchases = set.size;
@@ -239,21 +213,6 @@ exports.getRecentOrders = async (req, res) => {
   try {
     const limit = Math.min(Number(req.query.limit || 5), 50);
 
-    /* Dev fallback */
-    if (!dbReady(req) && devFakeAllowed()) {
-      return res.json({
-        orders: [
-          {
-            order_id: 'ORD-1001',
-            occurred_at: new Date().toISOString(),
-            customer: 'Guest',
-            total: 1999,
-            status: 'paid',
-          },
-        ],
-      });
-    }
-
     const ordersRes = await req.dbPool.request()
       .input('Limit', sql.Int, limit)
       .query(`
@@ -264,9 +223,8 @@ exports.getRecentOrders = async (req, res) => {
       `);
 
     const rows = ordersRes.recordset || [];
-
     // optional user enrichment
-    const userIds = [...new Set(rows.map(r => r.user_id).filter(v => v !== null && v !== undefined))];
+    const userIds = [...new Set(rows.map(r => r.UserId).filter(v => v !== null && v !== undefined))];
     let userMap = new Map();
     if (userIds.length) {
       const inList = userIds.map((_, i) => `@U${i}`).join(',');
@@ -275,19 +233,18 @@ exports.getRecentOrders = async (req, res) => {
       const uRes = await uReq.query(`
         SELECT UserId, FullName, Email
         FROM dbo.users
-        WHERE id IN (${inList})
+        WHERE UserId IN (${inList})
       `);
       userMap = new Map((uRes.recordset || []).map(u => [u.id, u]));
     }
-
     const out = rows.map(r => {
-      const u = userMap.get(r.user_id);
-      const customer = r.customer_name || u?.full_name || u?.email || r.customer_email || 'Guest';
+      const u = userMap.get(r.UserId);
+      const customer = r.CustomerName || u?.FullName || u?.Email || r.CustomerEmail || 'Guest';
       return {
-        order_id: r.order_number || `ORD-${r.id}`,
-        occurred_at: r.placed_at,
-        total: Number(r.total || 0),
-        status: r.status,
+        order_id: r.OrderNumber || `ORD-${r.id}`,
+        occurred_at: r.PlacedAt,
+        total: Number(r.Total || 0),
+        status: r.Status,
         customer,
       };
     });
