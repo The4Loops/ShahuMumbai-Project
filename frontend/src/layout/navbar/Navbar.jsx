@@ -118,7 +118,6 @@ export default function Navbar() {
       userRole = decoded.role || null;
     } catch {
       localStorage.removeItem("token");
-      console.error('Invalid JWT token');
     }
   }
 
@@ -126,13 +125,11 @@ export default function Navbar() {
   const fetchMenuData = useCallback(async () => {
     setIsLoading(true);
     try {
-      console.log('Fetching menus with language:', i18n.language);
       const res = await api.get(`/api/navbar/menus?lang=${i18n.language}`, {
         headers: {
           Authorization: token ? `Bearer ${token}` : undefined,
         },
       });
-      console.log('Menu API response:', res.data);
 
       let sorted = res.data.menus.sort((a, b) => a.OrderIndex - b.OrderIndex);
 
@@ -149,13 +146,11 @@ export default function Navbar() {
         sorted = sorted.filter((m) => m.Label.toLowerCase() !== t("navbar.menus.admin").toLowerCase());
       }
 
-      console.log('Processed menus:', sorted);
       setMenus(sorted);
       const initDrop = {};
       sorted.forEach((m) => (initDrop[m.Id] = false));
       setDropdown({ ...initDrop, account: false, lang: false });
     } catch (err) {
-      console.error('Error fetching menus:', err.response?.data || err.message);
       toast.error(err.response?.data?.message || t("navbar.errors.fetchMenus"));
     } finally {
       setIsLoading(false);
@@ -169,10 +164,8 @@ export default function Navbar() {
     }
     try {
       const response = await api.get("/api/cartById");
-      console.log('Cart API response:', response.data);
       setCartItemCount(response.data ? response.data.length : 0);
     } catch (err) {
-      console.error('Error fetching cart:', err.response?.data || err.message);
       toast.error(err.response?.data?.error || t("navbar.errors.fetchCart"));
       setCartItemCount(0);
     }

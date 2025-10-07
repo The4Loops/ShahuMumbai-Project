@@ -69,11 +69,10 @@ app.use((req, _res, next) => {
 app.use(helmet());
 
 // --- CORS (allow multiple frontends) ---
-// CORS
 const rawAllowed = process.env.ALLOWED_ORIGINS || process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
 const allowed = rawAllowed
   .split(',')
-  .map(s => s.trim().replace(/\/$/, '')) // strip trailing slash
+  .map(s => s.trim().replace(/\/$/, ''))
   .filter(Boolean);
 
 console.log('CORS allowed origins:', allowed);
@@ -82,23 +81,31 @@ const isDev = process.env.NODE_ENV !== 'production';
 
 app.use(cors({
   origin: (origin, cb) => {
-    // allow server-to-server/curl and anything in dev
     if (!origin || isDev) return cb(null, true);
 
     const normalized = origin.replace(/\/$/, '');
-    const ok = allowed.includes(normalized)
-      || /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized); // safety for local
+    const ok =
+      allowed.includes(normalized) ||
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized);
 
     if (ok) return cb(null, true);
 
     console.warn('Blocked by CORS:', origin);
-    return cb(null, false); // don't throw; just deny CORS
+    return cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
+// ✅ Handle all OPTIONS requests quickly
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(204);
+  } else {
+    next();
+  }
+});
 
 // Cookies (before guestSession)
 app.use(cookieParser(process.env.COOKIE_SECRET));

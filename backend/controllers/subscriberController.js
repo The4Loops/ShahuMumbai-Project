@@ -23,11 +23,11 @@ exports.getSubscribeUser = async (req, res) => {
           InstagramUrl AS instagram_url,
           LinkedInUrl AS linkedin_url,
           ProfileImage AS profile_image,
-          RoleId,
+          r.RoleId,
           Active AS active,
           Joined AS joined,
           LastLogin AS last_login,
-          UpdatedAt AS updated_at,
+          u.UpdatedAt AS updated_at,
           r.Label
         FROM users u
         INNER JOIN roles r ON u.RoleId = r.RoleId
@@ -200,7 +200,7 @@ exports.sendNewsletterMail = async (req, res) => {
 
     const users = usersResult.recordset;
     if (!users || users.length === 0) {
-      return res.status(404).json({ error: 'No subscribers found' });
+      return res.status(400).json({ message: 'No subscribers found' });
     }
 
     // Create plain text fallback by stripping HTML tags

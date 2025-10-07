@@ -13,20 +13,16 @@ const AuthCallback = () => {
     const error = params.get("error");
 
     if (error) {
-      console.error("Google OAuth Error:", error);
       toast.error(`Google login failed: ${error}`);
       navigate("/account");
       return;
     }
 
     if (!idToken) {
-      console.error("No ID token found in URL hash");
       toast.error("Google login failed: No ID token received.");
       navigate("/account");
       return;
     }
-
-    console.log("Google ID Token:", idToken);
 
     api
       .post("/api/auth/ssoLogin", {}, { headers: { Authorization: `Bearer ${idToken}` } })
@@ -35,7 +31,6 @@ const AuthCallback = () => {
         try {
           localStorage.setItem("token", token);
         } catch (storageError) {
-          console.error("Storage Error:", storageError);
           toast.error("Failed to store authentication token.");
           navigate("/account");
           return;
@@ -45,7 +40,6 @@ const AuthCallback = () => {
         try {
           decoded = jwtDecode(token);
         } catch (decodeError) {
-          console.error("Token Decode Error:", decodeError);
           localStorage.removeItem("token");
           toast.error("Invalid token format.");
           navigate("/account");
@@ -63,7 +57,6 @@ const AuthCallback = () => {
         }
       })
       .catch((error) => {
-        console.error("SSO Login Error:", error);
         toast.dismiss();
         toast.error(error.response?.data?.error || error.message || "Google login failed.");
         navigate("/account");

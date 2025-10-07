@@ -21,11 +21,9 @@ api.interceptors.request.use((config) => {
 // Log responses for debugging
 api.interceptors.response.use(
   (response) => {
-    console.log('API Response:', response.data);
     return response;
   },
   (error) => {
-    console.error('API Error:', error.response?.data || error.message);
     return Promise.reject(error);
   }
 );
