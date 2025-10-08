@@ -38,8 +38,8 @@ const MyOrders = () => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const { data } = await api.get("/orders"); // adjust endpoint
-        setOrders(data || []);
+        const response = await api.get("/api/orders");
+        setOrders(response.data.orders || []);
       } catch (err) {
         console.error("Failed to fetch orders:", err);
       } finally {
