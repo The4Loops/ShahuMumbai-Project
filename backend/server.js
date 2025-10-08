@@ -42,6 +42,10 @@ const wishlistRoutes = require('./routes/wishlistRoutes');
 const paymentsRoutes = require('./routes/paymentsRoutes');
 const heritageRoutes = require('./routes/heritageRoutes');
 const standaloneRoutes = require('./routes/standaloneRoutes'); // <-- public subscribe route
+const waitlistRoutes = require('./routes/waitlistRoutes');
+
+// Import controller directly to mount the webhook with raw parser
+const paymentsController = require('./controllers/paymentsController');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -110,7 +114,13 @@ app.use((req, res, next) => {
 // Cookies (before guestSession)
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-// JSON parser
+/** 
+ * IMPORTANT: Mount the Razorpay webhook BEFORE the global JSON parser,
+ * so req.rawBody is available for HMAC verification.
+ */
+app.post('/api/payments/webhook', express.raw({ type: '*/*' }), paymentsController.webhook);
+
+// Global JSON parser for everything else
 app.use(express.json());
 
 // Content Security Policy
@@ -173,9 +183,13 @@ app.use('/api', teamMembersRoutes);
 app.use('/api', collectionsRoutes);
 app.use('/api', subscriberRoutes);
 app.use('/api', wishlistRoutes);
+
+// Note: paymentsRoutes defines only /create-order and /verify (not /webhook)
 app.use('/api/payments', paymentsRoutes);
+
 app.use('/api', heritageRoutes);
 app.use('/api', standaloneRoutes); // <-- public subscribe endpoint
+app.use('/api/waitlist', waitlistRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

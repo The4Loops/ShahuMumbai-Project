@@ -3,14 +3,14 @@ import { Eye, Edit, Trash2, X, Search, ChevronLeft, ChevronRight } from "lucide-
 import api from "../../supabase/axios";
 import { toast } from "react-toastify";
 
-// Avatar Upload Component
+/* ------------------------- Avatar Upload ------------------------- */
 const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef();
 
   const handleFiles = (files) => {
-    const file = files[0];
-    if (file && file.type.startsWith("image/")) {
+    const file = files?.[0];
+    if (file && file.type?.startsWith("image/")) {
       setAvatarPreview(URL.createObjectURL(file));
     }
   };
@@ -26,7 +26,7 @@ const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
       className={`w-24 h-24 rounded-full border border-gray-300 overflow-hidden mx-auto mb-2 flex items-center justify-center cursor-pointer ${
         isDragOver ? "border-blue-400 bg-blue-50" : "bg-gray-200"
       }`}
-      onClick={() => fileInputRef.current.click()}
+      onClick={() => fileInputRef.current?.click()}
       onDragOver={(e) => {
         e.preventDefault();
         setIsDragOver(true);
@@ -37,7 +37,7 @@ const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
       {avatarPreview ? (
         <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
       ) : (
-        <span className="text-gray-500 text-2xl">{name?.[0] || "U"}</span>
+        <span className="text-gray-500 text-2xl">{name?.[0] ?? "U"}</span>
       )}
       <input
         ref={fileInputRef}
@@ -50,6 +50,7 @@ const AvatarUpload = ({ avatarPreview, setAvatarPreview, name }) => {
   );
 };
 
+/* --------------------------- User Tab ---------------------------- */
 function UserTab() {
   const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -59,16 +60,33 @@ function UserTab() {
   const [currentUser, setCurrentUser] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
-  // ✅ Pagination
   const [page, setPage] = useState(1);
   const [limit] = useState(5);
   const [totalUsers, setTotalUsers] = useState(0);
+  const [loading, setLoading] = useState(false);
 
   const roles = ["Admin", "Users", "Editor", "Moderator"];
   const statuses = ["Active", "Inactive"];
 
-  // ✅ Fetch only "Users" from API with pagination + search
+  // Normalize any incoming API user shape to our UI model
+ const normalizeUser = (u, idx) => {
+  const id = u?.UserId ?? u?.id ?? u?.email ?? `${idx}-${Date.now()}`;
+  return {
+    _key: String(id),
+    id,
+    name: u?.FullName ?? u?.full_name ?? u?.name ?? "—",
+    email: u?.Email ?? u?.email ?? "—",
+    role: u?.role ?? u?.Label ?? "Users",
+    status: (typeof u?.Active === "boolean" ? u.Active : u?.Active === 'Y') ? "Active" : "Inactive",
+    joined: u?.Joined ?? u?.joined ?? "N/A",
+    last: u?.LastLogin ?? u?.last_login ?? "Never",
+    avatar: u?.ProfileImage ?? u?.avatar ?? null,
+  };
+};
+
+  // Fetch with pagination + search; tolerate multiple API shapes
   const fetchUsers = async () => {
+    setLoading(true);
     try {
       const response = await api.get("/api/users", {
         params: {
@@ -77,39 +95,51 @@ function UserTab() {
           page,
           limit,
         },
+        headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
       });
-      const data = response.data;
-      const mappedUsers = data.users.map((u) => ({
-        id: u.id,
-        name: u.full_name,
-        email: u.email,
-        role: u.role,
-        status: u.active ? "Active" : "Inactive",
-        joined: u.joined || "N/A",
-        last: u.last_login || "Never",
-        avatar: null,
-      }));
 
-      setUsers(mappedUsers);
-      setTotalUsers(data.total || mappedUsers.length);
+      const raw = response?.data;
+
+      // Support various common shapes: { users: [] }, { data: [] }, [], { results: [] }
+      let list =
+        (Array.isArray(raw?.users) && raw.users) ||
+        (Array.isArray(raw?.data) && raw.data) ||
+        (Array.isArray(raw?.results) && raw.results) ||
+        (Array.isArray(raw) && raw) ||
+        [];
+
+      const mapped = list.map(normalizeUser);
+
+      const total =
+        (Number.isFinite(raw?.total) && raw.total) ||
+        (Number.isFinite(raw?.count) && raw.count) ||
+        mapped.length;
+
+      setUsers(mapped);
+      setTotalUsers(total);
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.error || "Failed to fetch users");
+      toast.error(error?.response?.data?.error || "Failed to fetch users");
+      setUsers([]);
+      setTotalUsers(0);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     fetchUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, searchQuery]);
 
   // Edit user
   const handleEditUser = (user) => {
     setCurrentUser(user);
-    setAvatarPreview(user.avatar || null);
+    setAvatarPreview(user?.avatar ?? null);
     setIsAddEditModalOpen(true);
   };
 
-  // Save user
+  // Save user (create/update)
   const handleSaveUser = async (e) => {
     e.preventDefault();
     const form = e.target;
@@ -133,7 +163,7 @@ function UserTab() {
         await api.post("/api/users", {
           full_name: name,
           email,
-          password: "password123", // ⚠️ must provide password when creating
+          password: "password123", // placeholder; replace with your flow
           role,
           active: status === "Active",
         });
@@ -141,26 +171,30 @@ function UserTab() {
       }
       fetchUsers();
       setIsAddEditModalOpen(false);
+      setCurrentUser(null);
+      setAvatarPreview(null);
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.error || "Failed to save user");
+      toast.error(error?.response?.data?.error || "Failed to save user");
     }
   };
 
   // Delete user
   const confirmDeleteUser = async () => {
+    if (!currentUser?.id) return;
     try {
       await api.delete(`/api/users/${currentUser.id}`);
       toast.success("User deleted successfully");
       setIsDeleteModalOpen(false);
+      setCurrentUser(null);
       fetchUsers();
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.error || "Failed to delete user");
+      toast.error(error?.response?.data?.error || "Failed to delete user");
     }
   };
 
-  const totalPages = Math.ceil(totalUsers / limit);
+  const totalPages = Math.max(1, Math.ceil((totalUsers || 0) / limit));
 
   return (
     <div className="p-4">
@@ -173,7 +207,7 @@ function UserTab() {
           value={searchQuery}
           onChange={(e) => {
             setSearchQuery(e.target.value);
-            setPage(1); // reset page when searching
+            setPage(1); // reset page on new search
           }}
           className="flex-1 border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
         />
@@ -192,15 +226,21 @@ function UserTab() {
             </tr>
           </thead>
           <tbody>
-            {users.length > 0 ? (
+            {loading ? (
+              <tr>
+                <td colSpan={5} className="p-4 text-center text-gray-500">
+                  Loading…
+                </td>
+              </tr>
+            ) : users.length > 0 ? (
               users.map((user) => (
-                <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={user._key} className="border-b border-gray-100 hover:bg-gray-50">
                   <td className="px-4 py-3 flex items-center gap-3">
                     <div className="w-10 h-10 flex items-center justify-center rounded-full overflow-hidden bg-gray-200">
                       {user.avatar ? (
                         <img src={user.avatar} alt="avatar" className="w-full h-full object-cover" />
                       ) : (
-                        <span className="text-gray-500 font-semibold">{user.name[0]}</span>
+                        <span className="text-gray-500 font-semibold">{user?.name?.[0] ?? "U"}</span>
                       )}
                     </div>
                     <div>
@@ -225,13 +265,28 @@ function UserTab() {
                     <div className="text-gray-400">Last: {user.last}</div>
                   </td>
                   <td className="px-4 py-3 flex items-center gap-2">
-                    <button onClick={() => setSelectedUser(user)} className="p-2 rounded-full hover:bg-blue-100 text-blue-600">
+                    <button
+                      onClick={() => setSelectedUser(user)}
+                      className="p-2 rounded-full hover:bg-blue-100 text-blue-600"
+                      aria-label="View"
+                    >
                       <Eye size={18} />
                     </button>
-                    <button onClick={() => handleEditUser(user)} className="p-2 rounded-full hover:bg-green-100 text-green-600">
+                    <button
+                      onClick={() => handleEditUser(user)}
+                      className="p-2 rounded-full hover:bg-green-100 text-green-600"
+                      aria-label="Edit"
+                    >
                       <Edit size={18} />
                     </button>
-                    <button onClick={() => { setCurrentUser(user); setIsDeleteModalOpen(true); }} className="p-2 rounded-full hover:bg-red-100 text-red-600">
+                    <button
+                      onClick={() => {
+                        setCurrentUser(user);
+                        setIsDeleteModalOpen(true);
+                      }}
+                      className="p-2 rounded-full hover:bg-red-100 text-red-600"
+                      aria-label="Delete"
+                    >
                       <Trash2 size={18} />
                     </button>
                   </td>
@@ -249,11 +304,11 @@ function UserTab() {
       </div>
 
       {/* ✅ Pagination Controls */}
-      {totalPages > 1 && (
+      {users.length > 0 && totalPages > 1 && (
         <div className="flex justify-center items-center gap-4 mt-4">
           <button
             disabled={page === 1}
-            onClick={() => setPage(page - 1)}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             className="p-2 border rounded disabled:opacity-50"
           >
             <ChevronLeft size={18} />
@@ -263,7 +318,7 @@ function UserTab() {
           </span>
           <button
             disabled={page === totalPages}
-            onClick={() => setPage(page + 1)}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             className="p-2 border rounded disabled:opacity-50"
           >
             <ChevronRight size={18} />
@@ -271,7 +326,7 @@ function UserTab() {
         </div>
       )}
 
-      {/* Keep your Add/Edit, View and Delete Modals same as before */}
+      {/* Add/Edit Modal */}
       {isAddEditModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <form
@@ -279,7 +334,11 @@ function UserTab() {
             className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative"
           >
             <button
-              onClick={() => setIsAddEditModalOpen(false)}
+              onClick={() => {
+                setIsAddEditModalOpen(false);
+                setCurrentUser(null);
+                setAvatarPreview(null);
+              }}
               type="button"
               className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
             >
@@ -337,7 +396,11 @@ function UserTab() {
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setIsAddEditModalOpen(false)}
+                onClick={() => {
+                  setIsAddEditModalOpen(false);
+                  setCurrentUser(null);
+                  setAvatarPreview(null);
+                }}
                 className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100"
               >
                 Cancel
@@ -350,6 +413,7 @@ function UserTab() {
         </div>
       )}
 
+      {/* View Modal */}
       {selectedUser && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative">
@@ -366,7 +430,7 @@ function UserTab() {
                 <img src={selectedUser.avatar} alt="Avatar" className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-200 text-2xl text-gray-500">
-                  {selectedUser.name[0]}
+                  {selectedUser?.name?.[0] ?? "U"}
                 </div>
               )}
             </div>
@@ -380,12 +444,13 @@ function UserTab() {
         </div>
       )}
 
+      {/* Delete Modal */}
       {isDeleteModalOpen && (
         <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md sm:max-w-sm relative">
             <h2 className="text-lg font-semibold mb-4">Delete User</h2>
             <p>
-              Are you sure you want to delete <strong>{currentUser?.name}</strong>?
+              Are you sure you want to delete <strong>{currentUser?.name ?? "this user"}</strong>?
             </p>
             <div className="mt-4 flex justify-end gap-2">
               <button

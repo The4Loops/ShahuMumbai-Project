@@ -1,16 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const paymentsController = require('../controllers/paymentsController');
+const payments = require('../controllers/paymentsController');
 
-// Create Razorpay Order for a given order_number
-router.post('/create-order', paymentsController.createRazorpayOrder);
+// IMPORTANT: mount webhook with raw body at the router level
+router.post(
+  '/webhook',
+  express.raw({ type: '*/*' }), // provides req.rawBody Buffer
+  payments.webhook
+);
 
-// Verify (client → server after successful checkout)
-router.post('/verify', paymentsController.verifyPayment);
-
-// Webhook (Razorpay → server) — raw body
-function rawBodySaver(req, res, buf) { req.rawBody = buf; }
-const rawJson = express.raw({ type: 'application/json', verify: rawBodySaver });
-router.post('/webhook', rawJson, paymentsController.webhook);
+// Normal JSON endpoints
+router.post('/create-order', express.json(), payments.createRazorpayOrder);
+router.post('/verify',       express.json(), payments.verifyPayment);
 
 module.exports = router;

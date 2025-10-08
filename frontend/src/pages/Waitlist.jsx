@@ -1,28 +1,12 @@
 // src/pages/Waitlist.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
 
-// Tailwind background colors for placeholders
-const colors = [
-  "bg-blue-400",
-  "bg-purple-400",
-  "bg-green-400",
-  "bg-pink-400",
-  "bg-yellow-400",
-  "bg-red-400",
-  "bg-indigo-400",
-  "bg-teal-400",
-];
+// If you use Vite, set VITE_API_BASE (e.g., http://localhost:5001) or leave blank when proxying /api.
+const API_BASE = import.meta?.env?.VITE_API_BASE || "";
 
-const getRandomColor = () => colors[Math.floor(Math.random() * colors.length)];
-
-const fakeTimes = ["Just now", "2m ago", "5m ago", "10m ago", "30m ago"];
-const getRandomTime = () => fakeTimes[Math.floor(Math.random() * fakeTimes.length)];
-
-const statuses = ["Available", "Out of Stock", "Upcoming"];
-const getRandomStatus = () => statuses[Math.floor(Math.random() * statuses.length)];
-
+// Badge styling stays the same
 const getStatusBadgeStyle = (status) => {
   switch (status) {
     case "Available":
@@ -37,82 +21,65 @@ const getStatusBadgeStyle = (status) => {
 };
 
 const Waitlist = () => {
-  const [products, setProducts] = useState([
-    {
-      id: 1,
-      name: "SuperCool Gadget",
-      status: "Out of Stock",
-      color: getRandomColor(),
-      updated: getRandomTime(),
-    },
-    {
-      id: 2,
-      name: "Smart Headphones",
-      status: "Upcoming",
-      color: getRandomColor(),
-      updated: getRandomTime(),
-    },
-    {
-      id: 3,
-      name: "Future Laptop",
-      status: "Available",
-      color: getRandomColor(),
-      updated: getRandomTime(),
-      availableSince: Date.now(), // track available time
-    },
-  ]);
-
+  const [products, setProducts] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const prevRef = useRef([]);
 
-  // Auto-refresh product status & last updated every 5 minutes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setProducts((prev) =>
-        prev
-          .map((product) => {
-            const newStatus = getRandomStatus();
-            const newUpdated = getRandomTime();
-            let updatedProduct = { ...product, updated: newUpdated };
+  // Use a saved email so user doesn't retype. You can prefill this elsewhere in your site.
+  const email =
+    (typeof window !== "undefined" && (localStorage.getItem("waitlistEmail") || "")) || "";
 
-            // If status changes
-            if (newStatus !== product.status) {
-              const toastMsg = `${product.name} is now ${newStatus}!`;
-              const id = Date.now() + Math.random();
+  const fetchWaitlist = async () => {
+    if (!email) return; // show capture UI below if not set
 
-              setToasts((old) => [...old, { id, message: toastMsg }]);
-
-              // Auto-remove toast after 1s
-              setTimeout(() => {
-                setToasts((old) => old.filter((t) => t.id !== id));
-              }, 1000);
-
-              updatedProduct.status = newStatus;
-
-              // If product just became Available → mark timestamp
-              if (newStatus === "Available") {
-                updatedProduct.availableSince = Date.now();
-              }
-            }
-
-            return updatedProduct;
-          })
-          // Remove products that have been "Available" for over 24 hours
-          .filter((p) => {
-            if (p.status === "Available" && p.availableSince) {
-              const hoursSinceAvailable = (Date.now() - p.availableSince) / (1000 * 60 * 60);
-              return hoursSinceAvailable < 24;
-            }
-            return true;
-          })
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/waitlist?email=${encodeURIComponent(email)}`
       );
+      if (!res.ok) return;
+      const data = await res.json(); // [{ id, name, status, imageUrl, updated(ISO), availableSince(epochMs|null) }]
 
-      // remove flash after animation
+      // Toast on status change since last snapshot
+      const prevById = Object.fromEntries(prevRef.current.map((p) => [p.id, p]));
+      data.forEach((p) => {
+        const prev = prevById[p.id];
+        if (prev && prev.status !== p.status) {
+          const id = Date.now() + Math.random();
+          setToasts((old) => [...old, { id, message: `${p.name} is now ${p.status}!` }]);
+          setTimeout(() => {
+            setToasts((old) => old.filter((t) => t.id !== id));
+          }, 1200);
+          p.flash = true;
+        }
+      });
+
+      // Remove flash class after animation
       setTimeout(() => {
-        setProducts((prev) => prev.map((product) => ({ ...product, flash: false })));
+        setProducts((curr) => curr.map((prod) => ({ ...prod, flash: false })));
       }, 800);
-    }, 300000); // 5 minutes
 
-    return () => clearInterval(interval);
+      // Hide items that have been Available > 24h
+      const filtered = data.filter((p) => {
+        if (p.status === "Available" && p.availableSince) {
+          const hours = (Date.now() - p.availableSince) / (1000 * 60 * 60);
+          return hours < 24;
+        }
+        return true;
+      });
+
+      setProducts(filtered);
+      prevRef.current = data; // store raw list (pre-filter) for next diff
+    } catch (e) {
+      // optional: show a toast or console
+      console.error("waitlist fetch failed", e);
+    }
+  };
+
+  // Initial + 5-min refresh
+  useEffect(() => {
+    fetchWaitlist();
+    const id = setInterval(fetchWaitlist, 300000); // 5 minutes
+    return () => clearInterval(id);
   }, []);
 
   const origin =
@@ -127,7 +94,6 @@ const Waitlist = () => {
           name="description"
           content="Track availability of items you’re watching. Get notified when products are back in stock at Shahu Mumbai."
         />
-        {/* Utility/personalized page – keep out of index */}
         <meta name="robots" content="noindex,follow" />
         <link rel="canonical" href={canonical} />
         <meta property="og:title" content="Waitlist | Shahu Mumbai" />
@@ -138,10 +104,41 @@ const Waitlist = () => {
       <div className="max-w-6xl mx-auto p-6 relative">
         <h1 className="text-3xl font-bold mb-8 text-center">My Waitlist</h1>
 
+        {/* Simple email capture if not set */}
+        {!email && (
+          <div className="max-w-md mx-auto mb-8 p-4 border rounded-lg">
+            <p className="text-sm mb-2">Enter your email to load your waitlist:</p>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const val = e.currentTarget.email.value.trim();
+                if (val) {
+                  localStorage.setItem("waitlistEmail", val);
+                  fetchWaitlist();
+                }
+              }}
+            >
+              <div className="flex gap-2">
+                <input
+                  name="email"
+                  type="email"
+                  className="flex-1 border px-3 py-2 rounded"
+                  placeholder="you@example.com"
+                  required
+                />
+                <button className="px-4 py-2 rounded bg-indigo-600 text-white">Save</button>
+              </div>
+            </form>
+          </div>
+        )}
+
         {/* Toast Notification Stack */}
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-50">
           {toasts.map((toast) => (
-            <div key={toast.id} className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeInOut">
+            <div
+              key={toast.id}
+              className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeInOut"
+            >
               {toast.message}
             </div>
           ))}
@@ -165,9 +162,19 @@ const Waitlist = () => {
                 {product.status}
               </span>
 
-              {/* Image Placeholder */}
-              <div className={`h-40 flex items-center justify-center ${product.color}`}>
-                <span className="text-white text-2xl font-bold">{product.name.charAt(0)}</span>
+              {/* Image Placeholder (or real imageUrl if provided) */}
+              <div className="h-40 flex items-center justify-center bg-gray-200">
+                {product.imageUrl ? (
+                  <img
+                    src={product.imageUrl}
+                    alt={product.name}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <span className="text-gray-700 text-2xl font-bold">
+                    {product.name?.charAt(0)}
+                  </span>
+                )}
               </div>
 
               {/* Card Body */}
@@ -175,7 +182,9 @@ const Waitlist = () => {
                 <h2 className="text-lg font-semibold text-gray-800">{product.name}</h2>
 
                 {product.status === "Available" ? (
-                  <p className="mt-2 text-sm text-gray-600">✅ This product is available now — no waitlist needed.</p>
+                  <p className="mt-2 text-sm text-gray-600">
+                    ✅ This product is available now — no waitlist needed.
+                  </p>
                 ) : (
                   <div className="mt-3 p-3 bg-indigo-50 border rounded-md">
                     <p className="text-sm text-gray-700">You are on the waitlist for:</p>
@@ -184,7 +193,10 @@ const Waitlist = () => {
                   </div>
                 )}
 
-                <p className="mt-3 text-xs text-gray-400">⏱ Last updated: {product.updated}</p>
+                <p className="mt-3 text-xs text-gray-400">
+                  ⏱ Last updated:{" "}
+                  {product.updated ? new Date(product.updated).toLocaleString() : "—"}
+                </p>
               </div>
             </div>
           ))}
