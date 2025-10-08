@@ -258,7 +258,9 @@ const Wishlist = () => {
                 />
                 <div className="p-4">
                   <div className="text-xs text-gray-500 uppercase mb-1">
-                    {item.products.categories?.name || "N/A"}
+                    {item.products.categories?.length
+                    ? item.products.categories.map((c) => c.name).join(", ")
+                    : "N/A"}
                   </div>
                   <div className="font-semibold text-sm mb-2 line-clamp-2">{item.products.name}</div>
                   <div className="mb-2">

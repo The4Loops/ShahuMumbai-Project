@@ -21,20 +21,6 @@ exports.addToCart = async (req, res) => {
     if (!product_id) return res.status(400).json({ error: 'product_id is required' });
     const qty = toInt(quantity);
     if (!qty || qty < 1) return res.status(400).json({ error: 'quantity must be >= 1' });
-
-   
-    if (!dbReady(req) && devFakeAllowed()) {
-      const id = crypto.randomUUID();
-      return res.status(201).json({
-        id,
-        user_id: owner,
-        product_id,
-        quantity: qty,
-        created_at: now(),
-        updated_at: now(),
-      });
-    }
-
     
     const sel = await req.dbPool.request()
       .input('UserId', sql.NVarChar(128), String(owner))
@@ -56,7 +42,7 @@ exports.addToCart = async (req, res) => {
         .input('UpdatedAt', sql.DateTime2, now())
         .query(`
           UPDATE dbo.carts
-          SET quantity = @Qty, updated_at = @UpdatedAt
+          SET quantity = @Qty, UpdatedAt = @UpdatedAt
           OUTPUT INSERTED.CartId, INSERTED.UserId, INSERTED.ProductId, INSERTED.quantity, INSERTED.CreatedAt, INSERTED.UpdatedAt
           WHERE CartId = @Id AND UserId = @UserId
         `);
@@ -89,28 +75,6 @@ exports.addToCart = async (req, res) => {
 exports.getCartItems = async (req, res) => {
   try {
     const owner = currentCartOwner(req);
-
-    // Dev fallback
-    if (!dbReady(req) && devFakeAllowed()) {
-      return res.status(200).json([
-        {
-          user_id: owner,
-          product_id: 1,
-          quantity: 2,
-          created_at: now(),
-          updated_at: now(),
-          product: {
-            id: 1,
-            name: 'Sample Product',
-            price: 999,
-            discountprice: 899,
-            stock: 5,
-            categories: [{ categoryid: 10, name: 'Category' }],
-            product_images: [{ id: 1, image_url: null, is_hero: 1 }],
-          },
-        },
-      ]);
-    }
 
     const q = await req.dbPool.request()
       .input('UserId', sql.NVarChar(128), String(owner))
@@ -178,17 +142,6 @@ exports.updateCartItem = async (req, res) => {
 
     if (!id || !qty || qty < 1) {
       return res.status(400).json({ error: 'Invalid cart item ID or quantity' });
-    }
-
-    if (!dbReady(req) && devFakeAllowed()) {
-      return res.status(200).json({
-        id,
-        user_id: owner,
-        product_id: 1,
-        quantity: qty,
-        created_at: now(),
-        updated_at: now(),
-      });
     }
 
     const r = await req.dbPool.request()

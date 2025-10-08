@@ -38,7 +38,7 @@ const MyOrders = () => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const response = await api.get("/api/orders");
+        const response = await api.get("/api/orders/user");
         setOrders(response.data.orders || []);
       } catch (err) {
         console.error("Failed to fetch orders:", err);
@@ -53,7 +53,7 @@ const MyOrders = () => {
     const invoiceText = `
 Invoice for Order ${order.id}
 -----------------------------
-Date: ${order.date}
+Date: ${order.placed_at}
 Customer: ${order.customer?.name}
 Email: ${order.customer?.email}
 Address: ${order.customer?.address}
@@ -61,7 +61,7 @@ Payment: ${order.customer?.payment}
 
 Items:
 ${order.items
-  ?.map((item) => `• ${item.qty}x ${item.name} - $${(item.price * item.qty).toFixed(2)}`)
+  ?.map((item) => `• ${item.quantity}x ${item.product_name} - $${(item.unit_price * item.quantity).toFixed(2)}`)
   .join("\n")}
 
 Subtotal: $${order.subtotal?.toFixed(2)}
@@ -74,6 +74,20 @@ ${order.tracking?.carrier} - ${order.tracking?.trackingNumber}
 Expected Delivery: ${order.tracking?.expectedDelivery}
     `;
     alert(`Invoice sent to ${order.customer?.email}\n\n${invoiceText}`);
+  };
+
+  const formatDateTime = (isoString) => {
+    if (!isoString) return null; // Handle null or undefined values
+    const date = new Date(isoString);
+    return date.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      year: 'numeric',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
 
   const sortedOrders = [...orders].sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -124,7 +138,7 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
                 <div>
                   <p className="font-medium text-[#1C1C1C]">Order ID: {order.id}</p>
                   <p className="text-sm text-[#666666]">
-                    Date: {order.date} | Delivery: {order.delivery}
+                    Date: {formatDateTime(order.placed_at)} | Delivery: {formatDateTime(order.delivered_at) || 'Not Delivered'}
                   </p>
                 </div>
                 <div className="flex gap-4">
@@ -148,7 +162,7 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
               {selectedOrderId === order.id && (
                 <div className="p-4 bg-white space-y-4">
                   {order.items?.map((item, index) => {
-                    const { icon, color } = getItemIcon(item.name);
+                    const { icon, color } = getItemIcon(item.product_name);
                     return (
                       <div
                         key={index}
@@ -162,11 +176,11 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
                         <div className="flex-1">
                           <p className="font-medium text-[#1C1C1C]">{item.name}</p>
                           <p className="text-sm text-[#666666]">
-                            Qty: {item.qty} • ${item.price?.toFixed(2)}
+                            Qty: {item.quantity} • ${item.unit_price?.toFixed(2)}
                           </p>
                         </div>
                         <div className="font-semibold text-nowrap text-[#1C1C1C]">
-                          ${(item.price * item.qty).toFixed(2)}
+                          ${(item.unit_price * item.quantity).toFixed(2)}
                         </div>
                       </div>
                     );

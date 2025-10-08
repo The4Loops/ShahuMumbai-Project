@@ -4,6 +4,7 @@ const router = express.Router();
 const orders = require('../controllers/ordersController');
 
 router.get('/orders', orders.listOrders);
+router.get('/orders/user', orders.getUserOrders);
 router.patch('/orders/:orderNumber/status', orders.updateFulfillmentStatus);
 
 module.exports = router;
