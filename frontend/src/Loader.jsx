@@ -1,31 +1,13 @@
-import React from "react";
+import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import vintageVideo from "../src/assets/Shahu.mp4";
 
-const Loader = ({ isLoading }) => {
-  // Animation variants for the orbiting dots
-  const dotVariants = {
-    pulse: (i) => ({
-      scale: [1, 1.3, 1],
-      opacity: [0.6, 1, 0.6],
-      transition: {
-        duration: 1.2,
-        repeat: Infinity,
-        delay: i * 0.2, // Staggered delay for each dot
-        ease: "easeInOut",
-      },
-    }),
-  };
+const VintageLoader = ({ onFinish }) => {
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Animation for the main spinning circle
-  const circleVariants = {
-    spin: {
-      rotate: 360,
-      transition: {
-        duration: 1.5,
-        repeat: Infinity,
-        ease: "linear",
-      },
-    },
+  const handleVideoEnd = () => {
+    setIsLoading(false);
+    if (onFinish) onFinish();
   };
 
   return (
@@ -36,34 +18,26 @@ const Loader = ({ isLoading }) => {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.4 }}
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-md"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white"
         >
-          <div className="relative w-24 h-24">
-            {/* Main spinning circle */}
-            <motion.div
-              className="absolute inset-0 border-6 border-t-6 border-[#6B4226] border-solid rounded-full border-t-transparent"
-              variants={circleVariants}
-              animate="spin"
-            />
-            {/* Orbiting dots */}
-            {[0, 1, 2, 3].map((i) => (
-              <motion.div
-                key={i}
-                className="absolute w-4 h-4 bg-[#D4A5A5] rounded-full"
-                style={{
-                  top: i % 2 === 0 ? "10%" : "70%",
-                  left: i < 2 ? "10%" : "70%",
-                }}
-                variants={dotVariants}
-                animate="pulse"
-                custom={i}
-              />
-            ))}
-          </div>
+          {/* Fullscreen responsive video */}
+          <video
+            src={vintageVideo}
+            autoPlay
+            muted
+            onEnded={handleVideoEnd}
+            className="
+              w-full h-full max-w-full max-h-full
+              sm:max-w-md sm:max-h-md
+              md:max-w-lg md:max-h-lg
+              lg:max-w-xl lg:max-h-xl
+              object-contain rounded-lg
+            "
+          />
         </motion.div>
       )}
     </AnimatePresence>
   );
 };
 
-export default Loader;
+export default VintageLoader;
