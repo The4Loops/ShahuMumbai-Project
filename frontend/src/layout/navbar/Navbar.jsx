@@ -231,7 +231,7 @@ export default function Navbar() {
   return (
     <div>
       <Loader isLoading={isLoading} />
-      <nav className="fixed top-0 w-full z-50 bg-transparent backdrop-blur-lg shadow-md font-serif">
+      <nav className="fixed top-0 w-full z-40 bg-transparent backdrop-blur-lg shadow-md font-serif ">
         {menus.length === 0 && !isLoading && <div>No menus available</div>}
         {/* Top Bar */}
         <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
@@ -324,7 +324,7 @@ export default function Navbar() {
           {/* Language + Account + Cart */}
           <ul className="flex items-center gap-6 justify-end flex-[1] relative">
             {/* Language dropdown (desktop) */}
-            <li ref={(el) => (refs.current.lang = el)} className="relative">
+            {/* <li ref={(el) => (refs.current.lang = el)} className="relative">
               <button
                 onClick={() =>
                   setDropdown((prev) => ({
@@ -384,7 +384,7 @@ export default function Navbar() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </li>
+            </li> */}
 
             {/* Account */}
             <li ref={(el) => (refs.current.account = el)}>

@@ -7,7 +7,7 @@ const sqlConfig = {
     server: process.env.DB_SERVER || 'localhost',
     port: parseInt(process.env.DB_PORT) || 1433,
     pool: {
-        max: 10,
+        max: 100,
         min: 0,
         idleTimeoutMillis: 30000
     },

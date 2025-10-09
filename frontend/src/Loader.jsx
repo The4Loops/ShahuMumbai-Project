@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import vintageVideo from "../src/assets/Shahu.mp4";
+import vintageVideo from "../src/assets/Loader/ShahuLoading.mp4";
 
 const VintageLoader = ({ onFinish }) => {
   const [isLoading, setIsLoading] = useState(true);
@@ -17,7 +17,7 @@ const VintageLoader = ({ onFinish }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.4 }}
+          transition={{ duration: 0.75 }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-white"
         >
           {/* Fullscreen responsive video */}
