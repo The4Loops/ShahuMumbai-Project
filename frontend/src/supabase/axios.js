@@ -1,31 +1,31 @@
-import axios from 'axios';
+import axios from "axios";
+
+/**
+ * Resolve API base URL safely across CRA and Vite and avoid calling .replace on undefined.
+ * - CRA exposes env vars only if they start with REACT_APP_
+ * - Vite exposes env as import.meta.env.VITE_*
+ */
+const fromCRA = typeof process !== "undefined" ? process.env?.REACT_APP_API_BASE_URL : "";
+
+const rawBase =
+  (typeof fromCRA === "string" && fromCRA);
+
+const baseURL = (typeof rawBase === "string" ? rawBase : "http://localhost:5000").replace(/\/$/, "");
 
 const api = axios.create({
-  baseURL: process.env.REACT_Server_API_BASE_URL || 'http://localhost:5000', // Match server.js PORT
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL,
+  withCredentials: true, // send your signed "sid" cookie for guest carts
+  headers: { "Content-Type": "application/json" },
 });
 
-// Add Authorization header with token if present
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-}, (error) => {
-  return Promise.reject(error);
-});
-
-// Log responses for debugging
-api.interceptors.response.use(
-  (response) => {
-    return response;
+// Attach Bearer if logged in
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem("token");
+    if (token) config.headers.Authorization = `Bearer ${token}`;
+    return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 export default api;

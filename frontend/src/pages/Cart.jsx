@@ -29,7 +29,7 @@ function Cart() {
         const formattedItems = response.data.map((item) => ({
           id: item.id,
           title: item.product.name,
-          category: item.product.categories.name || "Accessories",
+          category: (item.product.categories?.[0]?.name) || item.product.categories?.name || "Accessories",
           price: item.product.price - (item.product.discountprice || 0),
           oldPrice: item.product.discountprice ? item.product.price : null,
           quantity: item.quantity,
@@ -40,6 +40,9 @@ function Cart() {
           image: item.product.product_images.find((img) => img.is_hero)?.image_url,
         }));
         setCartItems(formattedItems);
+
+        // Notify navbar an absolute count (authoritative)
+        window.dispatchEvent(new CustomEvent("cart:updated", { detail: { absolute: formattedItems.length } }));
 
         // GA4: view_cart
         try {
@@ -76,13 +79,16 @@ function Cart() {
       await api.put(`/api/cart/${id}`, { quantity: newQuantity });
 
       setCartItems((items) =>
-        items.map((item) =>
-          item.id === id ? { ...item, quantity: newQuantity } : item
-        )
+        items.map((it) => (it.id === id ? { ...it, quantity: newQuantity } : it))
       );
+
+      // GA + toast
       Ecom.addToCart({ ...item, quantity: newQuantity, id });
       toast.dismiss();
       toast.success("Quantity updated!");
+
+      // Badge does not change in item count (still 1 line item), but if you prefer to treat item count differently, update delta=0.
+      window.dispatchEvent(new CustomEvent("cart:updated", { detail: { delta: 0 } }));
     } catch (error) {
       toast.dismiss();
       console.error("Error updating quantity:", error);
@@ -98,6 +104,9 @@ function Cart() {
       if (removed) Ecom.removeFromCart(removed);
       toast.dismiss();
       toast.success("Item removed from cart!");
+
+      // Notify navbar: one line item less
+      window.dispatchEvent(new CustomEvent("cart:updated", { detail: { delta: -1 } }));
     } catch (error) {
       console.error("Error removing item:", error);
       toast.dismiss();
@@ -110,19 +119,14 @@ function Cart() {
   const total = subtotal + tax;
 
   const baseUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://www.shahumumbai.com";
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const pageUrl = `${baseUrl}/cart`;
 
   return (
     <Layout>
       <Helmet>
         <title>Shopping Cart — Shahu Mumbai</title>
-        <meta
-          name="description"
-          content="Review items in your Shahu Mumbai cart and proceed to secure checkout."
-        />
+        <meta name="description" content="Review items in your Shahu Mumbai cart and proceed to secure checkout." />
         <link rel="canonical" href={pageUrl} />
         <meta name="robots" content="noindex,nofollow,noarchive" />
         <meta property="og:type" content="website" />
@@ -147,39 +151,23 @@ function Cart() {
               {cartItems.map((item, index) => (
                 <motion.div
                   key={item.id}
-                  className={`${
-                    categoryColors[item.category] || "bg-white"
-                  } p-4 sm:p-6 rounded-lg shadow flex flex-col sm:flex-row justify-between items-start gap-4`}
+                  className={`${categoryColors[item.category] || "bg-white"} p-4 sm:p-6 rounded-lg shadow flex flex-col sm:flex-row justify-between items-start gap-4`}
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                 >
                   <div className="flex gap-4">
                     {item.image && (
-                      <img
-                        src={item.image}
-                        alt={item.title}
-                        className="w-24 h-24 object-cover rounded-lg"
-                      />
+                      <img src={item.image} alt={item.title} className="w-24 h-24 object-cover rounded-lg" />
                     )}
                     <div>
-                      <p className="text-xs uppercase text-gray-500 mb-1">
-                        {item.category}
-                      </p>
+                      <p className="text-xs uppercase text-gray-500 mb-1">{item.category}</p>
                       <h3 className="font-semibold text-lg">{item.title}</h3>
                       <div className="flex items-center gap-2 mt-1 text-sm">
-                        <span className="text-red-500 font-semibold">
-                          ${item.price.toFixed(2)}
-                        </span>
-                        {item.oldPrice && (
-                          <span className="line-through text-gray-400">
-                            ${item.oldPrice.toFixed(2)}
-                          </span>
-                        )}
+                        <span className="text-red-500 font-semibold">₹{item.price.toFixed(2)}</span>
+                        {item.oldPrice && <span className="line-through text-gray-400">₹{item.oldPrice.toFixed(2)}</span>}
                         {item.discount && (
-                          <span className="text-white bg-pink-500 px-2 py-0.5 text-xs rounded-full">
-                            {item.discount}%
-                          </span>
+                          <span className="text-white bg-pink-500 px-2 py-0.5 text-xs rounded-full">{item.discount}%</span>
                         )}
                       </div>
                       <div className="mt-3 flex items-center gap-2">
@@ -200,13 +188,8 @@ function Cart() {
                     </div>
                   </div>
                   <div className="flex flex-col items-end justify-between gap-2">
-                    <span className="text-gray-700 font-medium text-md">
-                      ${(item.price * item.quantity).toFixed(2)}
-                    </span>
-                    <button
-                      onClick={() => handleRemove(item.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
+                    <span className="text-gray-700 font-medium text-md">₹{(item.price * item.quantity).toFixed(2)}</span>
+                    <button onClick={() => handleRemove(item.id)} className="text-red-500 hover:text-red-700">
                       <FaTrashAlt />
                     </button>
                   </div>
@@ -225,10 +208,7 @@ function Cart() {
 
               {/* Promo Code */}
               <div className="mb-4">
-                <label
-                  htmlFor="promo"
-                  className="block text-sm font-medium text-gray-600 mb-1"
-                >
+                <label htmlFor="promo" className="block text-sm font-medium text-gray-600 mb-1">
                   Promo Code
                 </label>
                 <div className="flex gap-2">
@@ -244,9 +224,7 @@ function Cart() {
                     className="px-4 py-2 bg-gray-800 text-white rounded hover:bg-gray-700 text-sm"
                     onClick={() => {
                       try {
-                        window.gtag?.("event", "apply_promotion", {
-                          coupon: promoCode || undefined,
-                        });
+                        window.gtag?.("event", "apply_promotion", { coupon: promoCode || undefined });
                       } catch {}
                     }}
                   >
@@ -259,7 +237,7 @@ function Cart() {
               <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
                   <span>Subtotal</span>
-                  <span>${subtotal.toFixed(2)}</span>
+                  <span>₹{subtotal.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Shipping</span>
@@ -267,14 +245,14 @@ function Cart() {
                 </div>
                 <div className="flex justify-between">
                   <span>Tax</span>
-                  <span>${tax.toFixed(2)}</span>
+                  <span>₹{tax.toFixed(2)}</span>
                 </div>
               </div>
 
               <hr className="my-4" />
               <div className="flex justify-between font-bold text-lg">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>₹{total.toFixed(2)}</span>
               </div>
 
               <button
@@ -295,9 +273,7 @@ function Cart() {
               >
                 Proceed to Checkout
               </button>
-              <p className="text-center text-sm text-gray-500 mt-2">
-                Estimated delivery in 3–5 business days
-              </p>
+              <p className="text-center text-sm text-gray-500 mt-2">Estimated delivery in 3–5 business days</p>
             </motion.div>
           </div>
         )}
@@ -315,7 +291,7 @@ function Cart() {
           </div>
           <div className="flex flex-col items-center gap-2">
             <LuTruck className="text-blue-600 text-2xl" />
-            <p className="font-medium text-sm">Free Shipping Over $100</p>
+            <p className="font-medium text-sm">Free Shipping Over ₹100</p>
           </div>
           <div className="flex flex-col items-center gap-2">
             <LuRotateCcw className="text-purple-600 text-2xl" />

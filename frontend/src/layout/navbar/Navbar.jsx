@@ -1,16 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  FaUser,
-  FaShoppingCart,
-  FaBars,
-  FaTimes,
-  FaGlobe,
-} from "react-icons/fa";
+import { FaUser, FaShoppingCart, FaBars, FaTimes, FaGlobe } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { motion, AnimatePresence } from "framer-motion";
 import Logo from "../../assets/ShahuLogo.png";
-import api from "../../supabase/axios";
+import api from "../../supabase/axios"; // your axios instance (withCredentials enabled)
 import { toast } from "react-toastify";
 import { useTranslation } from "react-i18next";
 import "../../i18n";
@@ -23,21 +17,14 @@ export const DropdownSection = ({ title, links, onLinkClick }) => {
     <div className="min-w-[180px] mt-4 first:mt-0">
       {title && (
         <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
-          {t(
-            `navbar.dropdown.${title.toLowerCase().replace(/\s+/g, "_")}`,
-            title
-          ).toUpperCase()}
+          {t(`navbar.dropdown.${title.toLowerCase().replace(/\s+/g, "_")}`, title).toUpperCase()}
         </h3>
       )}
       <ul className="space-y-1">
         {links?.map(({ Label, Href }) => (
           <li key={Label}>
-            <Link
-              to={Href}
-              className="text-gray-700 hover:text-[#D4A5A5]"
-              onClick={onLinkClick}
-            >
-              {Label} {/* Backend translates; no client-side t() needed */}
+            <Link to={Href} className="text-gray-700 hover:text-[#D4A5A5]" onClick={onLinkClick}>
+              {Label}
             </Link>
           </li>
         ))}
@@ -74,7 +61,7 @@ export const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
           if (e.key === "Escape") setOpen(false);
         }}
       >
-        {label} {/* Backend translates */}
+        {label}
       </span>
 
       <AnimatePresence>
@@ -114,9 +101,11 @@ export default function Navbar() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileDropdownOpen, setMobileDropdownOpen] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [cartItemCount, setCartItemCount] = useState(0);
-  const [searchQuery, setSearchQuery] = useState("");
 
+  // This is the badge count
+  const [cartItemCount, setCartItemCount] = useState(0);
+
+  const [searchQuery, setSearchQuery] = useState("");
   const refs = useRef({});
   const navigate = useNavigate();
 
@@ -136,9 +125,7 @@ export default function Navbar() {
     setIsLoading(true);
     try {
       const res = await api.get(`/api/navbar/menus?lang=${i18n.language}`, {
-        headers: {
-          Authorization: token ? `Bearer ${token}` : undefined,
-        },
+        headers: { Authorization: token ? `Bearer ${token}` : undefined },
       });
 
       let sorted = res.data.menus.sort((a, b) => a.OrderIndex - b.OrderIndex);
@@ -147,9 +134,7 @@ export default function Navbar() {
         ...menu,
         DropdownItems: userRole
           ? menu.DropdownItems.filter(
-              (item) =>
-                item.Roles.length === 0 ||
-                item.Roles.split(",").includes(userRole)
+              (item) => item.Roles.length === 0 || item.Roles.split(",").includes(userRole)
             )
           : menu.DropdownItems,
       }));
@@ -171,26 +156,38 @@ export default function Navbar() {
     }
   }, [userRole, i18n.language, t, token]);
 
+  // Always fetch count (guest OR logged-in). Guest carts use the signed cookie; no JWT required.
   const fetchCartItemCount = useCallback(async () => {
-    if (!token) {
-      setCartItemCount(0);
-      return;
-    }
     try {
       const response = await api.get("/api/cartById");
-      setCartItemCount(response.data ? response.data.length : 0);
-    } catch (err) {
-      toast.error(err.response?.data?.error || t("navbar.errors.fetchCart"));
+      setCartItemCount(Array.isArray(response.data) ? response.data.length : 0);
+    } catch (_err) {
+      // stay quiet to avoid spamming the user with toasts from the navbar
       setCartItemCount(0);
-    } finally {
-      setIsLoading(false);
     }
-  }, [token, t]);
+  }, []);
 
   useEffect(() => {
     fetchMenuData();
     fetchCartItemCount();
   }, [fetchMenuData, fetchCartItemCount]);
+
+  // Listen for cart updates from anywhere in the app
+  useEffect(() => {
+    const onCartUpdated = (e) => {
+      const { delta, absolute } = (e && e.detail) || {};
+      if (typeof absolute === "number") {
+        setCartItemCount(absolute);
+      } else if (typeof delta === "number") {
+        setCartItemCount((c) => Math.max(0, c + delta));
+      } else {
+        // fallback: refetch from API
+        fetchCartItemCount();
+      }
+    };
+    window.addEventListener("cart:updated", onCartUpdated);
+    return () => window.removeEventListener("cart:updated", onCartUpdated);
+  }, [fetchCartItemCount]);
 
   useEffect(() => {
     setLang(i18n.language);
@@ -219,6 +216,8 @@ export default function Navbar() {
     toast.success(t("navbar.logoutSuccess"));
     navigate("/");
     setMobileMenuOpen(false);
+    // after logout, fetch guest cart count (it may be different now)
+    fetchCartItemCount();
   };
 
   const handleSearchSubmit = (e) => {
@@ -231,19 +230,13 @@ export default function Navbar() {
   return (
     <div>
       <Loader isLoading={isLoading} />
-      <nav className="fixed top-0 w-full z-40 bg-transparent backdrop-blur-lg shadow-md font-serif ">
+      <nav className="fixed top-0 w-full z-40 bg-transparent backdrop-blur-lg shadow-md font-serif">
         {menus.length === 0 && !isLoading && <div>No menus available</div>}
+
         {/* Top Bar */}
         <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
-          <Link
-            to="/"
-            className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none"
-          >
-            <img
-              src={Logo}
-              alt={t("navbar.logoAlt")}
-              className="h-24 object-contain"
-            />
+          <Link to="/" className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none">
+            <img src={Logo} alt={t("navbar.logoAlt")} className="h-24 object-contain" />
           </Link>
           <button
             className="lg:hidden text-[#6B4226] p-2 ml-auto"
@@ -271,13 +264,10 @@ export default function Navbar() {
           {/* Menus */}
           <ul className="flex items-center gap-8 flex-[1]">
             {menus.map((menu) => {
-              const hasDropdown =
-                menu.DropdownItems && menu.DropdownItems.length > 0;
+              const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
 
               if (hasDropdown) {
-                const sortedItems = [...menu.DropdownItems].sort(
-                  (a, b) => a.OrderIndex - b.OrderIndex
-                );
+                const sortedItems = [...menu.DropdownItems].sort((a, b) => a.OrderIndex - b.OrderIndex);
 
                 return (
                   <DesktopDropdown
@@ -285,23 +275,15 @@ export default function Navbar() {
                     label={menu.Label}
                     isOpen={dropdown[menu.Id]}
                     setOpen={(state) => {
-                      const closedAll = Object.keys(dropdown).reduce(
-                        (acc, id) => ({ ...acc, [id]: false }),
-                        {}
-                      );
+                      const closedAll = Object.keys(dropdown).reduce((acc, id) => ({ ...acc, [id]: false }), {});
                       setDropdown({ ...closedAll, [menu.Id]: state });
                     }}
                     refEl={(el) => (refs.current[menu.Id] = el)}
                     content={
                       <DropdownSection
                         title={menu.Label}
-                        links={sortedItems.map((item) => ({
-                          Label: item.Label,
-                          Href: item.Href,
-                        }))}
-                        onLinkClick={() =>
-                          setDropdown((prev) => ({ ...prev, [menu.Id]: false }))
-                        }
+                        links={sortedItems.map((item) => ({ Label: item.Label, Href: item.Href }))}
+                        onLinkClick={() => setDropdown((prev) => ({ ...prev, [menu.Id]: false }))}
                       />
                     }
                   />
@@ -310,10 +292,7 @@ export default function Navbar() {
 
               return (
                 <li key={menu.Id}>
-                  <Link
-                    to={menu.Href || "#"}
-                    className="hover:text-[#D4A5A5] text-[#6B4226] font-normal"
-                  >
+                  <Link to={menu.Href || "#"} className="hover:text-[#D4A5A5] text-[#6B4226] font-normal">
                     {menu.Label}
                   </Link>
                 </li>
@@ -321,71 +300,8 @@ export default function Navbar() {
             })}
           </ul>
 
-          {/* Language + Account + Cart */}
+          {/* Account + Cart */}
           <ul className="flex items-center gap-6 justify-end flex-[1] relative">
-            {/* Language dropdown (desktop) */}
-            {/* <li ref={(el) => (refs.current.lang = el)} className="relative">
-              <button
-                onClick={() =>
-                  setDropdown((prev) => ({
-                    ...Object.keys(prev).reduce(
-                      (acc, k) => ({ ...acc, [k]: false }),
-                      {}
-                    ),
-                    lang: !prev.lang,
-                  }))
-                }
-                aria-label={t("navbar.selectLanguage")}
-                className="flex items-center gap-2 text-[#6B4226] hover:text-[#D4A5A5]"
-                title={t("navbar.selectLanguage")}
-              >
-                <FaGlobe size={18} />
-                <span className="text-sm font-medium">
-                  {LOCALES.find((l) => l.code === lang)?.label || lang}
-                </span>
-              </button>
-
-              <AnimatePresence>
-                {dropdown.lang && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -5 }}
-                    transition={{ duration: 0.2 }}
-                    className="absolute right-0 mt-2 bg-white border border-[#e6dcd2] rounded-md shadow p-2 z-20 w-56"
-                  >
-                    <ul className="max-h-72 overflow-auto">
-                      {LOCALES.map((l) => {
-                        const active = l.code === lang;
-                        return (
-                          <li key={l.code}>
-                            <button
-                              onClick={() => {
-                                i18n.changeLanguage(l.code);
-                                setLang(l.code);
-                                localStorage.setItem("lang", l.code);
-                                setDropdown((prev) => ({
-                                  ...prev,
-                                  lang: false,
-                                }));
-                              }}
-                              className={`w-full text-left px-3 py-2 rounded hover:bg-[#F7F0EE] ${
-                                active
-                                  ? "bg-[#F7F0EE] font-semibold text-[#6B4226]"
-                                  : "text-gray-700"
-                              }`}
-                            >
-                              {l.label}
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </li> */}
-
             {/* Account */}
             <li ref={(el) => (refs.current.account = el)}>
               <button
@@ -394,10 +310,7 @@ export default function Navbar() {
                   !token
                     ? navigate("/account")
                     : setDropdown((prev) => {
-                        const closedAll = Object.keys(prev).reduce(
-                          (acc, id) => ({ ...acc, [id]: false }),
-                          {}
-                        );
+                        const closedAll = Object.keys(prev).reduce((acc, id) => ({ ...acc, [id]: false }), {});
                         return { ...closedAll, account: !prev.account };
                       })
                 }
@@ -416,39 +329,27 @@ export default function Navbar() {
                   >
                     <ul className="space-y-2 text-sm">
                       <li>
-                        <button
-                          onClick={() => handleProtectedClick("/profile")}
-                        >
+                        <button onClick={() => handleProtectedClick("/profile")}>
                           {t("navbar.account.profile")}
                         </button>
                       </li>
                       <li>
-                        <button
-                          onClick={() => handleProtectedClick("/myorder")}
-                        >
+                        <button onClick={() => handleProtectedClick("/myorder")}>
                           {t("navbar.account.trackOrder")}
                         </button>
                       </li>
                       <li>
-                        <Link
-                          to="/wishlist"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
+                        <Link to="/wishlist" onClick={() => setMobileMenuOpen(false)}>
                           {t("navbar.account.wishlist")}
                         </Link>
                       </li>
                       <li>
-                        <Link
-                          to="/waitlist"
-                          onClick={() => setMobileMenuOpen(false)}
-                        >
+                        <Link to="/waitlist" onClick={() => setMobileMenuOpen(false)}>
                           {t("navbar.account.waitlist")}
                         </Link>
                       </li>
                       <li>
-                        <button onClick={handleLogout}>
-                          {t("navbar.account.logout")}
-                        </button>
+                        <button onClick={handleLogout}>{t("navbar.account.logout")}</button>
                       </li>
                     </ul>
                   </motion.div>
@@ -458,11 +359,7 @@ export default function Navbar() {
 
             {/* Cart */}
             <li className="relative">
-              <Link
-                to="/cart"
-                aria-label={t("navbar.cart")}
-                className="text-[#6B4226] hover:text-[#D4A5A5]"
-              >
+              <Link to="/cart" aria-label={t("navbar.cart")} className="text-[#6B4226] hover:text-[#D4A5A5]">
                 <FaShoppingCart size={20} />
                 {cartItemCount >= 0 && (
                   <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
@@ -488,11 +385,7 @@ export default function Navbar() {
               <div className="border-b border-[#d4c4b6] pb-2">
                 <button
                   className="w-full flex items-center justify-between py-2"
-                  onClick={() =>
-                    setMobileDropdownOpen((prev) =>
-                      prev === "lang" ? null : "lang"
-                    )
-                  }
+                  onClick={() => setMobileDropdownOpen((prev) => (prev === "lang" ? null : "lang"))}
                 >
                   <span className="flex items-center gap-2">
                     <FaGlobe />
@@ -521,9 +414,7 @@ export default function Navbar() {
                               setMobileDropdownOpen(null);
                             }}
                             className={`w-full text-left px-3 py-2 rounded ${
-                              active
-                                ? "bg-white text-[#6B4226] font-semibold"
-                                : "text-gray-700 hover:text-[#D4A5A5]"
+                              active ? "bg-white text-[#6B4226] font-semibold" : "text-gray-700 hover:text-[#D4A5A5]"
                             }`}
                           >
                             {l.label}
@@ -537,29 +428,17 @@ export default function Navbar() {
 
               {/* Mobile Menus */}
               {menus.map((menu) => {
-                const hasDropdown =
-                  menu.DropdownItems && menu.DropdownItems.length > 0;
+                const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
                 if (hasDropdown) {
-                  const sortedItems = [...menu.DropdownItems].sort(
-                    (a, b) => a.OrderIndex - b.OrderIndex
-                  );
+                  const sortedItems = [...menu.DropdownItems].sort((a, b) => a.OrderIndex - b.OrderIndex);
                   return (
-                    <div
-                      key={menu.Id}
-                      className="border-b border-[#d4c4b6] pb-2"
-                    >
+                    <div key={menu.Id} className="border-b border-[#d4c4b6] pb-2">
                       <button
                         className="w-full flex justify-between items-center py-2"
-                        onClick={() =>
-                          setMobileDropdownOpen((prev) =>
-                            prev === menu.Id ? null : menu.Id
-                          )
-                        }
+                        onClick={() => setMobileDropdownOpen((prev) => (prev === menu.Id ? null : menu.Id))}
                       >
                         <span>{menu.Label}</span>
-                        <span>
-                          {mobileDropdownOpen === menu.Id ? "−" : "+"}
-                        </span>
+                        <span>{mobileDropdownOpen === menu.Id ? "−" : "+"}</span>
                       </button>
                       <AnimatePresence>
                         {mobileDropdownOpen === menu.Id && (
@@ -605,9 +484,7 @@ export default function Navbar() {
                   onClick={() =>
                     !token
                       ? (navigate("/account"), setMobileMenuOpen(false))
-                      : setMobileDropdownOpen((prev) =>
-                          prev === "account" ? null : "account"
-                        )
+                      : setMobileDropdownOpen((prev) => (prev === "account" ? null : "account"))
                   }
                 >
                   <span>{t("navbar.account.label")}</span>
@@ -623,38 +500,19 @@ export default function Navbar() {
                       transition={{ duration: 0.25 }}
                       className="pl-4 pt-1 space-y-2 overflow-hidden"
                     >
-                      <Link
-                        to="/profile"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                      >
+                      <Link to="/profile" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
                         {t("navbar.account.profile")}
                       </Link>
-                      <Link
-                        to="/myorder"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                      >
+                      <Link to="/myorder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
                         {t("navbar.account.trackOrder")}
                       </Link>
-                      <Link
-                        to="/wishlist"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                      >
+                      <Link to="/wishlist" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
                         {t("navbar.account.wishlist")}
                       </Link>
-                      <Link
-                        to="/waitlist"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1"
-                      >
+                      <Link to="/waitlist" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
                         {t("navbar.account.waitlist")}
                       </Link>
-                      <button
-                        onClick={handleLogout}
-                        className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full"
-                      >
+                      <button onClick={handleLogout} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full">
                         {t("navbar.account.logout")}
                       </button>
                     </motion.div>
@@ -663,16 +521,10 @@ export default function Navbar() {
               </div>
 
               {/* Cart (mobile) */}
-              <Link
-                to="/cart"
-                onClick={() => setMobileMenuOpen(false)}
-                className="block py-2 border-b align-items-center border-[#d4c4b6] relative"
-              >
+              <Link to="/cart" onClick={() => setMobileMenuOpen(false)} className="block py-2 border-b align-items-center border-[#d4c4b6] relative">
                 {t("navbar.cart")}
                 {cartItemCount >= 0 && (
-                  <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
-                    {cartItemCount}
-                  </span>
+                  <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">{cartItemCount}</span>
                 )}
               </Link>
             </motion.div>

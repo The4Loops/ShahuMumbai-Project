@@ -15,7 +15,8 @@ import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
 
 // ---------- helpers ----------
-const asBool = (v) => v === true || v === "true" || v === 1 || v === "1";
+const asBool = (v) =>
+  v === true || v === "true" || v === 1 || v === "1" || v === "Y";
 const get = (obj, keys, fallback = undefined) =>
   keys.reduce((acc, k) => (acc && acc[k] != null ? acc[k] : undefined), obj) ??
   fallback;
@@ -45,8 +46,9 @@ const pickImageUrl = (img) =>
 const categoryName = (p) =>
   p?.categories?.name ||
   get(p, ["category", "name"]) ||
+  get(p, ["categories", 0, "name"]) ||
   get(p, ["categories", 0, "Name"]) ||
-  "N/A";
+  "Accessories";
 
 // Carousel Arrows
 const NextArrow = ({ onClick }) => (
@@ -88,14 +90,9 @@ const QuantitySelect = ({ max = 10, value, onChange }) => (
 
 const StarRating = ({ value = 0, size = 18 }) => {
   const full = Math.floor(value);
-  const stars = Array.from({ length: 5 }, (_, i) =>
-    i < full ? "full" : "empty"
-  );
+  const stars = Array.from({ length: 5 }, (_, i) => (i < full ? "full" : "empty"));
   return (
-    <span
-      className="inline-flex items-center gap-0.5"
-      aria-label={`Rating: ${value} out of 5`}
-    >
+    <span className="inline-flex items-center gap-0.5" aria-label={`Rating: ${value} out of 5`}>
       {stars.map((t, i) =>
         t === "full" ? (
           <AiFillStar key={i} size={size} className="text-[#D4A5A5]" />
@@ -117,6 +114,7 @@ const ProductDetails = () => {
   const [isInWishlist, setIsInWishlist] = useState(false);
   const [wishlistSubmitting, setWishlistSubmitting] = useState(false);
   const sliderRef = useRef();
+
   const token = localStorage.getItem("token");
   let decoded = "";
   if (token) {
@@ -150,7 +148,13 @@ const ProductDetails = () => {
         setLoading(true);
         const { data: p } = await api.get(`/api/products/${id}`);
         setProduct(p);
-        setSelectedColor(Array.isArray(p?.Colors) ? p.Colors[0] || null : null);
+
+        const colors = Array.isArray(p?.Colors)
+          ? p.Colors
+          : Array.isArray(p?.colors)
+          ? p.colors
+          : [];
+        setSelectedColor(colors[0] || null);
 
         const cat = categoryName(p);
         const { data: rel } = await api.get(
@@ -160,7 +164,7 @@ const ProductDetails = () => {
           (rel || []).filter((rp) => String(rp.id) !== String(id))
         );
 
-        document.title = `${p.name} - YourBrand`;
+        document.title = `${p.Name} - Shahu Mumbai`;
 
         try {
           Ecom.viewItem({
@@ -169,7 +173,7 @@ const ProductDetails = () => {
             category: cat,
             price: Number(p.Price) - (Number(p.DiscountPrice || 0) || 0),
             quantity: 1,
-            color: Array.isArray(p?.Colors) ? p.Colors[0] || null : null,
+            color: colors[0] || null,
           });
         } catch {}
       } catch (err) {
@@ -205,12 +209,14 @@ const ProductDetails = () => {
         return;
       }
       try {
-        const { data } = await api.get('/api/wishlist');
-        const isWishlisted = data.data.some(item => String(item.product_id) === String(id));
+        const { data } = await api.get("/api/wishlist");
+        const isWishlisted = (data.data || []).some(
+          (item) => String(item.product_id) === String(id)
+        );
         setIsInWishlist(isWishlisted);
       } catch (err) {
-        console.error('Error checking wishlist:', err);
-        toast.error(err.response?.data?.error || 'Failed to check wishlist');
+        console.error("Error checking wishlist:", err);
+        toast.error(err.response?.data?.error || "Failed to check wishlist");
       }
     };
 
@@ -228,7 +234,7 @@ const ProductDetails = () => {
 
   const handleToggleWishlist = async () => {
     if (!token || !userid) {
-      toast.error('Please log in to manage your wishlist');
+      toast.error("Please log in to manage your wishlist");
       return;
     }
     if (wishlistSubmitting) return;
@@ -236,40 +242,52 @@ const ProductDetails = () => {
     try {
       setWishlistSubmitting(true);
       if (isInWishlist) {
-        const { data } = await api.get('/api/wishlist');
-        const item = data.data.find(item => String(item.product_id) === String(id));
+        const { data } = await api.get("/api/wishlist");
+        const item = (data.data || []).find(
+          (it) => String(it.product_id) === String(id)
+        );
         if (item) {
           await api.delete(`/api/wishlist/${item.id}`);
           setIsInWishlist(false);
-          toast.success('Removed from wishlist');
+          toast.success("Removed from wishlist");
           try {
             Ecom.removeFromWishlist({
               id: product.ProductId,
               title: product.Name,
               category: categoryName(product),
-              price: Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
+              price:
+                Number(product.Price) -
+                (Number(product.DiscountPrice || 0) || 0),
             });
           } catch {}
         }
       } else {
-        const response = await api.post('/api/wishlist', { product_id: id });
+        const response = await api.post("/api/wishlist", { product_id: id });
         setIsInWishlist(true);
-        toast.success(response.data.message);
+        toast.success(response.data.message || "Added to wishlist");
         try {
           Ecom.addToWishlist({
             id: product.ProductId,
             title: product.Name,
             category: categoryName(product),
-            price: Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
+            price:
+              Number(product.Price) -
+              (Number(product.DiscountPrice || 0) || 0),
           });
         } catch {}
       }
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to update wishlist');
+      toast.error(err.response?.data?.error || "Failed to update wishlist");
     } finally {
       setWishlistSubmitting(false);
     }
   };
+
+  const [reviewName, setReviewName] = useState(fullName);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [cartSubmitting, setCartSubmitting] = useState(false);
 
   const submitReview = async (e) => {
     e.preventDefault();
@@ -290,40 +308,42 @@ const ProductDetails = () => {
       setAvgRating(Number(newAvg.toFixed(1)));
       setReviewText("");
       setReviewRating(5);
-    } catch (e) {
+    } catch (e2) {
       toast.dismiss();
-      toast.error(e.response?.data?.message || "Failed to submit review.");
+      toast.error(e2.response?.data?.message || "Failed to submit review.");
     } finally {
       setSubmitting(false);
     }
   };
 
-  const [reviewName, setReviewName] = useState(fullName);
-  const [reviewRating, setReviewRating] = useState(5);
-  const [reviewText, setReviewText] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [cartSubmitting, setCartSubmitting] = useState(false);
-
   const handleAddToCart = async () => {
-    if (product?.colors?.length && !selectedColor) {
+    const colors = Array.isArray(product?.Colors)
+      ? product.Colors
+      : Array.isArray(product?.colors)
+      ? product.colors
+      : [];
+    if (colors.length && !selectedColor) {
       toast.error("Please select a color.");
       return;
     }
-    if (Number(product.stock) === 0 || cartSubmitting) return;
+    if (Number(product.Stock) === 0 || cartSubmitting) return;
+
     try {
       setCartSubmitting(true);
       const payload = {
-        user_id: userid,
         product_id: product.ProductId,
         quantity: qty,
-        color: selectedColor || null,
       };
       await api.post("/api/cart", payload);
+
       toast.dismiss();
       toast.success(
-        `${product.Name}${
-          payload.color ? ` (${payload.color})` : ""
-        } added to cart!`
+        `${product.Name}${selectedColor ? ` (${selectedColor})` : ""} added to cart!`
+      );
+
+      // 🔔 notify navbar (optimistic bump by units)
+      window.dispatchEvent(
+        new CustomEvent("cart:updated", { detail: { delta: qty } })
       );
 
       try {
@@ -332,9 +352,10 @@ const ProductDetails = () => {
           title: product.Name,
           category: categoryName(product),
           price:
-            Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
+            Number(product.Price) -
+            (Number(product.DiscountPrice || 0) || 0),
           quantity: qty,
-          color: payload.color,
+          color: selectedColor || null,
         });
       } catch {}
     } catch (e) {
@@ -345,7 +366,22 @@ const ProductDetails = () => {
     }
   };
 
-  // Show "Coming Soon" if product is upcoming
+  // SEO & loading
+  const baseUrl =
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
+  const canonical = `${baseUrl}/products/${id}`;
+  const descSource =
+    product?.shortdescription ||
+    product?.description ||
+    "Discover product details at Shahu Mumbai.";
+  const metaDescription =
+    (typeof descSource === "string" ? descSource : "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 300);
+
   if (loading)
     return <p className="p-6 text-center text-[#6B4226]">Loading...</p>;
   if (error || !product)
@@ -354,26 +390,25 @@ const ProductDetails = () => {
         {error || "Product not found"}
       </p>
     );
+
   if (isUpcoming) {
     return (
       <Layout>
-        {/* Basic SEO (indexable or not — you can choose to index) */}
         <Helmet>
           <title>{`${product.Name} — Coming Soon | Shahu Mumbai`}</title>
           <meta
             name="description"
             content={`Coming soon: ${product.Name} from Shahu Mumbai.`}
           />
-          <link
-            rel="canonical"
-            href={`${
-              typeof window !== "undefined"
-                ? window.location.origin
-                : "https://www.shahumumbai.com"
-            }/products/${id}`}
+          <link rel="canonical" href={canonical} />
+          <meta
+            property="og:title"
+            content={`${product.Name} — Coming Soon`}
           />
-          <meta property="og:title" content={`${product.Name} — Coming Soon`} />
-          <meta property="og:description" content="Launching soon at Shahu Mumbai." />
+          <meta
+            property="og:description"
+            content="Launching soon at Shahu Mumbai."
+          />
         </Helmet>
 
         <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5] font-serif">
@@ -385,7 +420,8 @@ const ProductDetails = () => {
               {product.Name} will be available soon!
             </p>
             <p className="text-sm text-[#3E2C23] mt-2">
-              Launching on: {new Date(product.LaunchingDate).toLocaleString("en-IN", {
+              Launching on:{" "}
+              {new Date(product.LaunchingDate).toLocaleString("en-IN", {
                 dateStyle: "medium",
                 timeStyle: "short",
                 timeZone: "Asia/Kolkata",
@@ -411,12 +447,11 @@ const ProductDetails = () => {
   const imgs = Array.isArray(product.product_images)
     ? product.product_images
     : [];
-  const baseImages = [
+  const orderedImages = [
     ...imgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
     ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
   ].filter(Boolean);
-
-  const images = baseImages;
+  const images = orderedImages;
   const hero =
     images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
 
@@ -433,18 +468,6 @@ const ProductDetails = () => {
 
   const handleThumbClick = (idx) => sliderRef.current?.slickGoTo(idx);
 
-  // --- SEO: render once product is loaded ---
-  const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
-  const canonical = `${baseUrl}/products/${id}`;
-  const descSource =
-    product.shortdescription || product.description || "Discover product details at Shahu Mumbai.";
-  const metaDescription =
-    (typeof descSource === "string" ? descSource : "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 300);
-
   const productJsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -453,24 +476,71 @@ const ProductDetails = () => {
     image: images.length ? images : [hero],
     sku: String(product.ProductId),
     category: categoryName(product),
-    brand: product.branddesigner ? { "@type": "Brand", name: product.BrandDesigner } : undefined,
+    ...(product.BrandDesigner && {
+      brand: { "@type": "Brand", name: product.BrandDesigner },
+    }),
+    ...(Array.isArray(product.Colors) && product.Colors.length
+      ? { color: product.Colors.join(", ") }
+      : {}),
+    additionalProperty: [
+      ...(Array.isArray(product.Colors) && product.Colors.length
+        ? [
+            {
+              "@type": "PropertyValue",
+              name: "Color options",
+              value: product.Colors.join(", "),
+            },
+          ]
+        : []),
+      { "@type": "PropertyValue", name: "Category", value: categoryName(product) },
+    ],
     offers: {
       "@type": "Offer",
       url: canonical,
       priceCurrency: "INR",
       price: Number(salePrice).toFixed(2),
       availability:
-        Number(product.Stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        Number(product.Stock) > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
-    },
-    aggregateRating:
-      reviewCount > 0
+      ...(product.Stock != null
         ? {
+            inventoryLevel: {
+              "@type": "QuantitativeValue",
+              value: Number(product.Stock),
+            },
+          }
+        : {}),
+    },
+    ...(reviewCount > 0
+      ? {
+          aggregateRating: {
             "@type": "AggregateRating",
             ratingValue: String(avgRating),
             reviewCount: String(reviewCount),
-          }
-        : undefined,
+          },
+        }
+      : {}),
+    ...(Array.isArray(reviews) && reviews.length
+      ? {
+          review: reviews.slice(0, 3).map((r) => ({
+            "@type": "Review",
+            author: {
+              "@type": "Person",
+              name: r?.users?.full_name || r?.FullName || "Anonymous",
+            },
+            datePublished: r?.created_at || r?.CreatedAt || undefined,
+            reviewBody: r?.comment || r?.Comment || "",
+            reviewRating: {
+              "@type": "Rating",
+              ratingValue: String(r?.rating || r?.Rating || 0),
+              bestRating: "5",
+              worstRating: "1",
+            },
+          })),
+        }
+      : {}),
   };
 
   const breadcrumbJsonLd = {
@@ -479,14 +549,13 @@ const ProductDetails = () => {
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
       { "@type": "ListItem", position: 2, name: "Products", item: `${baseUrl}/products` },
-      { "@type": "ListItem", position: 3, name: product.name, item: canonical },
+      { "@type": "ListItem", position: 3, name: product.Name, item: canonical },
     ],
   };
 
   return (
     <Layout>
       <Helmet>
-        {/* Core SEO */}
         <title>{`${product.Name} — Shahu Mumbai`}</title>
         <meta name="description" content={metaDescription} />
         <meta name="robots" content="index,follow,max-image-preview:large" />
@@ -499,15 +568,13 @@ const ProductDetails = () => {
             "handwoven sarees",
             "artisan-made",
             "sustainable luxury",
-          ].filter(Boolean).join(", ")}
+          ]
+            .filter(Boolean)
+            .join(", ")}
         />
-
-        {/* Canonical + hreflang */}
         <link rel="canonical" href={canonical} />
         <link rel="alternate" hrefLang="en-IN" href={canonical} />
         <link rel="alternate" hrefLang="x-default" href={canonical} />
-
-        {/* Open Graph */}
         <meta property="og:type" content="product" />
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
@@ -515,98 +582,19 @@ const ProductDetails = () => {
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={images[0] || hero} />
-        <meta property="og:image:alt" content={`${product.Name} — product image`} />
-
-        {/* Twitter */}
-        {/* <meta name="twitter:card" content="summary_large_image" /> */}
-        {/* If you have a handle, uncomment: */}
-        {/* <meta name="twitter:site" content="@yourhandle" /> */}
-        {/* <meta name="twitter:title" content={`${product.name} — Shahu Mumbai`} />
-        <meta name="twitter:description" content={metaDescription} />
-        <meta name="twitter:image" content={images[0] || hero} /> */}
-
-        {/* Price meta (kept) */}
+        <meta
+          property="og:image:alt"
+          content={`${product.Name} — product image`}
+        />
         <meta name="product:price:amount" content={String(salePrice)} />
         <meta name="product:price:currency" content="INR" />
-
-        {/* Structured Data: Product (enriched) */}
         <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Product",
-            name: product.Name,
-            description: metaDescription,
-            image: images.length ? images : [hero],
-            sku: String(product.ProductId),
-            ...(product.gtin ? { gtin: String(product.gtin) } : {}),
-            category: categoryName(product),
-            ...(product.BrandDesigner && {
-              brand: { "@type": "Brand", name: product.BrandDesigner }
-            }),
-            ...(Array.isArray(product.Colors) && product.Colors.length
-              ? { color: product.Colors.join(", ") }
-              : {}),
-            additionalProperty: [
-              ...(Array.isArray(product.Colors) && product.Colors.length
-                ? [{
-                    "@type": "PropertyValue",
-                    name: "Color options",
-                    value: product.Colors.join(", ")
-                  }]
-                : []),
-              {
-                "@type": "PropertyValue",
-                name: "Category",
-                value: categoryName(product)
-              }
-            ],
-            offers: {
-              "@type": "Offer",
-              url: canonical,
-              priceCurrency: "INR",
-              price: Number(salePrice).toFixed(2),
-              availability:
-                Number(product.Stock) > 0
-                  ? "https://schema.org/InStock"
-                  : "https://schema.org/OutOfStock",
-              itemCondition: "https://schema.org/NewCondition",
-              ...(product.Stock != null ? { inventoryLevel: { "@type": "QuantitativeValue", value: Number(product.Stock) } } : {})
-            },
-            ...(reviewCount > 0
-              ? {
-                  aggregateRating: {
-                    "@type": "AggregateRating",
-                    ratingValue: String(avgRating),
-                    reviewCount: String(reviewCount)
-                  }
-                }
-              : {}),
-            ...(Array.isArray(reviews) && reviews.length
-              ? {
-                  review: reviews.slice(0, 3).map(r => ({
-                    "@type": "Review",
-                    author: {
-                      "@type": "Person",
-                      name: r?.users?.full_name || "Anonymous"
-                    },
-                    datePublished: r?.created_at || undefined,
-                    reviewBody: r?.comment || "",
-                    reviewRating: {
-                      "@type": "Rating",
-                      ratingValue: String(r?.rating || 0),
-                      bestRating: "5",
-                      worstRating: "1"
-                    }
-                  }))
-                }
-              : {})
-          })}
+          {JSON.stringify(productJsonLd)}
         </script>
-
-        {/* Structured Data: Breadcrumbs (kept) */}
-        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-    </Helmet>
-
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbJsonLd)}
+        </script>
+      </Helmet>
 
       <div className="min-h-screen px-4 md:px-6 py-16 pt-[60px] bg-[#F1E7E5] font-serif">
         {/* Breadcrumb */}
@@ -694,7 +682,7 @@ const ProductDetails = () => {
                 onClick={() => {
                   if (navigator.share) {
                     navigator.share({
-                      title: product.name,
+                      title: product.Name,
                       url: window.location.href,
                     });
                   } else {
@@ -732,9 +720,32 @@ const ProductDetails = () => {
                     Color: {selectedColor || "—"}
                   </p>
 
-                  {product.colors?.length ? (
+                  {Array.isArray(product.colors) && product.colors.length ? (
                     <div className="flex items-center gap-3">
                       {product.colors.map((c) => {
+                        const isSelected = selectedColor === c;
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setSelectedColor(c)}
+                            title={c}
+                            aria-pressed={isSelected}
+                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center focus:outline-none ${
+                              isSelected
+                                ? "border-[#6B4226] ring-2 ring-[#6B4226]/25"
+                                : "border-transparent"
+                            }`}
+                            style={{ backgroundColor: c }}
+                          >
+                            <span className="sr-only">{c}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  ) : Array.isArray(product.Colors) && product.Colors.length ? (
+                    <div className="flex items-center gap-3">
+                      {product.Colors.map((c) => {
                         const isSelected = selectedColor === c;
                         return (
                           <button
@@ -826,17 +837,19 @@ const ProductDetails = () => {
                   >
                     Buy Now
                   </button>
-                  {/* New Row: Watchlist + Waitlist */}
+                  {/* New Row: Wishlist + Waitlist */}
                   <div className="flex items-center gap-3">
-                    {/* Watchlist Icon Button */}
+                    {/* Wishlist Icon Button */}
                     <button
                       type="button"
                       className={` flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
                         isInWishlist
-                          ? 'bg-[#D4A5A5] text-white'
-                          : 'bg-black hover:bg-slate-600 text-[#D4A5A5]'
-                      } ${wishlistSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
-                      aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
+                          ? "bg-[#D4A5A5] text-white"
+                          : "bg-black hover:bg-slate-600 text-[#D4A5A5]"
+                      } ${wishlistSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                      aria-label={
+                        isInWishlist ? "Remove from wishlist" : "Add to wishlist"
+                      }
                       onClick={handleToggleWishlist}
                       disabled={wishlistSubmitting}
                     >
@@ -848,7 +861,9 @@ const ProductDetails = () => {
                       type="button"
                       className="flex-1 bg-black hover:bg-slate-600 text-white px-4 py-3 rounded-md font-semibold shadow transition"
                       aria-label="Join waitlist"
-                      onClick={() => console.log("Add to Waitlist", product.ProductId)}
+                      onClick={() =>
+                        console.log("Add to Waitlist", product.ProductId)
+                      }
                     >
                       Join Waitlist
                     </button>
@@ -863,7 +878,7 @@ const ProductDetails = () => {
                 </h3>
                 <ul className="list-disc list-inside text-sm text-[#3E2C23] space-y-1">
                   {product.ShortDescription ? (
-                    product.ShortDescription
+                    String(product.ShortDescription)
                       .split(/\.|\n|\r/)
                       .map((s) => s.trim())
                       .filter(Boolean)
@@ -888,10 +903,14 @@ const ProductDetails = () => {
               <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
                 {product.Description || "No additional description provided."}
               </p>
-              <div className="mt-4 text-md text-[#6B4226]">
-                Designer:{" "}
-                <span className="font-semibold">{product.BrandDesigner}</span>
-              </div>
+              {product.BrandDesigner && (
+                <div className="mt-4 text-md text-[#6B4226]">
+                  Designer:{" "}
+                  <span className="font-semibold">
+                    {product.BrandDesigner}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <div className="lg:col-span-4">
@@ -902,7 +921,13 @@ const ProductDetails = () => {
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Color</dt>
-                  <dd className="font-medium">{product.colors.length > 0 ? product.colors.join(", ") : "—"}</dd>
+                  <dd className="font-medium">
+                    {Array.isArray(product.colors) && product.colors.length
+                      ? product.colors.join(", ")
+                      : Array.isArray(product.Colors) && product.Colors.length
+                      ? product.Colors.join(", ")
+                      : "—"}
+                  </dd>
                 </div>
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Category</dt>
@@ -948,24 +973,26 @@ const ProductDetails = () => {
                 <ul className="space-y-4">
                   {reviews.map((r) => (
                     <li
-                      key={r.ReviewId}
+                      key={r.ReviewId || `${r.userid}-${r.productid}-${r.CreatedAt || r.created_at || Math.random()}`}
                       className="border border-[#F1E7E5] rounded-lg p-4"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <StarRating value={Number(r.Rating) || 0} />
+                          <StarRating value={Number(r.Rating || r.rating) || 0} />
                           <span className="text-sm text-[#6B4226] font-semibold">
-                            {r.FullName || "Anonymous"}
+                            {r.FullName || r?.users?.full_name || "Anonymous"}
                           </span>
                         </div>
                         <time className="text-xs text-[#3E2C23] opacity-70">
-                          {r.CreatedAt
-                            ? new Date(r.CreatedAt).toLocaleDateString("en-IN")
+                          {r.CreatedAt || r.created_at
+                            ? new Date(r.CreatedAt || r.created_at).toLocaleDateString(
+                                "en-IN"
+                              )
                             : ""}
                         </time>
                       </div>
                       <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                        {r.Comment}
+                        {r.Comment || r.comment}
                       </p>
                     </li>
                   ))}
@@ -1054,8 +1081,12 @@ const ProductDetails = () => {
                 ? related.product_images
                 : [];
               const relatedOrdered = [
-                ...rImgs.filter((i) => asBool(i?.is_hero === 'Y' ? true : false)).map(pickImageUrl),
-                ...rImgs.filter((i) => !asBool(i?.is_hero === 'Y' ? true : false)).map(pickImageUrl),
+                ...rImgs
+                  .filter((i) => asBool(i?.is_hero === "Y" ? true : i?.is_hero))
+                  .map(pickImageUrl),
+                ...rImgs
+                  .filter((i) => !asBool(i?.is_hero === "Y" ? true : i?.is_hero))
+                  .map(pickImageUrl),
               ].filter(Boolean);
               const relatedImage =
                 relatedOrdered[0] || "/assets/images/placeholder.png";
@@ -1067,11 +1098,11 @@ const ProductDetails = () => {
                 : Number(related.Price);
 
               return (
-                <div key={related.id} className="w-[260px]">
+                <div key={related.id || related.ProductId} className="w-[260px]">
                   <RelatedCard
                     product={{
-                      id: related.id,
-                      name: related.name,
+                      id: related.id || related.ProductId,
+                      name: related.Name || related.name,
                       price: relatedSalePrice,
                       image: relatedImage,
                       category: categoryName(related),
