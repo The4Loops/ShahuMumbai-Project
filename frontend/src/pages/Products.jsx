@@ -6,6 +6,7 @@ import Layout from "../layout/Layout";
 import { toast } from "react-toastify";
 import { FiFilter, FiChevronDown, FiX, FiSearch } from "react-icons/fi";
 import { Helmet } from "react-helmet-async";
+import { motion, AnimatePresence } from "framer-motion"; // Added for animations
 
 const ITEMS_PER_PAGE = 30;
 const FALLBACK_CATEGORIES = ["Men", "Women", "Accessories"];
@@ -60,10 +61,21 @@ const Products = () => {
   const [selectedCategories, setSelectedCategories] = useState(new Set());
   const [sort, setSort] = useState("relevance");
   const [page, setPage] = useState(1);
+  const [isMobile, setIsMobile] = useState(false); // Added for responsive handling
 
   const [searchParams, setSearchParams] = useSearchParams();
   const menuBtnRef = useRef(null);
   const menuRef = useRef(null);
+
+  // Detect mobile for layout adjustments (breakpoint at sm: 640px)
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    handleResize(); // Initial check
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Initialize search from URL query
   useEffect(() => {
@@ -163,7 +175,7 @@ const Products = () => {
 
   useEffect(() => {
     const onDocClick = (e) => {
-      if (!menuOpen) return;
+      if (!menuOpen || isMobile) return; // Disable outside click close on mobile (since it's inline)
       const target = e.target;
       if (
         menuRef.current &&
@@ -183,7 +195,7 @@ const Products = () => {
       document.removeEventListener("mousedown", onDocClick);
       document.removeEventListener("keydown", onKey);
     };
-  }, [menuOpen]);
+  }, [menuOpen, isMobile]);
 
   const activeCount =
     (search.trim() ? 1 : 0) +
@@ -321,7 +333,7 @@ const Products = () => {
         */}
       </Helmet>
 
-      <div className="pt-[130px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
+      <div className="pt-[10px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
         {/* Banner */}
         <div className="max-w-7xl mx-auto">
           <div
@@ -367,11 +379,11 @@ const Products = () => {
             </p>
 
             {/* Filter Dropdown */}
-            <div className="relative">
+            <div className="relative w-full sm:w-auto"> {/* Made full-width on mobile for better flow */}
               <button
                 ref={menuBtnRef}
                 onClick={() => setMenuOpen((o) => !o)}
-                className="relative flex items-center gap-2 px-3 xs:px-4 py-2 border-2 border-black rounded-lg bg-[#fdf6e9] hover:bg-[#eadfce] products-filter-button"
+                className="relative flex items-center gap-2 px-3 xs:px-4 py-2 border-2 border-black rounded-lg bg-[#fdf6e9] hover:bg-[#eadfce] products-filter-button w-full sm:w-auto justify-center sm:justify-start"
               >
                 <FiFilter size={16} />
                 <span className="text-sm font-semibold">Filter & Sort</span>
@@ -383,120 +395,129 @@ const Products = () => {
                 )}
               </button>
 
-              {menuOpen && (
-                <div
-                  ref={menuRef}
-                  className="absolute right-0 mt-2 w-[90vw] xs:w-[340px] max-w-[340px] z-20 rounded-xl border-2 border-black shadow-lg overflow-hidden products-filter-dropdown"
-                  style={{ backgroundColor: "#fdf6e9" }}
-                >
-                  <div className="p-3 xs:p-4 space-y-3">
-                    {/* Search */}
-                    <div>
-                      <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1">
-                        Search
-                      </label>
-                      <div className="relative">
-                        <FiSearch className="absolute left-2 xs:left-3 top-1/2 -translate-y-1/2 opacity-70" />
-                        <input
-                          value={search}
-                          onChange={(e) => {
-                            setSearch(e.target.value);
-                            setSearchParams(
-                              e.target.value.trim()
-                                ? { search: e.target.value.trim() }
-                                : {}
-                            );
-                          }}
-                          placeholder="Search products..."
-                          className="w-full px-8 xs:px-9 py-1.5 xs:py-2 border border-black/60 rounded bg-[#EDE1DF] text-xs xs:text-sm focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Categories */}
-                    <div>
-                      <div className="flex items-center justify-between">
-                        <label className="block text-xs xs:text-sm font-bold text-[#4a2c17]">
-                          Categories
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    ref={menuRef}
+                    initial={{ opacity: 0, y: isMobile ? 20 : -10, height: isMobile ? 0 : "auto" }}
+                    animate={{ opacity: 1, y: 0, height: "auto" }}
+                    exit={{ opacity: 0, y: isMobile ? 20 : -10, height: isMobile ? 0 : "auto" }}
+                    transition={{ duration: 0.3, ease: "easeInOut" }}
+                    className={`${
+                      isMobile
+                        ? "static w-full mt-4 rounded-xl border-2 border-black overflow-hidden bg-[#fdf6e9] shadow-lg"
+                        : "absolute right-0 mt-2 w-[340px] max-w-[340px] z-20 rounded-xl border-2 border-black shadow-lg overflow-hidden bg-[#fdf6e9]"
+                    } products-filter-dropdown`}
+                  >
+                    <div className="p-3 xs:p-4 space-y-3">
+                      {/* Search */}
+                      <div>
+                        <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1">
+                          Search
                         </label>
-                        {selectedCategories.size > 0 && (
-                          <button
-                            className="text-[10px] xs:text-xs underline text-[#4a2c17]/80"
-                            onClick={() => setSelectedCategories(new Set())}
-                          >
-                            Clear
-                          </button>
-                        )}
+                        <div className="relative">
+                          <FiSearch className="absolute left-2 xs:left-3 top-1/2 -translate-y-1/2 opacity-70" />
+                          <input
+                            value={search}
+                            onChange={(e) => {
+                              setSearch(e.target.value);
+                              setSearchParams(
+                                e.target.value.trim()
+                                  ? { search: e.target.value.trim() }
+                                  : {}
+                              );
+                            }}
+                            placeholder="Search products..."
+                            className="w-full px-8 xs:px-9 py-1.5 xs:py-2 border border-black/60 rounded bg-[#EDE1DF] text-xs xs:text-sm focus:outline-none"
+                          />
+                        </div>
                       </div>
-                      <div className="mt-2 grid grid-cols-2 gap-1 xs:gap-2">
-                        {categoryOptions.map((cat) => {
-                          const active = selectedCategories.has(cat);
-                          return (
-                            <label
-                              key={cat}
-                              className={`flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1.5 xs:py-2 rounded border text-xs xs:text-sm ${
-                                active
+
+                      {/* Categories */}
+                      <div>
+                        <div className="flex items-center justify-between">
+                          <label className="block text-xs xs:text-sm font-bold text-[#4a2c17]">
+                            Categories
+                          </label>
+                          {selectedCategories.size > 0 && (
+                            <button
+                              className="text-[10px] xs:text-xs underline text-[#4a2c17]/80"
+                              onClick={() => setSelectedCategories(new Set())}
+                            >
+                              Clear
+                            </button>
+                          )}
+                        </div>
+                        <div className="mt-2 grid grid-cols-2 gap-1 xs:gap-2">
+                          {categoryOptions.map((cat) => {
+                            const active = selectedCategories.has(cat);
+                            return (
+                              <label
+                                key={cat}
+                                className={`flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1.5 xs:py-2 rounded border text-xs xs:text-sm ${
+                                  active
+                                    ? "bg-black text-white border-black"
+                                    : "border-black hover:bg-[#eadfce]"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  className="accent-[#6B4226] w-3.5 h-3.5 xs:w-4 xs:h-4"
+                                  checked={active}
+                                  onChange={() => toggleCategory(cat)}
+                                />
+                                <span>{cat}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Sort */}
+                      <div>
+                        <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1 xs:mb-2">
+                          Sort by
+                        </label>
+                        <div className="grid grid-cols-3 gap-1 xs:gap-2">
+                          {[
+                            { v: "relevance", label: "Relevance" },
+                            { v: "price-asc", label: "Price ↑" },
+                            { v: "price-desc", label: "Price ↓" },
+                          ].map((opt) => (
+                            <button
+                              key={opt.v}
+                              onClick={() => setSort(opt.v)}
+                              className={`px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm rounded border ${
+                                sort === opt.v
                                   ? "bg-black text-white border-black"
                                   : "border-black hover:bg-[#eadfce]"
                               }`}
                             >
-                              <input
-                                type="checkbox"
-                                className="accent-[#6B4226] w-3.5 h-3.5 xs:w-4 xs:h-4"
-                                checked={active}
-                                onChange={() => toggleCategory(cat)}
-                              />
-                              <span>{cat}</span>
-                            </label>
-                          );
-                        })}
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Sort */}
-                    <div>
-                      <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1 xs:mb-2">
-                        Sort by
-                      </label>
-                      <div className="grid grid-cols-3 gap-1 xs:gap-2">
-                        {[
-                          { v: "relevance", label: "Relevance" },
-                          { v: "price-asc", label: "Price ↑" },
-                          { v: "price-desc", label: "Price ↓" },
-                        ].map((opt) => (
-                          <button
-                            key={opt.v}
-                            onClick={() => setSort(opt.v)}
-                            className={`px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm rounded border ${
-                              sort === opt.v
-                                ? "bg-black text-white border-black"
-                                : "border-black hover:bg-[#eadfce]"
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        ))}
-                      </div>
+                    {/* Footer */}
+                    <div className="flex items-center justify-between gap-2 p-2 xs:p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
+                      <button
+                        onClick={clearFilters}
+                        className="flex items-center gap-1 text-[10px] xs:text-sm underline text-[#4a2c17]"
+                      >
+                        <FiX /> Reset
+                      </button>
+                      <button
+                        onClick={() => setMenuOpen(false)}
+                        className="px-3 xs:px-4 py-1.5 xs:py-2 bg-black text-white rounded-lg font-bold text-xs xs:text-sm hover:bg-gray-800"
+                      >
+                        Apply
+                      </button>
                     </div>
-                  </div>
-
-                  {/* Footer */}
-                  <div className="flex items-center justify-between gap-2 p-2 xs:p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
-                    <button
-                      onClick={clearFilters}
-                      className="flex items-center gap-1 text-[10px] xs:text-sm underline text-[#4a2c17]"
-                    >
-                      <FiX /> Reset
-                    </button>
-                    <button
-                      onClick={() => setMenuOpen(false)}
-                      className="px-3 xs:px-4 py-1.5 xs:py-2 bg-black text-white rounded-lg font-bold text-xs xs:text-sm hover:bg-gray-800"
-                    >
-                      Apply
-                    </button>
-                  </div>
-                </div>
-              )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </div>

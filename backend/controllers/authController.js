@@ -9,7 +9,7 @@ exports.sendOtp = async (req, res) => {
   try {
     const { Email, FullName, Password } = req.body;
 
-    // Check if already exists
+    // Check if already exists in users table
     const userResult = await req.dbPool.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT UserId FROM users WHERE Email = @Email');
@@ -61,7 +61,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
       .query(`
         SELECT TOP 1 Email, Otp
         FROM ShortMessage
-        WHERE Email = @email
+        WHERE Email = @Email
         ORDER BY CreatedAt DESC
       `);
     const otpRecord = otpResult.recordset[0];
@@ -81,25 +81,61 @@ exports.verifyOtpAndRegister = async (req, res) => {
 
     const hashedPassword = Password ? await bcrypt.hash(Password, 10) : null;
 
-    await req.dbPool.request()
-      .input('FullName', sql.NVarChar, FullName)
+    // Check if email exists in subscriptions
+    const subscriptionResult = await req.dbPool.request()
       .input('Email', sql.NVarChar, Email)
-      .input('Password', sql.NVarChar, hashedPassword)
-      .input('RoleId', sql.Int, RoleId)
-      .input('SSOLogin', sql.Char(1), SSOLogin)
-      .input('Joined', sql.DateTime, new Date())
-      .input('UpdatedAt', sql.DateTime, new Date())
-      .query(`
-        INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, Joined, UpdatedAt)
-        VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @Joined, @UpdatedAt)
-      `);
+      .query('SELECT SubscriptionId FROM subscriptions WHERE Email = @Email');
+    const subscription = subscriptionResult.recordset[0];
+
+    // Insert or update user
+    let insertResult;
+    if (subscription) {
+      // Update existing subscription to users table
+      insertResult = await req.dbPool.request()
+        .input('FullName', sql.NVarChar, FullName)
+        .input('Email', sql.NVarChar, Email)
+        .input('Password', sql.NVarChar, hashedPassword)
+        .input('RoleId', sql.Int, RoleId)
+        .input('SSOLogin', sql.Char(1), SSOLogin)
+        .input('NewsLetterSubscription', sql.Char(1), 'Y')
+        .input('Joined', sql.DateTime, new Date())
+        .input('UpdatedAt', sql.DateTime, new Date())
+        .query(`
+          INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, NewsLetterSubscription, Joined, UpdatedAt)
+          OUTPUT INSERTED.UserId
+          VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @NewsLetterSubscription, @Joined, @UpdatedAt)
+        `);
+
+      // Delete the subscription record
+      await req.dbPool.request()
+        .input('SubscriptionId', sql.Int, subscription.SubscriptionId)
+        .query('DELETE FROM subscriptions WHERE SubscriptionId = @SubscriptionId');
+    } else {
+      // New user without prior subscription
+      insertResult = await req.dbPool.request()
+        .input('FullName', sql.NVarChar, FullName)
+        .input('Email', sql.NVarChar, Email)
+        .input('Password', sql.NVarChar, hashedPassword)
+        .input('RoleId', sql.Int, RoleId)
+        .input('SSOLogin', sql.Char(1), SSOLogin)
+        .input('NewsLetterSubscription', sql.Char(1), 'N')
+        .input('Joined', sql.DateTime, new Date())
+        .input('UpdatedAt', sql.DateTime, new Date())
+        .query(`
+          INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, NewsLetterSubscription, Joined, UpdatedAt)
+          OUTPUT INSERTED.UserId
+          VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @NewsLetterSubscription, @Joined, @UpdatedAt)
+        `);
+    }
+
+    const userId = insertResult.recordset[0].UserId;
 
     // Clean up OTP
     await req.dbPool.request()
       .input('email', sql.NVarChar, Email)
       .query('DELETE FROM shortmessage WHERE email = @email');
 
-    res.status(201).json({ message: 'User registered successfully' });
+    res.status(201).json({ message: 'User registered successfully', userId });
   } catch (err) {
     console.error('Error in verifyOtpAndRegister:', err);
     res.status(500).json({ error: err.message || 'Internal server error' });
@@ -216,7 +252,6 @@ exports.login = async (req, res) => {
 // SSO LOGIN
 exports.ssoLogin = async (req, res) => {
   try {
-
     // Extract token from Authorization header
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
@@ -268,6 +303,7 @@ exports.ssoLogin = async (req, res) => {
           u.FullName, 
           u.Email, 
           u.SSOLogin, 
+          u.NewsLetterSubscription,
           r.Label
         FROM users u
         INNER JOIN roles r ON u.RoleId = r.RoleId
@@ -279,6 +315,12 @@ exports.ssoLogin = async (req, res) => {
     let roleLabel = userRoleLabel;
 
     if (!existingUser) {
+      // Check if email exists in subscriptions
+      const subscriptionResult = await req.dbPool.request()
+        .input('Email', sql.NVarChar, user.email)
+        .query('SELECT SubscriptionId FROM subscriptions WHERE Email = @Email');
+      const subscription = subscriptionResult.recordset[0];
+
       // New User -> Create with SSOLogin = 'Y'
       const insertResult = await req.dbPool.request()
         .input('FullName', sql.NVarChar, user.user_metadata.full_name || user.email)
@@ -286,23 +328,32 @@ exports.ssoLogin = async (req, res) => {
         .input('Password', sql.NVarChar, '')
         .input('RoleId', sql.Int, RoleId)
         .input('SSOLogin', sql.Char(1), 'Y')
+        .input('NewsLetterSubscription', sql.Char(1), subscription ? 'Y' : 'N')
         .input('Joined', sql.DateTime, new Date())
         .input('UpdatedAt', sql.DateTime, new Date())
         .query(`
-          INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, Joined, UpdatedAt)
+          INSERT INTO users (FullName, Email, Password, RoleId, SSOLogin, NewsLetterSubscription, Joined, UpdatedAt)
           OUTPUT INSERTED.UserId
-          VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @Joined, @UpdatedAt)
+          VALUES (@FullName, @Email, @Password, @RoleId, @SSOLogin, @NewsLetterSubscription, @Joined, @UpdatedAt)
         `);
+
       userId = insertResult.recordset[0].UserId;
+
+      // Delete the subscription record if it existed
+      if (subscription) {
+        await req.dbPool.request()
+          .input('SubscriptionId', sql.Int, subscription.SubscriptionId)
+          .query('DELETE FROM subscriptions WHERE SubscriptionId = @SubscriptionId');
+      }
     } else {
-      if (existingUser.SSOLogin !== 'Y') {
+      if (existingUser.SSOLogin !== 'Y' && existingUser.SSOLogin !== 'N') {
         console.error('SSO login not allowed for user:', user.email);
         return res.status(403).json({ error: 'SSO login is not allowed for this user.' });
       }
       userId = existingUser.UserId;
       roleLabel = existingUser.Label;
 
-      // Update LastLogin
+      // Update LastLogin and ensure NewsLetterSubscription is preserved
       await req.dbPool.request()
         .input('UserId', sql.Int, userId)
         .input('LastLogin', sql.DateTime, new Date())
@@ -327,17 +378,15 @@ exports.ssoLogin = async (req, res) => {
   }
 };
 
-// Send OTP for Reset Password
+// SEND OTP FOR RESET PASSWORD
 exports.sendResetPasswordOtp = async (req, res) => {
   try {
     const { Email } = req.body;
 
-    // Validate email presence
     if (!Email) {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    // Check if user exists
     const userResult = await req.dbPool.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT UserId FROM users WHERE Email = @Email');
@@ -356,7 +405,6 @@ exports.sendResetPasswordOtp = async (req, res) => {
       .input('otp', sql.NVarChar, otp)
       .query('INSERT INTO shortmessage (email, otp, CreatedAt) VALUES (@email, @otp, GETDATE())');
 
-    // Send OTP via email
     const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
@@ -379,12 +427,11 @@ exports.sendResetPasswordOtp = async (req, res) => {
   }
 };
 
-// Verify OTP and Reset Password
+// VERIFY OTP AND RESET PASSWORD
 exports.verifyResetPasswordOtp = async (req, res) => {
   try {
     const { Email, otp, NewPassword } = req.body;
 
-    // Validate inputs
     if (!Email || !otp || !NewPassword) {
       return res.status(400).json({ error: 'Email, OTP, and new password are required' });
     }
@@ -393,7 +440,6 @@ exports.verifyResetPasswordOtp = async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
-    // Check if user exists
     const userResult = await req.dbPool.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT UserId FROM users WHERE Email = @Email');
@@ -401,7 +447,6 @@ exports.verifyResetPasswordOtp = async (req, res) => {
       return res.status(400).json({ error: 'Email not found' });
     }
 
-    // Verify OTP
     const otpResult = await req.dbPool.request()
       .input('email', sql.NVarChar, Email)
       .input('otp', sql.NVarChar, otp)
@@ -415,10 +460,8 @@ exports.verifyResetPasswordOtp = async (req, res) => {
       return res.status(400).json({ error: 'Invalid or expired OTP' });
     }
 
-    // Hash the new password
     const hashedPassword = await bcrypt.hash(NewPassword, 10);
 
-    // Update user's password
     await req.dbPool.request()
       .input('Email', sql.NVarChar, Email)
       .input('Password', sql.NVarChar, hashedPassword)
@@ -428,7 +471,6 @@ exports.verifyResetPasswordOtp = async (req, res) => {
         WHERE Email = @Email
       `);
 
-    // Delete the used OTP
     await req.dbPool.request()
       .input('email', sql.NVarChar, Email)
       .input('otp', sql.NVarChar, otp)
@@ -440,5 +482,3 @@ exports.verifyResetPasswordOtp = async (req, res) => {
     res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
-
-module.exports = exports;

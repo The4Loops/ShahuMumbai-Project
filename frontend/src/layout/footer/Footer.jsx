@@ -44,32 +44,32 @@ const Footer = () => {
               </h4>
               <button
                 onClick={() => openPopup("customerService")}
-                className="block text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.services.customerService")}
-              </button>
+              </button><br />
               <button
                 onClick={() => openPopup("faq")}
-                className="block text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.services.faq")}
               </button>
             </div>
 
             {/* Orders */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 text-center">
               <h4 className="text-sm xs:text-base font-bold border-b-2 border-dotted border-black pb-1 mb-2 xs:mb-3">
                 {t("footer.orders.title")}
               </h4>
               <Link
                 to="/myorder"
-                className="block text-xs xs:text-sm text-left mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.orders.trackOrder")}
-              </Link>
+              </Link><br/>
               <button
                 onClick={() => openPopup("returns")}
-                className="block text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.orders.returns")}
               </button>
@@ -82,13 +82,13 @@ const Footer = () => {
               </h4>
               <button
                 onClick={() => openPopup("privacy")}
-                className="block text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.legal.privacy")}
-              </button>
+              </button><br/>
               <button
                 onClick={() => openPopup("terms")}
-                className="block text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.legal.terms")}
               </button>
