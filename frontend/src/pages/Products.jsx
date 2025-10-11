@@ -321,8 +321,7 @@ const Products = () => {
         */}
       </Helmet>
 
-
-      <div className="pt-[130px] pb-12 px-4 bg-[#EDE1DF] min-h-screen font-serif">
+      <div className="pt-[130px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
         {/* Banner */}
         <div className="max-w-7xl mx-auto">
           <div
@@ -341,14 +340,14 @@ const Products = () => {
                 backgroundSize: "12px 12px",
               }}
             />
-            <div className="relative px-8 py-10 lg:px-12 lg:py-14 text-center">
-              <span className="inline-block px-3 py-1 text-[11px] tracking-wider uppercase border border-[#9c6644] rounded-full text-[#4a2c17] bg-[#fdf6e9]">
+            <div className="relative px-4 xs:px-6 py-8 xs:py-10 text-center products-banner">
+              <span className="inline-block px-2 py-1 text-[10px] xs:text-[11px] tracking-wider uppercase border border-[#9c6644] rounded-full text-[#4a2c17] bg-[#fdf6e9]">
                 Freshly Curated
               </span>
-              <h1 className="mt-3 text-3xl md:text-4xl font-extrabold text-[#4a2c17]">
+              <h1 className="mt-2 text-2xl xs:text-3xl font-extrabold text-[#4a2c17]">
                 Discover Handpicked Styles
               </h1>
-              <p className="mt-2 text-[#4a2c17]/80 text-base md:text-lg max-w-2xl mx-auto">
+              <p className="mt-2 text-sm xs:text-base text-[#4a2c17]/80 max-w-[90%] mx-auto">
                 Earthy tones, timeless silhouettes. Use filters to find your perfect piece.
               </p>
             </div>
@@ -356,9 +355,9 @@ const Products = () => {
         </div>
 
         {/* Controls */}
-        <div className="max-w-7xl mx-auto mt-6">
+        <div className="max-w-7xl mx-auto mt-4 xs:mt-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[#4a2c17]">
+            <p className="text-[#4a2c17] text-sm xs:text-base">
               Showing{" "}
               <span className="font-bold">
                 {filtered.length === 0 ? 0 : start + 1}–
@@ -372,13 +371,13 @@ const Products = () => {
               <button
                 ref={menuBtnRef}
                 onClick={() => setMenuOpen((o) => !o)}
-                className="relative flex items-center gap-2 px-4 py-2 border-2 border-black rounded-lg bg-[#fdf6e9] hover:bg-[#eadfce]"
+                className="relative flex items-center gap-2 px-3 xs:px-4 py-2 border-2 border-black rounded-lg bg-[#fdf6e9] hover:bg-[#eadfce] products-filter-button"
               >
-                <FiFilter />
-                <span className="font-semibold">Filter & Sort</span>
+                <FiFilter size={16} />
+                <span className="text-sm font-semibold">Filter & Sort</span>
                 <FiChevronDown className={`transition ${menuOpen ? "rotate-180" : ""}`} />
                 {activeCount > 0 && (
-                  <span className="absolute -top-2 -right-2 text-[11px] leading-none bg-black text-white rounded-full px-2 py-1 border-2 border-black">
+                  <span className="absolute -top-2 -right-2 text-[10px] leading-none bg-black text-white rounded-full px-1.5 py-0.5 border-2 border-black">
                     {activeCount}
                   </span>
                 )}
@@ -387,17 +386,17 @@ const Products = () => {
               {menuOpen && (
                 <div
                   ref={menuRef}
-                  className="absolute right-0 mt-2 w-[340px] z-20 rounded-xl border-2 border-black shadow-lg overflow-hidden"
+                  className="absolute right-0 mt-2 w-[90vw] xs:w-[340px] max-w-[340px] z-20 rounded-xl border-2 border-black shadow-lg overflow-hidden products-filter-dropdown"
                   style={{ backgroundColor: "#fdf6e9" }}
                 >
-                  <div className="p-4 space-y-4">
+                  <div className="p-3 xs:p-4 space-y-3">
                     {/* Search */}
                     <div>
-                      <label className="block text-sm font-bold text-[#4a2c17] mb-1">
+                      <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1">
                         Search
                       </label>
                       <div className="relative">
-                        <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 opacity-70" />
+                        <FiSearch className="absolute left-2 xs:left-3 top-1/2 -translate-y-1/2 opacity-70" />
                         <input
                           value={search}
                           onChange={(e) => {
@@ -409,7 +408,7 @@ const Products = () => {
                             );
                           }}
                           placeholder="Search products..."
-                          className="w-full px-9 py-2 border border-black/60 rounded bg-[#EDE1DF] text-sm focus:outline-none"
+                          className="w-full px-8 xs:px-9 py-1.5 xs:py-2 border border-black/60 rounded bg-[#EDE1DF] text-xs xs:text-sm focus:outline-none"
                         />
                       </div>
                     </div>
@@ -417,26 +416,25 @@ const Products = () => {
                     {/* Categories */}
                     <div>
                       <div className="flex items-center justify-between">
-                        <label className="block text-sm font-bold text-[#4a2c17]">
+                        <label className="block text-xs xs:text-sm font-bold text-[#4a2c17]">
                           Categories
                         </label>
                         {selectedCategories.size > 0 && (
                           <button
-                            className="text-xs underline text-[#4a2c17]/80"
+                            className="text-[10px] xs:text-xs underline text-[#4a2c17]/80"
                             onClick={() => setSelectedCategories(new Set())}
                           >
                             Clear
                           </button>
                         )}
                       </div>
-
-                      <div className="mt-2 grid grid-cols-2 gap-2">
+                      <div className="mt-2 grid grid-cols-2 gap-1 xs:gap-2">
                         {categoryOptions.map((cat) => {
                           const active = selectedCategories.has(cat);
                           return (
                             <label
                               key={cat}
-                              className={`flex items-center gap-2 px-3 py-2 rounded border ${
+                              className={`flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1.5 xs:py-2 rounded border text-xs xs:text-sm ${
                                 active
                                   ? "bg-black text-white border-black"
                                   : "border-black hover:bg-[#eadfce]"
@@ -444,11 +442,11 @@ const Products = () => {
                             >
                               <input
                                 type="checkbox"
-                                className="accent-[#6B4226]"
+                                className="accent-[#6B4226] w-3.5 h-3.5 xs:w-4 xs:h-4"
                                 checked={active}
                                 onChange={() => toggleCategory(cat)}
                               />
-                              <span className="text-sm">{cat}</span>
+                              <span>{cat}</span>
                             </label>
                           );
                         })}
@@ -457,10 +455,10 @@ const Products = () => {
 
                     {/* Sort */}
                     <div>
-                      <label className="block text-sm font-bold text-[#4a2c17] mb-2">
+                      <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1 xs:mb-2">
                         Sort by
                       </label>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-3 gap-1 xs:gap-2">
                         {[
                           { v: "relevance", label: "Relevance" },
                           { v: "price-asc", label: "Price ↑" },
@@ -469,7 +467,7 @@ const Products = () => {
                           <button
                             key={opt.v}
                             onClick={() => setSort(opt.v)}
-                            className={`px-3 py-2 text-sm rounded border ${
+                            className={`px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm rounded border ${
                               sort === opt.v
                                 ? "bg-black text-white border-black"
                                 : "border-black hover:bg-[#eadfce]"
@@ -482,17 +480,17 @@ const Products = () => {
                     </div>
                   </div>
 
-                  {/* footer */}
-                  <div className="flex items-center justify-between gap-2 p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
+                  {/* Footer */}
+                  <div className="flex items-center justify-between gap-2 p-2 xs:p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
                     <button
                       onClick={clearFilters}
-                      className="flex items-center gap-1 text-sm underline text-[#4a2c17]"
+                      className="flex items-center gap-1 text-[10px] xs:text-sm underline text-[#4a2c17]"
                     >
                       <FiX /> Reset
                     </button>
                     <button
                       onClick={() => setMenuOpen(false)}
-                      className="px-4 py-2 bg-black text-white rounded-lg font-bold hover:bg-gray-800"
+                      className="px-3 xs:px-4 py-1.5 xs:py-2 bg-black text-white rounded-lg font-bold text-xs xs:text-sm hover:bg-gray-800"
                     >
                       Apply
                     </button>
@@ -504,30 +502,30 @@ const Products = () => {
         </div>
 
         {/* Grid */}
-        <div className="max-w-7xl mx-auto mt-6">
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="max-w-7xl mx-auto mt-4 xs:mt-6 products-grid">
+          <div className="grid gap-4 xs:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <div
                   key={i}
-                  className="h-80 bg-[#fdf6e9] border border-[#9c6644]/30 rounded-lg animate-pulse"
+                  className="h-80 bg-[#fdf6e9] border border-[#9c6644]/30 rounded-lg animate-pulse w-full max-w-[300px] mx-auto"
                 />
               ))
             ) : paged.length > 0 ? (
               paged.map((product) => <ProductCard key={product.id} product={product} />)
             ) : (
-              <p className="text-center col-span-full text-[#6B4226] text-lg">
+              <p className="text-center col-span-full text-[#6B4226] text-base xs:text-lg">
                 No products found
               </p>
             )}
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-8">
+          <div className="flex flex-wrap items-center justify-center gap-1 xs:gap-2 mt-6 xs:mt-8">
             <button
               onClick={() => setPage((p) => Math.max(1, p - 1))}
               disabled={page === 1}
-              className="px-3 py-2 border-2 border-black rounded disabled:opacity-50 hover:bg-[#fdf6e9]"
+              className="px-2 xs:px-3 py-1.5 xs:py-2 border-2 border-black rounded text-xs xs:text-sm disabled:opacity-50 hover:bg-[#fdf6e9]"
             >
               Prev
             </button>
@@ -538,7 +536,7 @@ const Products = () => {
                 <button
                   key={n}
                   onClick={() => setPage(n)}
-                  className={`px-3 py-2 rounded border-2 ${
+                  className={`px-2 xs:px-3 py-1.5 xs:py-2 rounded border-2 text-xs xs:text-sm ${
                     isActive
                       ? "bg-black text-white border-black"
                       : "border-black hover:bg-[#fdf6e9]"
@@ -551,7 +549,7 @@ const Products = () => {
             <button
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
               disabled={page === totalPages}
-              className="px-3 py-2 border-2 border-black rounded disabled:opacity-50 hover:bg-[#fdf6e9]"
+              className="px-2 xs:px-3 py-1.5 xs:py-2 border-2 border-black rounded text-xs xs:text-sm disabled:opacity-50 hover:bg-[#fdf6e9]"
             >
               Next
             </button>

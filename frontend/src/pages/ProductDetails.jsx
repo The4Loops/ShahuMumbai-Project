@@ -625,19 +625,19 @@ const ProductDetails = () => {
         <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left: Thumbs */}
           <div className="lg:col-span-2 order-2 lg:order-1">
-            <div className="flex lg:flex-col gap-3 lg:sticky lg:top-24">
+            <div className="flex lg:flex-col gap-2 lg:sticky lg:top-24">
               {images.length ? (
                 images.map((img, idx) => (
                   <button
                     key={idx}
                     onClick={() => handleThumbClick(idx)}
-                    className="border-2 border-transparent hover:border-[#D4A5A5] rounded-md overflow-hidden w-20 h-20 bg-white"
+                    className="border-2 border-transparent hover:border-[#D4A5A5] rounded-md overflow-hidden w-16 h-10 sm:w-20 sm:h-20 bg-white"
                     aria-label={`Thumbnail ${idx + 1}`}
                   >
                     <img
                       src={img}
                       alt={`${product.Name} thumbnail ${idx + 1}`}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       onError={(e) => {
                         e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
                       }}
@@ -645,7 +645,7 @@ const ProductDetails = () => {
                   </button>
                 ))
               ) : (
-                <div className="w-20 h-20 bg-white rounded-md border border-[#D4A5A5]" />
+                <div className="w-16 h-16 sm:w-20 sm:h-20 bg-white rounded-md border border-[#D4A5A5]" />
               )}
             </div>
           </div>
@@ -653,14 +653,14 @@ const ProductDetails = () => {
           {/* Center: Gallery */}
           <div className="lg:col-span-6 order-1 lg:order-2">
             <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-2 pb-8 relative">
-              <Slider {...sliderSettings} ref={sliderRef}>
+             <Slider {...sliderSettings} ref={sliderRef}>
                 {images.length ? (
                   images.map((img, index) => (
                     <div key={index} className="px-2">
                       <img
                         src={img}
                         alt={`${product.Name} view ${index + 1}`}
-                        className="h-[560px] w-full object-cover rounded-md border border-[#D4A5A5] shadow-sm bg-white"
+                        className="w-full h-auto max-h-[70vh] object-contain rounded-md border border-[#D4A5A5] shadow-sm bg-white"
                         onError={(e) => {
                           e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
                         }}
@@ -671,7 +671,7 @@ const ProductDetails = () => {
                   <img
                     src={hero}
                     alt={`${product.Name}`}
-                    className="h-[560px] w-full object-cover rounded-md"
+                    className="w-full h-auto max-h-[80vh] object-contain rounded-md"
                   />
                 )}
               </Slider>
@@ -947,57 +947,56 @@ const ProductDetails = () => {
         {/* Reviews */}
         <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8">
-            <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-[#6B4226]">
-                  Customer Reviews
-                </h2>
-                <div className="flex items-center gap-2">
-                  <StarRating value={avgRating} />
-                  <span className="text-sm text-[#3E2C23]">
-                    {avgRating}/5 • {reviewCount} review
-                    {reviewCount === 1 ? "" : "s"}
-                  </span>
+            <div className="lg:col-span-8">
+              <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-3 xs:p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-2 xs:mb-3 sm:mb-4">
+                  <h2 className="text-lg xs:text-xl font-bold text-[#6B4226]">
+                    Customer Reviews
+                  </h2>
+                  <div className="flex items-center gap-1 xs:gap-2">
+                    <StarRating value={avgRating} />
+                    <span className="text-xs xs:text-sm text-[#3E2C23]">
+                      {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                    </span>
+                  </div>
                 </div>
-              </div>
 
-              {reviewLoading ? (
-                <p className="text-[#6B4226]">Loading reviews…</p>
-              ) : reviewError ? (
-                <p className="text-red-500">{reviewError}</p>
-              ) : reviews.length === 0 ? (
-                <p className="text-[#3E2C23]">
-                  No reviews yet. Be the first to review!
-                </p>
-              ) : (
-                <ul className="space-y-4">
-                  {reviews.map((r) => (
-                    <li
-                      key={r.ReviewId || `${r.userid}-${r.productid}-${r.CreatedAt || r.created_at || Math.random()}`}
-                      className="border border-[#F1E7E5] rounded-lg p-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <StarRating value={Number(r.Rating || r.rating) || 0} />
-                          <span className="text-sm text-[#6B4226] font-semibold">
-                            {r.FullName || r?.users?.full_name || "Anonymous"}
-                          </span>
+                {reviewLoading ? (
+                  <p className="text-[#6B4226] text-sm xs:text-base">Loading reviews…</p>
+                ) : reviewError ? (
+                  <p className="text-red-500 text-sm xs:text-base">{reviewError}</p>
+                ) : reviews.length === 0 ? (
+                  <p className="text-[#3E2C23] text-sm xs:text-base">
+                    No reviews yet. Be the first to review!
+                  </p>
+                ) : (
+                  <ul className="space-y-2 xs:space-y-3 sm:space-y-4">
+                    {reviews.map((r) => (
+                      <li
+                        key={r.ReviewId || `${r.userid}-${r.productid}-${r.CreatedAt || r.created_at || Math.random()}`}
+                        className="border border-[#F1E7E5] rounded-lg p-3 xs:p-4"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1 xs:gap-2">
+                            <StarRating value={Number(r.Rating || r.rating) || 0}/>
+                            <span className="text-xs xs:text-sm text-[#6B4226] font-semibold">
+                              {r.FullName || r?.users?.full_name || "Anonymous"}
+                            </span>
+                          </div>
+                          <time className="text-[10px] xs:text-xs text-[#3E2C23] opacity-70">
+                            {r.CreatedAt || r.created_at
+                              ? new Date(r.CreatedAt || r.created_at).toLocaleDateString("en-IN")
+                              : ""}
+                          </time>
                         </div>
-                        <time className="text-xs text-[#3E2C23] opacity-70">
-                          {r.CreatedAt || r.created_at
-                            ? new Date(r.CreatedAt || r.created_at).toLocaleDateString(
-                                "en-IN"
-                              )
-                            : ""}
-                        </time>
-                      </div>
-                      <p className="mt-2 text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                        {r.Comment || r.comment}
-                      </p>
-                    </li>
-                  ))}
-                </ul>
-              )}
+                        <p className="mt-1 xs:mt-2 text-xs xs:text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
+                          {r.Comment || r.comment}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
           </div>
 

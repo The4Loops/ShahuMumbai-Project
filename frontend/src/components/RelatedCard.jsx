@@ -12,7 +12,7 @@ const RelatedCard = ({ product }) => {
       <img
         src={process.env.PUBLIC_URL + image}
         alt={name}
-        className="h-56 w-full object-cover"
+        className="h-full w-full object-contain"
       />
 
       <div className="p-4 font-serif flex flex-col gap-1">

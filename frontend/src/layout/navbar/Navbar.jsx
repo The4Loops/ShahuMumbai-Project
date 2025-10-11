@@ -231,8 +231,6 @@ export default function Navbar() {
     <div>
       <Loader isLoading={isLoading} />
       <nav className="fixed top-0 w-full z-40 bg-transparent backdrop-blur-lg shadow-md font-serif">
-        {menus.length === 0 && !isLoading && <div>No menus available</div>}
-
         {/* Top Bar */}
         <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
           <Link to="/" className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none">

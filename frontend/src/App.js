@@ -1,5 +1,5 @@
 import { Routes, Route } from "react-router-dom";
-import React from "react";
+import React, { useState } from "react"; // Add useState
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import "./App.css";
 
@@ -32,14 +32,21 @@ import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
 import AddCollections from "./admin/AddCollections";
+import VintageLoader from "./Loader"; // Import the loader
 
 function App() {
   useAutoLogout();
+  const [isLoading, setIsLoading] = useState(true); // Track loading state
 
   const siteUrl =
     typeof window !== "undefined"
       ? window.location.origin
       : "https://www.shahumumbai.com";
+
+  // Callback to handle when the loader finishes
+  const handleLoadingComplete = () => {
+    setIsLoading(false);
+  };
 
   return (
     <HelmetProvider>
@@ -58,7 +65,7 @@ function App() {
             "@type": "Organization",
             name: "Shahu Mumbai",
             url: siteUrl,
-            logo: `${siteUrl}/logo.png`,
+            logo: `${siteUrl}/ShahuLogo.png`,
             sameAs: [
               "https://www.instagram.com/shahumumbai",
               "https://www.linkedin.com/company/shahumumbai",
@@ -66,6 +73,9 @@ function App() {
           })}
         </script>
       </Helmet>
+
+      {/* Show loader while isLoading is true */}
+      <VintageLoader onFinish={handleLoadingComplete} />
 
       {/* Router-aware analytics */}
       <PageTracker />
@@ -104,11 +114,12 @@ function App() {
         <Route path="/blog" element={<Blog />} />
         <Route path="/blogs/:id" element={<BlogsView />} />
         <Route path="/returns" element={<Returns />} />
-        <Route path="waitlist" element={<WaitlistProductCard />} />
+        <Route path="/waitlist" element={<WaitlistProductCard />} />
         <Route path="/collections/:id" element={<CollectionsPage />} />
       </Routes>
 
-      <NewsletterPopup />
+      {/* Only show NewsletterPopup after loading is complete */}
+      {!isLoading && <NewsletterPopup />}
     </HelmetProvider>
   );
 }
