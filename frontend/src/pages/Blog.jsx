@@ -37,33 +37,23 @@ const Blog = () => {
 
   // Initialize user
   useEffect(() => {
-    const storedUserId = localStorage.getItem("user_id");
     const token = localStorage.getItem("token");
 
     if (token) {
       try {
         const decoded = jwtDecode(token);
         const name =
-          decoded.user_metadata?.fullname ||
           decoded.fullname ||
           decoded.email ||
           "Anonymous";
         setFullName(name);
-        setUserId(decoded.sub || storedUserId || uuidv4());
+        setUserId(decoded.id);
       } catch (err) {
         console.error("Error decoding token:", err);
         setFullName(null);
       }
     } else {
       setFullName(null);
-    }
-
-    if (!storedUserId && !token) {
-      const newUserId = uuidv4();
-      localStorage.setItem("user_id", newUserId);
-      setUserId(newUserId);
-    } else if (storedUserId) {
-      setUserId(storedUserId);
     }
   }, []);
 
@@ -74,11 +64,6 @@ const Blog = () => {
       try {
         const blogsResponse = await api.get("/api/blogs");
         setBlogs(blogsResponse.data);
-
-        const likesResponse = await api.get(
-          `/api/user/likes?user_id=${userId}`
-        );
-        setLikedBlogs(likesResponse.data?.likedBlogIds || []);
       } catch (error) {
         toast.dismiss();
         toast.error("Failed to load blogs or likes. Please try again.");
@@ -115,10 +100,9 @@ const Blog = () => {
       });
       setBlogs((prevBlogs) =>
         prevBlogs.map((blog) =>
-          blog.id === blogId ? { ...blog, likes: response.data.likes } : blog
+          blog.BlogId === blogId ? { ...blog, Likes: response.data.Likes } : blog
         )
       );
-      setLikedBlogs((prev) => [...prev, blogId]);
       toast.dismiss();
       toast.success("Blog liked!");
     } catch (error) {
@@ -348,7 +332,7 @@ const Blog = () => {
                     <span>8 min read</span>
                   </div>
                   <div className="flex flex-wrap gap-2 mb-4">
-                    {(blog.tags || []).map((tag, i) => (
+                    {(blog.Tags || []).map((tag, i) => (
                       <span
                         key={i}
                         className="px-3 py-1 text-sm bg-[#fbe9e7] text-[#5d4037] rounded-full"

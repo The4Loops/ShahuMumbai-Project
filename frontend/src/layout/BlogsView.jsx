@@ -30,7 +30,7 @@ const BlogsView = () => {
       try {
         const payload = jwtDecode(token);
         setUser({
-          id: payload.id || payload.sub,
+          id: payload.id,
           name: payload.fullname,
         });
       } catch (err) {
@@ -233,7 +233,7 @@ const BlogsView = () => {
 
         {/* Tags */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {JSON.parse(blog.tags || '[]').map((tag, i) => (
+          {blog.Tags.map((tag, i) => (
             <span
               key={i}
               className="text-xs bg-gray-200 px-2 py-1 rounded flex items-center gap-1"

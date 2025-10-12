@@ -4,9 +4,7 @@ const crypto = require('crypto');
 function dbReady(req) {
   return req.dbPool && req.dbPool.connected;
 }
-function devFakeAllowed() {
-  return process.env.ALLOW_FAKE === '1';
-}
+
 const now = () => new Date();
 
 function buildReviewTree(reviews) {
@@ -178,121 +176,66 @@ exports.resetBlog = async (req, res) => {
 exports.getBlogById = async (req, res) => {
   try {
     const { id } = req.params;
-    if (!id) return res.status(400).json({ error: 'Blog ID is required' });
+    if (!id) return res.status(400).json({ error: "Blog ID is required" });
 
-    if (!dbReady(req) && devFakeAllowed()) {
-      return res.status(200).json({
-        id,
-        title: 'Sample Blog',
-        slug: 'sample-blog',
-        excerpt: 'Lorem ipsum',
-        content: '<p>content</p>',
-        category: 'General',
-        tags: JSON.stringify(['sample']),
-        status: 'DRAFT',
-        is_active: true,
-        created_at: now(),
-        updated_at: now(),
-        reviews: [
-          {
-            BlogReviewId: 1,
-            BlogId: id,
-            ParentId: null,
-            UserId: 1,
-            Name: 'John',
-            CreatedAt: new Date().toISOString(),
-            Text: 'Amazing insights!',
-            Stars: 5,
-            replies: [
-              {
-                BlogReviewId: 11,
-                BlogId: id,
-                ParentId: 1,
-                UserId: 2,
-                Name: 'Alice',
-                CreatedAt: new Date().toISOString(),
-                Text: 'Totally agree!',
-                Stars: null,
-                replies: [
-                  {
-                    BlogReviewId: 111,
-                    BlogId: id,
-                    ParentId: 11,
-                    UserId: 3,
-                    Name: 'Mike',
-                    CreatedAt: new Date().toISOString(),
-                    Text: 'Same here!',
-                    Stars: null,
-                    replies: [],
-                  },
-                ],
-              },
-            ],
-          },
-          {
-            BlogReviewId: 2,
-            BlogId: id,
-            ParentId: null,
-            UserId: 4,
-            Name: 'Sarah',
-            CreatedAt: new Date().toISOString(),
-            Text: 'Great read but needs more examples.',
-            Stars: 4,
-            replies: [],
-          },
-        ],
-      });
-    }
-
-    const blogQuery = await req.dbPool.request()
-      .input('Id', sql.NVarChar(36), id)
+    // ✅ Fetch blog by ID
+    const blogQuery = await req.dbPool
+      .request()
+      .input("Id", sql.Int, id)
       .query(`SELECT * FROM dbo.blogs WHERE BlogId=@Id AND IsActive='Y'`);
 
     const blogData = blogQuery.recordset?.[0];
-    if (!blogData) return res.status(404).json({ error: 'Blog not found or not active' });
+    if (!blogData)
+      return res
+        .status(404)
+        .json({ error: "Blog not found or not active" });
 
-    const reviewsQuery = await req.dbPool.request()
-      .input('BlogId', sql.NVarChar(36), id)
-      .query(`SELECT * FROM dbo.blogreviews WHERE BlogId=@BlogId ORDER BY CreatedAt ASC`);
+    // ✅ Parse Tags safely
+    try {
+      blogData.Tags = JSON.parse(blogData.Tags || "[]");
+    } catch {
+      blogData.Tags = [];
+    }
+
+    // ✅ Fetch reviews
+    const reviewsQuery = await req.dbPool
+      .request()
+      .input("BlogId", sql.Int, id)
+      .query(
+        `SELECT * FROM dbo.BlogReviews WHERE BlogId=@BlogId ORDER BY CreatedAt ASC`
+      );
 
     const allReviews = reviewsQuery.recordset || [];
     const reviewMap = new Map();
     const topLevelReviews = [];
 
-    allReviews.forEach(review => {
+    // Build reply tree
+    allReviews.forEach((review) => {
       review.replies = [];
       reviewMap.set(review.BlogReviewId, review);
     });
 
-    allReviews.forEach(review => {
+    allReviews.forEach((review) => {
       if (review.ParentId) {
         const parent = reviewMap.get(review.ParentId);
-        if (parent) {
-          parent.replies.push(review);
-        }
+        if (parent) parent.replies.push(review);
       } else {
         topLevelReviews.push(review);
       }
     });
 
+    // Sort reviews
+    const sortReplies = (replies) => {
+      replies.sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+      replies.forEach((r) => {
+        if (r.replies?.length > 0) sortReplies(r.replies);
+      });
+    };
+
     topLevelReviews.sort((a, b) => new Date(b.CreatedAt) - new Date(a.CreatedAt));
+    topLevelReviews.forEach((r) => sortReplies(r.replies));
 
-    topLevelReviews.forEach(review => {
-      if (review.replies.length > 0) {
-        review.replies.sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
-        // Recursively sort nested replies
-        const sortReplies = (replies) => {
-          replies.forEach(r => {
-            if (r.replies.length > 0) {
-              r.replies.sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
-              sortReplies(r.replies);
-            }
-          });
-        };
-        sortReplies(review.replies);
-      }
-    });
-
+    // ✅ Build final response
     const responseData = {
       ...blogData,
       reviews: topLevelReviews,
@@ -300,7 +243,7 @@ exports.getBlogById = async (req, res) => {
 
     res.status(200).json(responseData);
   } catch (err) {
-    console.error('Error in getBlogById:', err);
+    console.error("Error in getBlogById:", err);
     res.status(500).json({ error: err.message });
   }
 };
@@ -355,45 +298,34 @@ exports.getUserDrafts = async (_req, res) => {
 // GET /api/blogs
 exports.getAllBlogs = async (req, res) => {
   try {
-    if (!dbReady(req) && devFakeAllowed()) {
-      const id = crypto.randomUUID();
-      return res.status(200).json([{
-        id,
-        title: 'Hello World',
-        slug: 'hello-world',
-        status: 'PUBLISHED',
-        publish_at: now(),
-        is_active: 1,
-        reviews: buildReviewTree([{
-          id: crypto.randomUUID(),
-          blog_id: id,
-          parent_id: null,
-          user_id: 'u1',
-          name: 'Alice',
-          created_at: now(),
-          text: 'Great post!',
-          stars: 5,
-        }]),
-      }]);
-    }
 
+    // ✅ Fetch blogs
     const blogsRes = await req.dbPool.request().query(`
       SELECT * FROM dbo.blogs
-      WHERE status='PUBLISHED' AND isActive='Y'
+      WHERE Status = 'PUBLISHED' AND IsActive = 'Y'
       ORDER BY PublishAt DESC
     `);
 
     const blogs = blogsRes.recordset || [];
     if (!blogs.length) return res.status(200).json([]);
 
-    const blogIds = blogs.map(b => b.id);
-  
-    const inList = blogIds.map((_, i) => `@B${i}`).join(',');
+    // ✅ Get blog IDs
+    const blogIds = blogs.map((b) => b.BlogId);
+    const inList = blogIds.map((_, i) => `@B${i}`).join(",");
     const rReq = req.dbPool.request();
-    blogIds.forEach((id, i) => rReq.input(`B${i}`, sql.NVarChar(36), id));
+    blogIds.forEach((id, i) => rReq.input(`B${i}`, sql.Int, id));
 
+    // ✅ Fetch reviews
     const reviewsRes = await rReq.query(`
-      SELECT BlogReviewId AS id, BlogId AS blog_id,ParentId AS parent_id,UserId AS user_id, name,CreatedAt AS created_at, text, stars
+      SELECT 
+        BlogReviewId AS id,
+        BlogId AS blog_id,
+        ParentId AS parent_id,
+        UserId AS user_id,
+        Name AS name,
+        CreatedAt AS created_at,
+        Text AS text,
+        Stars AS stars
       FROM dbo.BlogReviews
       WHERE BlogId IN (${inList})
       ORDER BY CreatedAt ASC
@@ -405,14 +337,27 @@ exports.getAllBlogs = async (req, res) => {
       return acc;
     }, {});
 
-    blogs.forEach(b => {
-      b.reviews = buildReviewTree(byBlog[b.id] || []);
+    // ✅ Attach parsed Tags & reviews
+    blogs.forEach((b) => {
+      // Convert Tags to array
+      try {
+        b.Tags = JSON.parse(b.Tags || "[]");
+      } catch {
+        b.Tags = [];
+      }
+
+      // Attach review tree
+      b.reviews = buildReviewTree(byBlog[b.BlogId] || []);
     });
 
+    // ✅ Send response
     res.status(200).json(blogs);
   } catch (error) {
-    console.error('Error in getAllBlogs:', error);
-    res.status(500).json({ message: 'Failed to fetch blogs', error: error.message });
+    console.error("Error in getAllBlogs:", error);
+    res.status(500).json({
+      message: "Failed to fetch blogs",
+      error: error.message,
+    });
   }
 };
 
@@ -545,7 +490,7 @@ exports.incrementLikes = async (req, res) => {
 
     const request = req.dbPool.request()
       .input('BlogId', sql.NVarChar(36), id)
-      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('UserId', sql.Int, Number(user_id))
       .input('Action', sql.NVarChar(16), 'LIKE')
       .input('CreatedAt', sql.DateTime2, now());
 
@@ -558,8 +503,8 @@ exports.incrementLikes = async (req, res) => {
     }
 
     await req.dbPool.request()
-      .input('BlogId', sql.NVarChar(36), id)
-      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('BlogId', sql.Int, Number(id))
+      .input('UserId', sql.Int, Number(user_id))
       .input('Action', sql.NVarChar(16), 'LIKE')
       .input('CreatedAt', sql.DateTime2, now())
       .query(`
@@ -567,11 +512,18 @@ exports.incrementLikes = async (req, res) => {
         VALUES (@BlogId, @UserId, @Action, @CreatedAt)
       `);
 
-    const countRes = await req.dbPool.request()
-      .input('BlogId', sql.NVarChar(36), id)
-      .query(`SELECT COUNT(*) AS likes FROM dbo.UserInteractions WHERE BlogId=@BlogId AND ActionType='LIKE'`);
+      await req.dbPool.request()
+      .input('BlogId', sql.Int, Number(id))
+      .query(`
+        Update Blogs set Likes=Likes+1
+        WHERE BlogId=@BlogId
+      `);
 
-    res.status(200).json({ likes: countRes.recordset?.[0]?.likes || 0 });
+    const countRes = await req.dbPool.request()
+      .input('BlogId', sql.Int, Number(id))
+      .query(`SELECT COUNT(*) AS Likes FROM dbo.UserInteractions WHERE BlogId = @BlogId and ActionType='LIKE'`);
+
+    res.status(200).json({ Likes: countRes.recordset?.[0]?.Likes || 0 });
   } catch (error) {
     console.error('Error in incrementLikes:', error);
     res.status(500).json({ message: 'Failed to like blog', error: error.message });
@@ -590,8 +542,8 @@ exports.incrementViews = async (req, res) => {
     }
 
     const ex = await req.dbPool.request()
-      .input('BlogId', sql.NVarChar(36), id)
-      .input('UserId', sql.NVarChar(128), String(user_id))
+      .input('BlogId', sql.Int, id)
+      .input('UserId', sql.Int, Number(user_id))
       .query(`
         SELECT 1 FROM dbo.UserInteractions
         WHERE BlogId=@BlogId AND UserId=@UserId AND ActionType='VIEW'
@@ -599,14 +551,21 @@ exports.incrementViews = async (req, res) => {
 
     if (!ex.recordset?.[0]) {
       await req.dbPool.request()
-        .input('BlogId', sql.NVarChar(36), id)
-        .input('UserId', sql.NVarChar(128), String(user_id))
+        .input('BlogId', sql.Int, id)
+        .input('UserId', sql.Int, Number(user_id))
         .input('Action', sql.NVarChar(16), 'VIEW')
         .input('CreatedAt', sql.DateTime2, now())
         .query(`
           INSERT INTO dbo.UserInteractions (BlogId, UserId, ActionType, CreatedAt)
           VALUES (@BlogId, @UserId, @Action, @CreatedAt)
         `);
+      
+      await req.dbPool.request()
+      .input('BlogId', sql.Int, Number(id))
+      .query(`
+        Update Blogs set Views=Views+1
+        WHERE BlogId=@BlogId
+      `);  
     }
 
     const countRes = await req.dbPool.request()
