@@ -3,8 +3,6 @@ import { FaFacebookF, FaInstagram, FaYoutube } from "react-icons/fa";
 import { toast } from "react-toastify";
 import FAQPopup from "../FAQ";
 import CustomerServicePopup from "../CustomerService";
-import PrivacyPopup from "../Privacy";
-import TermsPopup from "../Terms";
 import ReturnsPopup from "../../pages/Returns";
 import { Link } from "react-router-dom";
 import api from "../../supabase/axios";
@@ -80,18 +78,18 @@ const Footer = () => {
               <h4 className="text-sm xs:text-base font-bold border-b-2 border-dotted border-black pb-1 mb-2 xs:mb-3">
                 {t("footer.legal.title")}
               </h4>
-              <button
-                onClick={() => openPopup("privacy")}
+              <Link
+                to="/privacy-policy"
                 className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.legal.privacy")}
-              </button><br/>
-              <button
-                onClick={() => openPopup("terms")}
+              </Link><br/>
+              <Link
+                to="/terms-and-conditions"
                 className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
                 {t("footer.legal.terms")}
-              </button>
+              </Link>
             </div>
 
             {/* Follow Us */}
@@ -169,8 +167,6 @@ const Footer = () => {
 
       {activePopup === "faq" && <FAQPopup onClose={closePopup} />}
       {activePopup === "customerService" && <CustomerServicePopup onClose={closePopup} />}
-      {activePopup === "privacy" && <PrivacyPopup onClose={closePopup} />}
-      {activePopup === "terms" && <TermsPopup onClose={closePopup} />}
       {activePopup === "returns" && <ReturnsPopup onClose={closePopup} />}
     </>
   );

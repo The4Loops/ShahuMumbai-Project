@@ -33,6 +33,8 @@ import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
 import AddCollections from "./admin/AddCollections";
 import VintageLoader from "./Loader"; // Import the loader
+import PrivacyPolicy from "./pages/PrivacyPolicy";
+import TermsAndConditions from "./pages/TermsAndConditions";
 
 function App() {
   useAutoLogout();
@@ -116,6 +118,8 @@ function App() {
         <Route path="/returns" element={<Returns />} />
         <Route path="/waitlist" element={<WaitlistProductCard />} />
         <Route path="/collections/:id" element={<CollectionsPage />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
       </Routes>
 
       {/* Only show NewsletterPopup after loading is complete */}
