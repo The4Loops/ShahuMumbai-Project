@@ -1,11 +1,17 @@
-import React, { useEffect } from "react";
+import React, { useEffect,useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
+import VintageLoader from "../Loader";
 
 const AuthCallback = () => {
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
+
+   const handleLoadingComplete = () => {
+    setIsLoading(false);
+  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.substring(1));
@@ -48,7 +54,6 @@ const AuthCallback = () => {
 
         const userRole = decoded.role;
         toast.dismiss();
-        toast.success(res.data.message || "SSO login successful!");
 
         if (userRole === "Admin") {
           navigate("/admin");
@@ -63,7 +68,7 @@ const AuthCallback = () => {
       });
   }, [navigate]);
 
-  return <div>Logging you in with Google...</div>;
+  return <VintageLoader onFinish={handleLoadingComplete}/>;
 };
 
 export default AuthCallback;

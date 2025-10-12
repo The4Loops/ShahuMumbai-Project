@@ -11,34 +11,55 @@ export default function NewsletterPopup() {
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
-    const hasSeenPopup = localStorage.getItem("newsletterPopupShown");
-    if (hasSeenPopup) return;
+  const token = localStorage.getItem("token");
+  const hasSeenPopup = localStorage.getItem("newsletterPopupShown");
+  if (hasSeenPopup) return;
 
-    // Check if all images in the page have loaded
-    const waitForImages = () => {
-      const images = Array.from(document.images);
-      if (images.every((img) => img.complete)) {
-        setTimeout(() => setShow(true), 1000); // slight delay
-      } else {
-        // Wait for images to load
-        const onLoad = () => {
-          if (images.every((img) => img.complete)) {
-            setTimeout(() => setShow(true), 1000);
-            images.forEach((img) => img.removeEventListener("load", onLoad));
-          }
-        };
-        images.forEach((img) => img.addEventListener("load", onLoad));
+  const checkStatus = async () => {
+    let shouldShow = true;
+    if (token) {
+      try {
+        const response = await api.get("/api/newsletter/status", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.data.dontShow) shouldShow = false;
+      } catch {
+        // ignore
       }
-    };
+    }
 
-    // Wait until React renders the DOM
-    requestAnimationFrame(waitForImages);
-  }, []);
+    if (!shouldShow) return;
+    setTimeout(() => setShow(true), 200);
+  };
+
+  checkStatus();
+}, []);
+
+
+  useEffect(() => {
+    if (show) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "auto";
+    }
+
+    return () => {
+      document.body.style.overflow = "auto";
+    };
+  }, [show]);
 
   const handleClose = () => {
     setShow(false);
     if (dontShowAgain) {
       localStorage.setItem("newsletterPopupShown", "true");
+      const token = localStorage.getItem("token");
+      if (token) {
+        api.post("/api/newsletter/optout", {}, {
+          headers: { Authorization: `Bearer ${token}` },
+        }).catch((err) => {
+          console.error("Failed to opt out:", err);
+        });
+      }
     }
   };
 
@@ -74,7 +95,7 @@ export default function NewsletterPopup() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.8, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="relative bg-white rounded-2xl shadow-xl p-4 xs:p-6 sm:p-8 w-[90vw] max-w-[300px] xs:max-w-[340px] sm:max-w-md text-center newsletter-popup-content"
+            className="relative bg-white rounded-2xl shadow-xl p-4 xs:p-6 sm:p-8 w-[90vw] max-w-[350px] xs:max-w-[340px] sm:max-w-md text-center newsletter-popup-content"
           >
             <button
               onClick={handleClose}
@@ -117,7 +138,7 @@ export default function NewsletterPopup() {
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
                     type="submit"
-                    className="bg-gradient-to-r from-pink-500 to-purple-500 text-white px-2 xs:px-6 py-1.5 xs:py-2 font-semibold rounded-full shadow-md text-xs xs:text-sm"
+                    className="flex-shrink-0 bg-gradient-to-r from-pink-500 to-purple-500 text-white p-2 xs:py-2 font-semibold rounded-full shadow-md text-xs xs:text-sm"
                   >
                     Subscribe
                   </motion.button>

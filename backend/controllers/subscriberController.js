@@ -299,3 +299,61 @@ exports.sendNewsletterMail = async (req, res) => {
     res.status(500).json({ error: 'Server error', details: error.message });
   }
 };
+
+exports.getNewsletterStatus = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET); // Ensure JWT_SECRET is set in env
+    const userId = decoded.id; // Assuming 'id' is the UserId in token payload
+
+    const userResult = await req.dbPool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT NewsLetterSubscription, OptOutNewsletterPopup
+        FROM users
+        WHERE UserId = @UserId
+      `);
+
+    const user = userResult.recordset[0];
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    const dontShow = user.NewsLetterSubscription === 'Y' || user.OptOutNewsletterPopup === 'Y';
+    res.status(200).json({ dontShow });
+  } catch (error) {
+    console.error('getNewsletterStatus:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};
+
+exports.optOutNewsletter = async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const userId = decoded.id;
+
+    await req.dbPool.request()
+      .input('UserId', sql.Int, userId)
+      .input('OptOutNewsletterPopup', sql.Char(1), 'Y')
+      .input('UpdatedAt', sql.DateTime, new Date().toISOString())
+      .query(`
+        UPDATE users
+        SET OptOutNewsletterPopup = @OptOutNewsletterPopup, UpdatedAt = @UpdatedAt
+        WHERE UserId = @UserId
+      `);
+
+    res.status(200).json({ message: 'Opted out successfully' });
+  } catch (error) {
+    console.error('optOutNewsletter:', error);
+    res.status(500).json({ error: 'Server error', details: error.message });
+  }
+};

@@ -35,9 +35,6 @@ exports.getMenusWithItems = async (req, res) => {
     const { error: authError, decoded } = verifyUser(req);
     let result;
     
-    const language = req.query.lang || 'en-US';
-    const targetLang = language.split('-')[0].toLowerCase(); // e.g., 'hi' for hi-IN
-
     // Use MSSQL connection pool from req.dbPool
     if (authError) {
       result = await req.dbPool.request()
@@ -55,22 +52,6 @@ exports.getMenusWithItems = async (req, res) => {
     let menus = result.recordset[0]?.result
       ? JSON.parse(result.recordset[0].result).Menu
       : [];
-
-    // Translate menus and DropdownItems
-    menus = await Promise.all(
-      menus.map(async (menu) => {
-        menu.Label = language === 'en-US' ? menu.Label : await translateText(menu.Label, targetLang);
-        if (menu.DropdownItems) {
-          menu.DropdownItems = await Promise.all(
-            menu.DropdownItems.map(async (item) => {
-              item.Label = language === 'en-US' ? item.Label : await translateText(item.Label, targetLang);
-              return item;
-            })
-          );
-        }
-        return menu;
-      })
-    );
 
     // Apply sorting and filtering
     let sorted = menus.sort((a, b) => a.OrderIndex - b.OrderIndex);

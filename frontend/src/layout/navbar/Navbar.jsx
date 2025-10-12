@@ -1,23 +1,20 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { FaUser, FaShoppingCart, FaBars, FaTimes, FaGlobe } from "react-icons/fa";
+import { FaUser, FaShoppingCart, FaBars, FaTimes } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import { motion, AnimatePresence } from "framer-motion";
 import Logo from "../../assets/ShahuLogo.png";
 import api from "../../supabase/axios"; // your axios instance (withCredentials enabled)
 import { toast } from "react-toastify";
-import { useTranslation } from "react-i18next";
-import "../../i18n";
 import Loader from "../../Loader";
 
 // Reusable Dropdown section
 export const DropdownSection = ({ title, links, onLinkClick }) => {
-  const { t } = useTranslation();
   return (
     <div className="min-w-[180px] mt-4 first:mt-0">
       {title && (
         <h3 className="font-semibold mb-2 border-b pb-1 text-[#6B4226]">
-          {t(`navbar.dropdown.${title.toLowerCase().replace(/\s+/g, "_")}`, title).toUpperCase()}
+          {title.toUpperCase()}
         </h3>
       )}
       <ul className="space-y-1">
@@ -82,20 +79,7 @@ export const DesktopDropdown = ({ label, isOpen, setOpen, refEl, content }) => {
 };
 
 export default function Navbar() {
-  const { i18n, t } = useTranslation();
 
-  const LOCALES = [
-    { code: "en-US", label: t("navbar.languages.en-US") },
-    { code: "en-CA", label: t("navbar.languages.en-CA") },
-    { code: "en-AU", label: t("navbar.languages.en-AU") },
-    { code: "en-UK", label: t("navbar.languages.en-UK") },
-    { code: "es-ES", label: t("navbar.languages.es-ES") },
-    { code: "fr-FR", label: t("navbar.languages.fr-FR") },
-    { code: "fr-MC", label: t("navbar.languages.fr-MC") },
-    { code: "hi-IN", label: t("navbar.languages.hi-IN") },
-  ];
-
-  const [lang, setLang] = useState(i18n.language);
   const [menus, setMenus] = useState([]);
   const [dropdown, setDropdown] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -124,7 +108,7 @@ export default function Navbar() {
   const fetchMenuData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`/api/navbar/menus?lang=${i18n.language}`, {
+      const res = await api.get(`/api/navbar/menus`, {
         headers: { Authorization: token ? `Bearer ${token}` : undefined },
       });
 
@@ -141,20 +125,20 @@ export default function Navbar() {
 
       if (userRole !== "Admin") {
         sorted = sorted.filter(
-          (m) => m.Label.toLowerCase() !== t("navbar.menus.admin").toLowerCase()
+          (m) => m.Label.toLowerCase() !== "admin".toLowerCase()
         );
       }
 
       setMenus(sorted);
       const initDrop = {};
       sorted.forEach((m) => (initDrop[m.Id] = false));
-      setDropdown({ ...initDrop, account: false, lang: false });
+      setDropdown({ ...initDrop, account: false });
     } catch (err) {
-      toast.error(err.response?.data?.message || t("navbar.errors.fetchMenus"));
+      toast.error(err.response?.data?.message || "Failed to fetch menus");
     } finally {
       setIsLoading(false);
     }
-  }, [userRole, i18n.language, t, token]);
+  }, [userRole, token]);
 
   // Always fetch count (guest OR logged-in). Guest carts use the signed cookie; no JWT required.
   const fetchCartItemCount = useCallback(async () => {
@@ -166,6 +150,7 @@ export default function Navbar() {
       setCartItemCount(0);
     }
   }, []);
+  
 
   useEffect(() => {
     fetchMenuData();
@@ -189,10 +174,6 @@ export default function Navbar() {
     return () => window.removeEventListener("cart:updated", onCartUpdated);
   }, [fetchCartItemCount]);
 
-  useEffect(() => {
-    setLang(i18n.language);
-  }, [i18n.language]);
-
   const handleClickOutside = useCallback((e) => {
     Object.keys(refs.current).forEach((key) => {
       if (refs.current[key] && !refs.current[key].contains(e.target)) {
@@ -213,7 +194,6 @@ export default function Navbar() {
 
   const handleLogout = () => {
     localStorage.clear();
-    toast.success(t("navbar.logoutSuccess"));
     navigate("/");
     setMobileMenuOpen(false);
     // after logout, fetch guest cart count (it may be different now)
@@ -234,12 +214,12 @@ export default function Navbar() {
         {/* Top Bar */}
         <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
           <Link to="/" className="absolute left-1/2 transform -translate-x-1/2 lg:static lg:transform-none">
-            <img src={Logo} alt={t("navbar.logoAlt")} className="h-24 object-contain" />
+            <img src={Logo} alt="Shahu Logo" className="h-24 object-contain" />
           </Link>
           <button
             className="lg:hidden text-[#6B4226] p-2 ml-auto"
             onClick={() => setMobileMenuOpen((prev) => !prev)}
-            aria-label={t("navbar.toggleMenu")}
+            aria-label="Toggle Menu"
           >
             {mobileMenuOpen ? <FaTimes size={26} /> : <FaBars size={26} />}
           </button>
@@ -251,7 +231,7 @@ export default function Navbar() {
           <div className="flex justify-start bg-transparent backdrop-blur-lg flex-[1]">
             <input
               type="text"
-              placeholder={t("navbar.searchPlaceholder")}
+              placeholder="Search products..."
               className="w-[300px] px-2 py-1.5 bg-transparent backdrop-blur-sm font-bold rounded-full border border-gray-300"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -260,7 +240,7 @@ export default function Navbar() {
           </div>
 
           {/* Menus */}
-          <ul className="flex items-center gap-8 flex-[1]">
+          <ul className="flex items-center justify-center gap-8 flex-[1]">
             {menus.map((menu) => {
               const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
 
@@ -303,7 +283,7 @@ export default function Navbar() {
             {/* Account */}
             <li ref={(el) => (refs.current.account = el)}>
               <button
-                aria-label={t("navbar.account.label")}
+                aria-label="Account"
                 onClick={() =>
                   !token
                     ? navigate("/account")
@@ -328,26 +308,26 @@ export default function Navbar() {
                     <ul className="space-y-2 text-sm">
                       <li>
                         <button onClick={() => handleProtectedClick("/profile")}>
-                          {t("navbar.account.profile")}
+                          Profile
                         </button>
                       </li>
                       <li>
                         <button onClick={() => handleProtectedClick("/myorder")}>
-                          {t("navbar.account.trackOrder")}
+                          Track Order
                         </button>
                       </li>
                       <li>
                         <Link to="/wishlist" onClick={() => setMobileMenuOpen(false)}>
-                          {t("navbar.account.wishlist")}
+                          Wishlist
                         </Link>
                       </li>
                       <li>
                         <Link to="/waitlist" onClick={() => setMobileMenuOpen(false)}>
-                          {t("navbar.account.waitlist")}
+                          Waitlist
                         </Link>
                       </li>
                       <li>
-                        <button onClick={handleLogout}>{t("navbar.account.logout")}</button>
+                        <button onClick={handleLogout}>Logout</button>
                       </li>
                     </ul>
                   </motion.div>
@@ -357,7 +337,7 @@ export default function Navbar() {
 
             {/* Cart */}
             <li className="relative">
-              <Link to="/cart" aria-label={t("navbar.cart")} className="text-[#6B4226] hover:text-[#D4A5A5]">
+              <Link to="/cart" aria-label="Cart" className="text-[#6B4226] hover:text-[#D4A5A5]">
                 <FaShoppingCart size={20} />
                 {cartItemCount >= 0 && (
                   <span className="absolute -top-3 -right-5 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">
@@ -379,50 +359,6 @@ export default function Navbar() {
               transition={{ duration: 0.2 }}
               className="lg:hidden bg-[#F1E7E5] border-t border-[#e0d8d1] px-4 py-4 space-y-4 overflow-y-auto max-h-[80vh]"
             >
-              {/* Language (mobile) */}
-              <div className="border-b border-[#d4c4b6] pb-2">
-                <button
-                  className="w-full flex items-center justify-between py-2"
-                  onClick={() => setMobileDropdownOpen((prev) => (prev === "lang" ? null : "lang"))}
-                >
-                  <span className="flex items-center gap-2">
-                    <FaGlobe />
-                    <span>{t("navbar.language")}</span>
-                  </span>
-                  <span>{mobileDropdownOpen === "lang" ? "−" : "+"}</span>
-                </button>
-                <AnimatePresence>
-                  {mobileDropdownOpen === "lang" && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.25 }}
-                      className="pl-2 pt-1 space-y-1 overflow-hidden"
-                    >
-                      {LOCALES.map((l) => {
-                        const active = l.code === lang;
-                        return (
-                          <button
-                            key={l.code}
-                            onClick={() => {
-                              i18n.changeLanguage(l.code);
-                              setLang(l.code);
-                              localStorage.setItem("lang", l.code);
-                              setMobileDropdownOpen(null);
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded ${
-                              active ? "bg-white text-[#6B4226] font-semibold" : "text-gray-700 hover:text-[#D4A5A5]"
-                            }`}
-                          >
-                            {l.label}
-                          </button>
-                        );
-                      })}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
 
               {/* Mobile Menus */}
               {menus.map((menu) => {
@@ -485,7 +421,7 @@ export default function Navbar() {
                       : setMobileDropdownOpen((prev) => (prev === "account" ? null : "account"))
                   }
                 >
-                  <span>{t("navbar.account.label")}</span>
+                  <span>Account</span>
                   <span>{mobileDropdownOpen === "account" ? "−" : "+"}</span>
                 </button>
 
@@ -499,19 +435,19 @@ export default function Navbar() {
                       className="pl-4 pt-1 space-y-2 overflow-hidden"
                     >
                       <Link to="/profile" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
-                        {t("navbar.account.profile")}
+                        Profile
                       </Link>
                       <Link to="/myorder" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
-                        {t("navbar.account.trackOrder")}
+                        Track Order
                       </Link>
                       <Link to="/wishlist" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
-                        {t("navbar.account.wishlist")}
+                        Wishlist
                       </Link>
                       <Link to="/waitlist" onClick={() => setMobileMenuOpen(false)} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1">
-                        {t("navbar.account.waitlist")}
+                        Waitlist
                       </Link>
                       <button onClick={handleLogout} className="block text-sm text-gray-700 hover:text-[#D4A5A5] py-1 text-left w-full">
-                        {t("navbar.account.logout")}
+                        Logout
                       </button>
                     </motion.div>
                   )}
@@ -520,7 +456,7 @@ export default function Navbar() {
 
               {/* Cart (mobile) */}
               <Link to="/cart" onClick={() => setMobileMenuOpen(false)} className="block py-2 border-b align-items-center border-[#d4c4b6] relative">
-                {t("navbar.cart")}
+                Cart
                 {cartItemCount >= 0 && (
                   <span className="ml-2 bg-red-700 text-white text-xs rounded-full px-2 py-0.5">{cartItemCount}</span>
                 )}

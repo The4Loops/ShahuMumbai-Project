@@ -31,7 +31,6 @@ import PageTracker from "./PageTracker";
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
-import AddCollections from "./admin/AddCollections";
 import VintageLoader from "./Loader"; // Import the loader
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
@@ -77,7 +76,7 @@ function App() {
       </Helmet>
 
       {/* Show loader while isLoading is true */}
-      <VintageLoader onFinish={handleLoadingComplete} />
+      {isLoading && <VintageLoader onFinish={handleLoadingComplete} />}
 
       {/* Router-aware analytics */}
       <PageTracker />
