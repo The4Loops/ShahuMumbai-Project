@@ -17,7 +17,7 @@ const iconMap = [GiStoneCrafting, GiSpinningWheel, MdOutlineDiamond];
 const colorMap = [
   { titleColor: "text-amber-700", dotColor: "bg-amber-700" },
   { titleColor: "text-red-600", dotColor: "bg-red-600" },
-  { titleColor: "text-blue-600", dotColor: "bg-blue-600" }
+  { titleColor: "text-blue-600", dotColor: "bg-blue-600" },
 ];
 const imageMap = [inspirationImg, celebratingImg, modernImg];
 
@@ -33,7 +33,7 @@ export default function HeritageTimeline() {
       description: item.description,
       Icon: iconMap[idx % iconMap.length],
       image: imageMap[idx % imageMap.length],
-      ...colorMap[idx % colorMap.length]
+      ...colorMap[idx % colorMap.length],
     }));
   }, [t]);
 
@@ -43,12 +43,16 @@ export default function HeritageTimeline() {
     setActiveIndex((prev) => (prev + 1) % milestones.length);
   };
   const handlePrev = () => {
-    setActiveIndex((prev) => (prev === 0 ? milestones.length - 1 : prev - 1));
+    setActiveIndex((prev) =>
+      prev === 0 ? milestones.length - 1 : prev - 1
+    );
   };
 
   // --- SEO (invisible only) ---
   const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
   const canonical = `${baseUrl}/heritagetimeline`;
 
   const breadcrumbJsonLd = {
@@ -60,34 +64,40 @@ export default function HeritageTimeline() {
     ],
   };
 
-const itemListJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "ItemList",
-  numberOfItems: milestones.length,
-  itemListElement: milestones.map((m, i) => ({
-    "@type": "ListItem",
-    position: i + 1,
-    item: {
-      "@type": "Event", // or "CreativeWork" if you prefer
-      name: `${m.year} — ${m.title}`,
-      url: `${canonical}#${encodeURIComponent(m.title)}`,
-      description: m.description,
-      startDate: m.year,
-      image: m.image ? `${baseUrl}${m.image}` : undefined
-    }
-  }))
-};
+  const itemListJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    numberOfItems: milestones.length,
+    itemListElement: milestones.map((m, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      item: {
+        "@type": "Event",
+        name: `${m.year} — ${m.title}`,
+        url: `${canonical}#${encodeURIComponent(m.title)}`,
+        description: m.description,
+        startDate: m.year,
+        image: m.image ? `${baseUrl}${m.image}` : undefined,
+      },
+    })),
+  };
 
   return (
     <Layout>
       <Helmet>
-        {/* Core SEO */}
         <title>Heritage Timeline — Shahu Mumbai</title>
         <meta
           name="description"
           content="Explore Shahu Mumbai’s heritage timeline—key inspirations, craftsmanship milestones, and modern evolutions across the years."
         />
-        <meta name="robots" content={ (Array.isArray(milestones) && milestones.length === 0) ? "noindex,follow" : "index,follow,max-image-preview:large" } />
+        <meta
+          name="robots"
+          content={
+            Array.isArray(milestones) && milestones.length === 0
+              ? "noindex,follow"
+              : "index,follow,max-image-preview:large"
+          }
+        />
         <meta
           name="keywords"
           content="Shahu Mumbai heritage, heritage timeline, Indian craftsmanship history, artisanal fashion, brand story, sustainable luxury India"
@@ -103,21 +113,24 @@ const itemListJsonLd = {
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content="Heritage Timeline — Shahu Mumbai" />
-        <meta property="og:description" content="A journey through our inspirations and craftsmanship milestones." />
+        <meta
+          property="og:description"
+          content="A journey through our inspirations and craftsmanship milestones."
+        />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/heritage.jpg`} />
-        <meta property="og:image:alt" content="Shahu Mumbai — Heritage Timeline milestones" />
-
-        {/* Twitter
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@yourhandle" />
-        <meta name="twitter:title" content="Heritage Timeline — Shahu Mumbai" />
-        <meta name="twitter:description" content="Key inspirations and craftsmanship milestones from Shahu Mumbai." />
-        <meta name="twitter:image" content={`${baseUrl}/og/heritage.jpg`} /> */}
+        <meta
+          property="og:image:alt"
+          content="Shahu Mumbai — Heritage Timeline milestones"
+        />
 
         {/* Structured Data */}
-        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbJsonLd)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(itemListJsonLd)}
+        </script>
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -127,13 +140,12 @@ const itemListJsonLd = {
             description:
               "Explore Shahu Mumbai’s heritage timeline—key inspirations, craftsmanship milestones, and modern evolutions across the years.",
             isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
-            mainEntity: itemListJsonLd, // your ItemList of milestones
+            mainEntity: itemListJsonLd,
           })}
         </script>
       </Helmet>
 
-
-      <section className="bg-[#F1E7E5] py-16 px-6">
+      <section className="bg-[#F1E7E5] py-16">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16 text-gray-800 tracking-wide">
             {t("heritage.title")}
@@ -185,25 +197,42 @@ const itemListJsonLd = {
           </div>
 
           {/* Mobile Timeline */}
-          <div className="md:hidden overflow-x-auto py-4">
-            <div className="flex gap-8 px-4">
+          <div className="md:hidden bg-[#F1E7E5] py-8">
+            <div className="overflow-x-auto px-4 snap-x snap-mandatory flex gap-6 scrollbar-hide">
               {milestones.map((item, index) => {
                 const Icon = item.Icon;
                 return (
-                  <div key={index} className="flex-shrink-0 w-32 text-center">
+                  <div
+                    key={index}
+                    className="snap-center flex-shrink-0 w-64 bg-white rounded-2xl shadow-md p-4 transition-transform hover:scale-[1.02] duration-300"
+                  >
                     <button
                       onClick={() => setActiveIndex(index)}
                       aria-label={`Open ${item.title} modal`}
-                      className={`mb-2 ${item.dotColor} w-14 h-14 rounded-full flex items-center justify-center text-white text-2xl shadow-md mx-auto hover:scale-110 transition-transform`}
+                      className={`mb-4 mx-auto ${item.dotColor} w-16 h-16 rounded-full flex items-center justify-center text-white text-3xl shadow-lg hover:brightness-110 active:scale-95 transition`}
                     >
                       <Icon />
                     </button>
-                    <time className="block text-sm text-gray-500">
+
+                    <div className="relative mb-3">
+                      <img
+                        src={item.image}
+                        alt={item.title}
+                        className="w-full h-40 object-cover rounded-xl"
+                      />
+                    </div>
+
+                    <time className="block text-sm text-gray-500 mb-1">
                       {item.year}
                     </time>
-                    <h3 className={`text-base font-bold ${item.titleColor}`}>
+                    <h3
+                      className={`text-lg font-bold ${item.titleColor} mb-1`}
+                    >
                       {item.title}
                     </h3>
+                    <p className="text-gray-700 text-sm line-clamp-3">
+                      {item.description}
+                    </p>
                   </div>
                 );
               })}
@@ -212,59 +241,63 @@ const itemListJsonLd = {
         </div>
       </section>
 
-      {/* Modal */}
+      {/* Modal (Improved for mobile) */}
       {activeIndex !== null && milestones[activeIndex] && (
         <div
-          className="fixed inset-0 bg-black/60 flex items-center justify-center z-50"
+          className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
           onClick={() => setActiveIndex(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6 relative animate-modalScale"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 sm:p-6 relative animate-modalScale overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setActiveIndex(null)}
               aria-label="Close modal"
-              className="absolute top-4 right-4 sm:top-3 sm:right-3 p-2 rounded-full text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition-colors text-2xl focus:outline-none focus:ring-2 focus:ring-gray-400"
+              className="absolute top-3 right-3 p-2 rounded-full text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition text-2xl focus:outline-none focus:ring-2 focus:ring-gray-400"
             >
               <IoMdClose />
             </button>
 
-            <button
-              className="absolute top-1/2 left-2 sm:left-0 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 text-gray-700 p-3 rounded-full shadow"
-              aria-label="Previous milestone"
-              onClick={handlePrev}
-            >
-              <FaChevronLeft />
-            </button>
-
-            <button
-              className="absolute top-1/2 right-2 sm:right-0 -translate-y-1/2 bg-gray-200 hover:bg-gray-300 text-gray-700 p-3 rounded-full shadow"
-              aria-label="Next milestone"
-              onClick={handleNext}
-            >
-              <FaChevronRight />
-            </button>
+            <div className="flex items-center justify-between mb-3">
+              <button
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-full shadow transition"
+                aria-label="Previous milestone"
+                onClick={handlePrev}
+              >
+                <FaChevronLeft />
+              </button>
+              <button
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 p-2 rounded-full shadow transition"
+                aria-label="Next milestone"
+                onClick={handleNext}
+              >
+                <FaChevronRight />
+              </button>
+            </div>
 
             <img
               src={milestones[activeIndex].image}
               alt={milestones[activeIndex].title}
-              className="w-full rounded-lg mb-4 shadow-md"
+              className="w-full h-48 object-cover rounded-lg mb-4 shadow"
             />
+
             <time className="block text-sm text-gray-500 mb-1">
               {milestones[activeIndex].year}
             </time>
-            <h3 className={`text-2xl font-bold ${milestones[activeIndex].titleColor} mb-2`}>
+            <h3
+              className={`text-xl font-bold ${milestones[activeIndex].titleColor} mb-2`}
+            >
               {milestones[activeIndex].title}
             </h3>
-            <p className="text-gray-700 leading-relaxed">
+            <p className="text-gray-700 text-base leading-relaxed">
               {milestones[activeIndex].description}
             </p>
           </div>
         </div>
       )}
 
-      {/* Animations */}
+      {/* Animations + Utility */}
       <style>
         {`
           @keyframes fadeUp {
@@ -281,6 +314,9 @@ const itemListJsonLd = {
           .animate-modalScale {
             animation: modalScale 0.4s ease-out forwards;
           }
+          /* Hide scrollbars for mobile horizontal scroll */
+          .scrollbar-hide::-webkit-scrollbar { display: none; }
+          .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
         `}
       </style>
     </Layout>

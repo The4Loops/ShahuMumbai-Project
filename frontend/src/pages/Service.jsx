@@ -45,9 +45,8 @@ function ServicePage() {
     typeof window !== "undefined"
       ? window.location.origin
       : "https://www.shahumumbai.com";
-  const canonical = `${origin}/Services`; // matches your <Route path="/Services" ...>
+  const canonical = `${origin}/Services`;
 
-  // Build Services as an ItemList
   const servicesJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
@@ -69,7 +68,8 @@ function ServicePage() {
     })),
   };
 
-  const title = "Our Services — Personal Styling, Curation & Restoration | Shahu Mumbai";
+  const title =
+    "Our Services — Personal Styling, Curation & Restoration | Shahu Mumbai";
   const desc =
     "Explore Shahu’s services: personal styling, custom sourcing, vintage curation, restoration, home decor styling, and event styling. Crafted with heritage and care.";
 
@@ -79,61 +79,71 @@ function ServicePage() {
         <title>{title}</title>
         <meta name="description" content={desc} />
         <link rel="canonical" href={canonical} />
-        {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:title" content={title} />
         <meta property="og:description" content={desc} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${origin}/og/services.jpg`} />
-        {/* Twitter */}
         <meta name="twitter:card" content="summary_large_image" />
-        <script type="application/ld+json">{JSON.stringify(servicesJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify(servicesJsonLd)}
+        </script>
       </Helmet>
 
-      <div className="bg-[#F1E7E5] px-4 sm:px-8 md:px-16 lg:px-24 py-16 text-[#2e2e2e] min-h-screen">
+      <div className="bg-[#F1E7E5] px-5 sm:px-8 md:px-16 lg:px-24 py-16 text-[#2e2e2e] min-h-screen">
         {/* Header */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl font-serif mb-4">Our Services</h1>
-          <p className="text-[#555] max-w-xl mx-auto">
-            Discover a range of personalized vintage services designed to elevate
-            your style and space.
+          <h1 className="text-4xl font-serif tracking-wide mb-4 text-[#2e2e2e]">
+            Our Services
+          </h1>
+          <p className="text-[#5a5a5a] max-w-xl mx-auto leading-relaxed text-base">
+            Discover a range of personalized vintage services designed to
+            elevate your style and space.
           </p>
         </div>
 
-        {/* Mobile/Tablet Timeline */}
-        <div className="block lg:hidden relative border-l-2 border-[#d4b8a5] pl-6 space-y-10 sm:pl-8 md:pl-12 max-w-2xl mx-auto">
+        {/* 🌿 Mobile/Tablet — Luxury Magazine Look */}
+        <div className="block lg:hidden relative space-y-10 max-w-md mx-auto">
           {services.map((service, idx) => (
-            <div key={idx} className="relative">
-              {/* Dot with icon */}
-              <div
-                className="absolute -left-5 top-1.5 w-10 h-10 flex items-center justify-center bg-white border-2 border-[#d4b8a5] rounded-full text-xl sm:-left-6 sm:w-12 sm:h-12"
-                aria-hidden="true"
-              >
-                {service.icon}
-              </div>
+            <div
+              key={idx}
+              className="relative flex flex-col items-center text-center bg-[#FAF7F3] border border-[#e8ded2] rounded-2xl px-6 py-10 shadow-sm hover:shadow-md transition-all duration-500"
+            >
+              {/* Icon */}
+              <div className="text-4xl mb-4">{service.icon}</div>
 
-              {/* Content */}
-              <h3 className="text-lg sm:text-xl font-semibold mb-1">
+              {/* Title */}
+              <h3 className="text-xl font-serif font-semibold tracking-wide mb-2 text-[#2e2e2e]">
                 {service.title}
               </h3>
-              <p className="text-[#555] text-sm sm:text-base leading-relaxed">
+
+              {/* Divider line */}
+              <div className="w-10 h-[1px] bg-[#d8c9b8] mb-3"></div>
+
+              {/* Description */}
+              <p className="text-[#5a5a5a] text-sm leading-relaxed max-w-xs">
                 {service.description}
               </p>
             </div>
           ))}
         </div>
 
-        {/* Desktop Grid with spacing */}
+        {/* 💎 Desktop Grid (unchanged) */}
         <div className="hidden lg:grid grid-cols-3 gap-10 max-w-6xl mx-auto">
           {services.map((service, idx) => (
             <div
               key={idx}
               className="p-8 text-center border border-gray-300/40 rounded-xl bg:white/50 hover:shadow-md transition"
             >
-              <div className="text-5xl mb-4 transition-transform hover:scale-110" aria-hidden="true">
+              <div
+                className="text-5xl mb-4 transition-transform hover:scale-110"
+                aria-hidden="true"
+              >
                 {service.icon}
               </div>
-              <h3 className="text-xl font-semibold mb-2">{service.title}</h3>
+              <h3 className="text-xl font-semibold mb-2 font-serif">
+                {service.title}
+              </h3>
               <p className="text-[#555] text-base">{service.description}</p>
             </div>
           ))}
