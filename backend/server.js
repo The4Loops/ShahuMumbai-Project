@@ -189,7 +189,7 @@ app.use('/api/payments', paymentsRoutes);
 
 app.use('/api', heritageRoutes);
 app.use('/api', standaloneRoutes); // <-- public subscribe endpoint
-app.use('/api/waitlist', waitlistRoutes);
+app.use('/api', waitlistRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

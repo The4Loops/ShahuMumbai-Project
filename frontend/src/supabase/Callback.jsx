@@ -68,7 +68,7 @@ const AuthCallback = () => {
       });
   }, [navigate]);
 
-  return <VintageLoader onFinish={handleLoadingComplete}/>;
+  return <div></div>;
 };
 
 export default AuthCallback;

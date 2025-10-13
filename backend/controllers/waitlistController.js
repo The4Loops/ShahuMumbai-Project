@@ -1,6 +1,52 @@
 const sql = require('mssql');
 const sqlConfig = require('../config/db');
 
+exports.getAllWaitlist = async (req, res) => {
+  try {
+    const pool = await sql.connect(sqlConfig);
+
+    const query = `
+      WITH lastChange AS (
+        SELECT ProductId, MAX(EventUtc) AS LastStatusChangeUtc
+        FROM dbo.ProductStatusLog
+        GROUP BY ProductId
+      )
+      SELECT
+        w.UserEmail   AS email,
+        v.ProductId   AS id,
+        v.Name        AS name,
+        v.Status      AS status,
+        v.ImageUrl    AS imageUrl,
+        ISNULL(v.LastUpdatedUtc, v.UpdatedAt) AS updated,
+        CASE WHEN v.Status = 'Available' THEN lc.LastStatusChangeUtc ELSE NULL END AS availableSinceUtc
+      FROM dbo.Waitlist w
+      JOIN dbo.vProductsForWaitlist v ON v.ProductId = w.ProductId
+      LEFT JOIN lastChange lc ON lc.ProductId = v.ProductId
+      ORDER BY v.Name, w.UserEmail;
+    `;
+
+    const result = await pool.request().query(query);
+
+    const formatted = result.recordset.map(r => ({
+      email: r.email,
+      id: r.id,
+      name: r.name,
+      status: r.status,
+      imageUrl: r.imageUrl || null,
+      updated: r.updated ? new Date(r.updated).toISOString() : null,
+      availableSince: r.availableSinceUtc ? new Date(r.availableSinceUtc).getTime() : null
+    }));
+
+    res.json({
+      total: formatted.length,
+      waitlist: formatted
+    });
+  } catch (err) {
+    console.error('getAllWaitlist error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 
 exports.getWaitlist = async (req, res) => {
   try {
