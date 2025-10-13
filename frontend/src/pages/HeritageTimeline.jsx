@@ -241,20 +241,20 @@ export default function HeritageTimeline() {
         </div>
       </section>
 
-      {/* Modal (Improved for mobile) */}
+      {/* Modal */}
       {activeIndex !== null && milestones[activeIndex] && (
         <div
           className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4"
           onClick={() => setActiveIndex(null)}
         >
           <div
-            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg p-5 sm:p-6 relative animate-modalScale overflow-hidden"
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-96 p-5 sm:p-6 relative animate-modalScale overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             <button
               onClick={() => setActiveIndex(null)}
               aria-label="Close modal"
-              className="absolute top-3 right-3 p-2 rounded-full text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition text-2xl focus:outline-none focus:ring-2 focus:ring-gray-400"
+              className="absolute top-2 left-60 p-2 rounded-full text-gray-500 hover:text-gray-800 hover:bg-gray-200 transition text-2xl focus:outline-none focus:ring-2 focus:ring-gray-400"
             >
               <IoMdClose />
             </button>
