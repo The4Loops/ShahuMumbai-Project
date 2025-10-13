@@ -177,7 +177,7 @@ app.use('/api', cartRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', checkoutRoutes);
-app.use('/api', ordersRoutes);
+app.use('/api/orders', ordersRoutes);
 app.use('/api', contactUsRoutes);
 app.use('/api', teamMembersRoutes);
 app.use('/api', collectionsRoutes);

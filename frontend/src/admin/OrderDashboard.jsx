@@ -2,6 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 
 const STATUS = ["All", "Pending", "Shipped", "Delivered"];
+const CARRIERS = ["Other", "FedEx", "UPS", "USPS", "DHL", "BlueDart", "Delhivery"];
 
 const statusBadge = (s) => {
   switch (s) {
@@ -14,11 +15,44 @@ const statusBadge = (s) => {
   }
 };
 
+/** ========= AUTH-AWARE FETCH HELPERS =========
+ * - If you use JWT in local/session storage, this adds Authorization header.
+ * - If you use cookie/session auth, keep credentials: 'include'.
+ *   (If you use ONLY JWT and no cookies, you can delete the credentials line.)
+ */
+function authHeaders() {
+  const token =
+    localStorage.getItem("admin_token") ||
+    sessionStorage.getItem("admin_token");
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+async function authFetch(url, opts = {}) {
+  return fetch(url, {
+    credentials: "include", // <-- keep for cookie/session auth; remove if pure JWT and no cookies
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders(),
+      ...(opts.headers || {}),
+    },
+    ...opts,
+  });
+}
+
+// Calls the backend to save tracking
+async function saveTracking(orderNumber, trackingNumber, carrier) {
+  const r = await authFetch(`/api/orders/${encodeURIComponent(orderNumber)}/tracking`, {
+    method: "PUT",
+    body: JSON.stringify({ trackingNumber, carrier: carrier || null }),
+  });
+  if (!r.ok) throw new Error((await r.json()).error || "Failed to save tracking");
+  return r.json(); // { ok: true, order: {...} }
+}
+
 export default function OrderDashboard() {
   // which table to show
   const [active, setActive] = useState("orders"); // 'orders' | 'waitlist'
 
-  // Orders state (your original)
+  // Orders state
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState([]);
@@ -35,6 +69,19 @@ export default function OrderDashboard() {
   const [wlPageSize] = useState(50);
   const [wlPage, setWlPage] = useState(1);
 
+  // Tracking edit state
+  const [savingRow, setSavingRow] = useState(null); // orderNumber currently saving
+  const [drafts, setDrafts] = useState({}); // { [orderNumber]: { trackingNumber, carrier } }
+
+  const setDraft = (orderNumber, patch) =>
+    setDrafts((d) => ({ ...d, [orderNumber]: { ...(d[orderNumber] || {}), ...patch } }));
+
+  const getDraft = (order) =>
+    drafts[order.id] ?? {
+      trackingNumber: order.TrackingNumber || "",
+      carrier: order.Carrier || "Other",
+    };
+
   // ----- LOADERS -----
   const loadOrders = async () => {
     try {
@@ -45,7 +92,14 @@ export default function OrderDashboard() {
         limit: String(ordersLimit),
         offset: String(ordersOffset),
       });
-      const r = await fetch(`/api/orders?${params.toString()}`);
+      const r = await authFetch(`/api/orders?${params.toString()}`);
+      if (!r.ok) {
+        // Helpful console to see why (401, 403, etc.)
+        console.error("Orders load failed:", r.status, r.statusText);
+        setOrders([]);
+        setOrdersTotal(0);
+        return;
+      }
       const j = await r.json();
       setOrders(j.orders || []);
       setOrdersTotal(j.total || 0);
@@ -66,7 +120,13 @@ export default function OrderDashboard() {
         page: String(wlPage),
         pageSize: String(wlPageSize),
       });
-      const r = await fetch(`/api/admin/waitlist?${params.toString()}`);
+      const r = await authFetch(`/api/admin/waitlist?${params.toString()}`);
+      if (!r.ok) {
+        console.error("Waitlist load failed:", r.status, r.statusText);
+        setWaitlist([]);
+        setWlTotal(0);
+        return;
+      }
       const j = await r.json();
       setWaitlist(j.items || []);
       setWlTotal(j.total || 0);
@@ -80,14 +140,12 @@ export default function OrderDashboard() {
   };
 
   // ----- EFFECTS -----
-  // Load orders on active, filter, offset
   useEffect(() => {
     if (active !== "orders") return;
     loadOrders();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, filter, ordersOffset]);
 
-  // Debounce orders query
   useEffect(() => {
     if (active !== "orders") return;
     const t = setTimeout(() => {
@@ -98,14 +156,12 @@ export default function OrderDashboard() {
     // eslint-disable-next-line
   }, [query, active]);
 
-  // Load waitlist on active, page
   useEffect(() => {
     if (active !== "waitlist") return;
     loadWaitlist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, wlPage]);
 
-  // Debounce waitlist query
   useEffect(() => {
     if (active !== "waitlist") return;
     const t = setTimeout(() => {
@@ -213,19 +269,74 @@ export default function OrderDashboard() {
             {ordersFiltered.map((order) => (
               <div
                 key={order.id}
-                className="flex items-center justify-between p-4 rounded-lg border border-[#E6DCD2] bg-white"
+                className="p-4 rounded-lg border border-[#E6DCD2] bg-white space-y-2"
               >
-                <div>
-                  <p className="font-semibold text-[#6B4226]">{order.id}</p>
-                  <p className="text-sm text-[#6B4226]/70">{order.customer}</p>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-semibold text-[#6B4226]">{order.id}</p>
+                    <p className="text-sm text-[#6B4226]/70">{order.customer}</p>
+                  </div>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(order.status)}`}>
+                    {order.status}
+                  </span>
                 </div>
-                <span
-                  className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(
-                    order.status
-                  )}`}
-                >
-                  {order.status}
-                </span>
+
+                {/* Tracking (mobile) */}
+                <div className="mt-2 space-y-2">
+                  <div className="text-xs text-[#6B4226]/70">
+                    Tracking: {order.TrackingNumber || "—"}
+                    {order.Carrier ? ` · ${order.Carrier}` : ""}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={getDraft(order).trackingNumber}
+                      onChange={(e) =>
+                        setDraft(order.id, { trackingNumber: e.target.value })
+                      }
+                      placeholder="Tracking number"
+                      className="rounded-md px-2 py-1 border border-[#E6DCD2] text-xs"
+                      disabled={savingRow === order.id}
+                    />
+                    <select
+                      value={getDraft(order).carrier}
+                      onChange={(e) => setDraft(order.id, { carrier: e.target.value })}
+                      className="rounded-md px-2 py-1 border border-[#E6DCD2] text-xs"
+                      disabled={savingRow === order.id}
+                    >
+                      {CARRIERS.map((c) => (
+                        <option key={c} value={c}>
+                          {c}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={async () => {
+                        const d = getDraft(order);
+                        if (!d.trackingNumber.trim()) return alert("Enter a tracking number.");
+                        try {
+                          setSavingRow(order.id);
+                          const { order: updated } = await saveTracking(
+                            order.id,
+                            d.trackingNumber.trim(),
+                            d.carrier
+                          );
+                          setOrders((list) =>
+                            list.map((o) => (o.id === order.id ? { ...o, ...updated, status: "Shipped" } : o))
+                          );
+                        } catch (e) {
+                          console.error(e);
+                          alert("Failed to save tracking.");
+                        } finally {
+                          setSavingRow(null);
+                        }
+                      }}
+                      className="px-2 py-1 border rounded text-xs disabled:opacity-50"
+                      disabled={savingRow === order.id}
+                    >
+                      {savingRow === order.id ? "…" : "Save"}
+                    </button>
+                  </div>
+                </div>
               </div>
             ))}
             {!ordersLoading && ordersFiltered.length === 0 && (
@@ -242,28 +353,87 @@ export default function OrderDashboard() {
                 <tr className="bg-[#F1E7E5] text-[#6B4226]">
                   <th className="p-3 text-left">Order ID</th>
                   <th className="p-3 text-left">Customer</th>
+                  <th className="p-3 text-left">Tracking</th>
                   <th className="p-3 text-center">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {ordersFiltered.map((order) => (
-                  <tr key={order.id} className="border-t border-[#E6DCD2]">
-                    <td className="p-3 text-[#6B4226]">{order.id}</td>
-                    <td className="p-3 text-[#6B4226]">{order.customer}</td>
-                    <td className="p-3 text-center">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(
-                          order.status
-                        )}`}
-                      >
-                        {order.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))}
+                {ordersFiltered.map((order) => {
+                  const d = getDraft(order);
+                  const disabled = savingRow === order.id;
+                  return (
+                    <tr key={order.id} className="border-t border-[#E6DCD2]">
+                      <td className="p-3 text-[#6B4226]">{order.id}</td>
+                      <td className="p-3 text-[#6B4226]">{order.customer}</td>
+                      <td className="p-3 text-[#6B4226]">
+                        <div className="flex items-center gap-2">
+                          <input
+                            value={d.trackingNumber}
+                            onChange={(e) =>
+                              setDraft(order.id, { trackingNumber: e.target.value })
+                            }
+                            placeholder="Tracking number"
+                            className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm w-40"
+                            disabled={disabled}
+                          />
+                          <select
+                            value={d.carrier}
+                            onChange={(e) => setDraft(order.id, { carrier: e.target.value })}
+                            className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm"
+                            disabled={disabled}
+                            aria-label="Carrier"
+                          >
+                            {CARRIERS.map((c) => (
+                              <option key={c} value={c}>
+                                {c}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            onClick={async () => {
+                              if (!d.trackingNumber.trim()) return alert("Enter a tracking number.");
+                              try {
+                                setSavingRow(order.id);
+                                const { order: updated } = await saveTracking(
+                                  order.id,
+                                  d.trackingNumber.trim(),
+                                  d.carrier
+                                );
+                                setOrders((list) =>
+                                  list.map((o) =>
+                                    o.id === order.id ? { ...o, ...updated, status: "Shipped" } : o
+                                  )
+                                );
+                              } catch (e) {
+                                console.error(e);
+                                alert("Failed to save tracking.");
+                              } finally {
+                                setSavingRow(null);
+                              }
+                            }}
+                            className="px-3 py-1.5 border rounded text-sm hover:bg-[#F5EFED] disabled:opacity-50"
+                            disabled={disabled}
+                          >
+                            {disabled ? "Saving…" : "Save"}
+                          </button>
+                        </div>
+                        <div className="text-xs text-[#6B4226]/70 mt-1">
+                          Current: {order.TrackingNumber || "—"}
+                          {order.Carrier ? ` · ${order.Carrier}` : ""}
+                          {order.ShippedAt ? ` · ${new Date(order.ShippedAt).toLocaleString()}` : ""}
+                        </div>
+                      </td>
+                      <td className="p-3 text-center">
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge(order.status)}`}>
+                          {order.status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
                 {!ordersLoading && ordersFiltered.length === 0 && (
                   <tr>
-                    <td colSpan={3} className="p-3 text-sm text-[#6B4226]/70">
+                    <td colSpan={4} className="p-3 text-sm text-[#6B4226]/70">
                       No orders match your filters.
                     </td>
                   </tr>

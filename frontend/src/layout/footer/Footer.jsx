@@ -3,7 +3,6 @@ import { FaFacebookF, FaInstagram, FaYoutube } from "react-icons/fa";
 import { toast } from "react-toastify";
 import FAQPopup from "../FAQ";
 import CustomerServicePopup from "../CustomerService";
-import ReturnsPopup from "../../pages/Returns";
 import { Link } from "react-router-dom";
 import api from "../../supabase/axios";
 import { useTranslation } from "react-i18next";
@@ -65,12 +64,18 @@ const Footer = () => {
               >
                 {t("footer.orders.trackOrder")}
               </Link><br/>
-              <button
-                onClick={() => openPopup("returns")}
+              <Link
+                to="/shipping-policy"
                 className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
               >
-                {t("footer.orders.returns")}
-              </button>
+                {t("footer.orders.shipping")}
+              </Link><br />
+              <Link
+                to="/cancellation-refund-policy"
+                className="text-xs xs:text-sm mb-1 xs:mb-2 hover:text-[#D4A5A5] transition-colors"
+              >
+                {t("footer.orders.refund")}
+              </Link>
             </div>
 
             {/* Legal */}
@@ -167,7 +172,6 @@ const Footer = () => {
 
       {activePopup === "faq" && <FAQPopup onClose={closePopup} />}
       {activePopup === "customerService" && <CustomerServicePopup onClose={closePopup} />}
-      {activePopup === "returns" && <ReturnsPopup onClose={closePopup} />}
     </>
   );
 };

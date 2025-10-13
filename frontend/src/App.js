@@ -34,6 +34,8 @@ import CollectionsPage from "./pages/CollectionsPage";
 import VintageLoader from "./Loader"; // Import the loader
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
+import ShippingPolicy from './pages/ShippingPolicy';
+import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 
 function App() {
   useAutoLogout();
@@ -119,6 +121,8 @@ function App() {
         <Route path="/collections/:id" element={<CollectionsPage />} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
         <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+        <Route path="/shipping-policy" element={<ShippingPolicy />} />
+        <Route path="/cancellation-refund-policy" element={<CancellationRefundPolicy />} />
       </Routes>
 
       {/* Only show NewsletterPopup after loading is complete */}

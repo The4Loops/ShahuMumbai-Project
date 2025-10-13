@@ -39,7 +39,9 @@
     "orders": {
       "title": "Orders",
       "trackOrder": "Track Order",
-      "returns": "Returns"
+      "returns": "Returns",
+      "shipping": "Shipping Policy",
+      "refund": "Cancellation & Refund Policy"
     },
     "legal": {
       "title": "Legal",

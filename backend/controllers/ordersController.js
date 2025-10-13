@@ -1,5 +1,5 @@
 const sql = require('mssql');
-const jwt = require('jsonwebtoken'); 
+const jwt = require('jsonwebtoken');
 
 /* GET /api/orders?status=All|Pending|Shipped|Delivered&q=&limit=50&offset=0 */
 exports.listOrders = async (req, res) => {
@@ -18,7 +18,7 @@ exports.listOrders = async (req, res) => {
     const whereConditions = [];
 
     if (status && status !== 'All') {
-      const normalizedStatus = status.toLowerCase();
+      const normalizedStatus = String(status).toLowerCase();
       if (!['pending', 'shipped', 'delivered'].includes(normalizedStatus)) {
         return res.status(400).json({ error: 'invalid_status' });
       }
@@ -35,36 +35,43 @@ exports.listOrders = async (req, res) => {
 
     const query = `
       SELECT 
+        OrderId,
         OrderNumber,
         CustomerName,
         CustomerEmail,
         FulFillmentStatus,
-        PlacedAt
-      FROM orders
+        PlacedAt,
+        TrackingNumber,
+        Carrier,
+        ShippedAt
+      FROM dbo.Orders
       ${whereClause}
       ORDER BY PlacedAt DESC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
     `;
 
     const request = req.dbPool.request();
-    parameters.forEach(param => request.input(param.name, param.type, param.value));
+    parameters.forEach(p => request.input(p.name, p.type, p.value));
     request.input('offset', sql.Int, offset);
     request.input('limit', sql.Int, limit);
 
     const result = await request.query(query);
 
-    const countQuery = `SELECT COUNT(*) AS total FROM orders${whereClause}`;
-
+    const countQuery = `SELECT COUNT(*) AS total FROM dbo.Orders${whereClause}`;
     const countRequest = req.dbPool.request();
-    parameters.forEach(param => countRequest.input(param.name, param.type, param.value));
+    parameters.forEach(p => countRequest.input(p.name, p.type, p.value));
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
 
     const orders = result.recordset.map(o => ({
+      // front-end expects id = OrderNumber
       id: o.OrderNumber,
       customer: o.CustomerName || o.CustomerEmail || 'Guest',
-      status: (o.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()),
+      status: (o.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()), // Pending|Shipped|Delivered
       placed_at: o.PlacedAt,
+      TrackingNumber: o.TrackingNumber || null,
+      Carrier: o.Carrier || null,
+      ShippedAt: o.ShippedAt || null,
     }));
 
     return res.json({ orders, total });
@@ -87,44 +94,102 @@ exports.updateFulfillmentStatus = async (req, res) => {
       return res.status(400).json({ error: 'invalid_status' });
     }
 
+    // Build dynamic update for timestamps
     let query = `
-      UPDATE orders
-      SET FulFillmentStatus = @status, UpdatedAt = @updated_at
+      UPDATE dbo.Orders
+      SET FulFillmentStatus = @status,
+          UpdatedAt = @updated_at
     `;
     const parameters = [
       { name: 'orderNumber', type: sql.NVarChar, value: orderNumber },
       { name: 'status', type: sql.NVarChar, value: normalized },
-      { name: 'updated_at', type: sql.DateTime, value: new Date().toISOString() }
+      { name: 'updated_at', type: sql.DateTime2, value: new Date() }
     ];
 
     if (normalized === 'shipped') {
-      query += ', ShippedAt = @shipped_at';
-      parameters.push({ name: 'shipped_at', type: sql.DateTime, value: new Date().toISOString() });
+      query += ', ShippedAt = ISNULL(ShippedAt, @shipped_at)';
+      parameters.push({ name: 'shipped_at', type: sql.DateTime2, value: new Date() });
     }
     if (normalized === 'delivered') {
-      query += ', DeliveredAt = @delivered_at';
-      parameters.push({ name: 'delivered_at', type: sql.DateTime, value: new Date().toISOString() });
+      query += ', DeliveredAt = ISNULL(DeliveredAt, @delivered_at)';
+      parameters.push({ name: 'delivered_at', type: sql.DateTime2, value: new Date() });
     }
 
-    query += ' OUTPUT INSERTED.OrderNumber, INSERTED.FulFillmentStatus, INSERTED.ShippedAt, INSERTED.DeliveredAt WHERE OrderNumber = @orderNumber';
+    query += `
+      OUTPUT INSERTED.OrderNumber,
+             INSERTED.FulFillmentStatus,
+             INSERTED.ShippedAt,
+             INSERTED.DeliveredAt,
+             INSERTED.TrackingNumber,
+             INSERTED.Carrier
+      WHERE OrderNumber = @orderNumber
+    `;
 
     const request = req.dbPool.request();
-    parameters.forEach(param => request.input(param.name, param.type, param.value));
-
+    parameters.forEach(p => request.input(p.name, p.type, p.value));
     const result = await request.query(query);
 
-    if (result.rowsAffected[0] === 0) {
+    if (!result.rowsAffected || result.rowsAffected[0] === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-
-    const data = result.recordset[0];
-    return res.json({ ok: true, order: data });
+    return res.json({ ok: true, order: result.recordset[0] });
   } catch (e) {
     console.error('orders.updateFulfillmentStatus error:', e);
     return res.status(500).json({ error: 'internal_error' });
   }
 };
 
+/* PUT /api/orders/:orderNumber/tracking  { trackingNumber: string, carrier?: string } */
+exports.updateTracking = async (req, res) => {
+  try {
+    const orderNumber = req.params.orderNumber;
+    const { trackingNumber, carrier } = req.body || {};
+    if (!orderNumber) return res.status(400).json({ error: 'missing_order_number' });
+
+    if (!trackingNumber || typeof trackingNumber !== 'string' || trackingNumber.trim().length === 0) {
+      return res.status(400).json({ error: 'invalid_tracking_number' });
+    }
+    if (carrier && carrier.length > 50) {
+      return res.status(400).json({ error: 'carrier_too_long' });
+    }
+
+    const request = req.dbPool.request();
+    request.input('orderNumber', sql.NVarChar, orderNumber);
+    request.input('trackingNumber', sql.NVarChar(100), trackingNumber.trim());
+    request.input('carrier', sql.NVarChar(50), carrier ? carrier.trim() : null);
+    request.input('now', sql.DateTime2, new Date());
+
+    // Set tracking + auto flip to 'shipped' if not delivered yet
+    const query = `
+      UPDATE dbo.Orders
+      SET TrackingNumber   = @trackingNumber,
+          Carrier          = @carrier,
+          FulFillmentStatus= CASE WHEN FulFillmentStatus = 'delivered' THEN 'delivered' ELSE 'shipped' END,
+          ShippedAt        = ISNULL(ShippedAt, @now),
+          UpdatedAt        = @now
+      OUTPUT INSERTED.OrderId,
+             INSERTED.OrderNumber,
+             INSERTED.CustomerName,
+             INSERTED.FulFillmentStatus,
+             INSERTED.TrackingNumber,
+             INSERTED.Carrier,
+             INSERTED.ShippedAt
+      WHERE OrderNumber = @orderNumber
+    `;
+
+    const result = await request.query(query);
+    if (!result.rowsAffected || result.rowsAffected[0] === 0) {
+      return res.status(404).json({ error: 'Order not found' });
+    }
+
+    return res.json({ ok: true, order: result.recordset[0] });
+  } catch (e) {
+    console.error('orders.updateTracking error:', e);
+    return res.status(500).json({ error: 'internal_error' });
+  }
+};
+
+/* GET /api/user/orders  (requires Bearer JWT) */
 exports.getUserOrders = async (req, res) => {
   try {
     // Extract JWT token from Authorization header
@@ -136,16 +201,13 @@ exports.getUserOrders = async (req, res) => {
     const token = authHeader.split(' ')[1];
     let userId;
     try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET); // Assumes JWT_SECRET is set in environment
-      userId = decoded.id; // Assumes userId is stored in the JWT payload
-    } catch (e) {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      userId = decoded.id;
+    } catch {
       return res.status(401).json({ error: 'invalid_token' });
     }
+    if (!userId) return res.status(400).json({ error: 'missing_user_id' });
 
-    if (!userId) {
-      return res.status(400).json({ error: 'missing_user_id' });
-    }
-  
     const query = `
       SELECT 
         o.OrderId,
@@ -159,6 +221,8 @@ exports.getUserOrders = async (req, res) => {
         o.SubTotal,
         o.ShippingTotal,
         o.TaxTotal,
+        o.TrackingNumber,
+        o.Carrier,
         u.UserId,
         u.FullName,
         u.Email,
@@ -167,31 +231,27 @@ exports.getUserOrders = async (req, res) => {
         p.Price,  
         oi.Qty,
         oi.UnitPrice
-      FROM orders o
-      INNER JOIN users u ON o.UserId = u.UserId
-      LEFT JOIN orderitems oi ON o.OrderId = oi.OrderId
-      LEFT JOIN products p ON oi.ProductId = p.ProductId
+      FROM dbo.Orders o
+      INNER JOIN dbo.Users u      ON o.UserId = u.UserId
+      LEFT  JOIN dbo.OrderItems oi ON o.OrderId = oi.OrderId
+      LEFT  JOIN dbo.Products p     ON oi.ProductId = p.ProductId
       WHERE o.UserId = @userId
       ORDER BY o.PlacedAt DESC
     `;
 
     const request = req.dbPool.request();
     request.input('userId', sql.Int, userId);
-
     const result = await request.query(query);
 
-    // Group results by order to handle multiple order items
     const ordersMap = new Map();
-    result.recordset.forEach(row => {
-      const orderId = row.OrderNumber;
-      if (!ordersMap.has(orderId)) {
-        ordersMap.set(orderId, {
-          id: orderId,
+    for (const row of result.recordset) {
+      const key = row.OrderNumber;
+      if (!ordersMap.has(key)) {
+        ordersMap.set(key, {
+          id: row.OrderNumber,
           customer: {
             name: row.CustomerName || row.CustomerEmail || 'Guest',
-            email: row.UserEmail,
-            address: row.CustomerAddress || 'N/A',
-            payment: row.PaymentMethod || 'N/A'
+            email: row.Email || row.CustomerEmail || null,
           },
           status: (row.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()),
           placed_at: row.PlacedAt,
@@ -200,27 +260,23 @@ exports.getUserOrders = async (req, res) => {
           subtotal: row.SubTotal || 0,
           shipping: row.ShippingTotal || 0,
           tax: row.TaxTotal || 0,
-          user: {
-            id: row.UserId,
-            username: row.FullName,
-            email: row.Email
-          },
+          tracking_number: row.TrackingNumber || null,
+          carrier: row.Carrier || null,
           items: []
         });
       }
       if (row.ProductId) {
-        ordersMap.get(orderId).items.push({
+        ordersMap.get(key).items.push({
           product_id: row.ProductId,
           product_name: row.Name,
           quantity: row.Qty,
           unit_price: row.UnitPrice,
-          total_price: row.Qty * row.UnitPrice
+          total_price: (row.Qty || 0) * (row.UnitPrice || 0)
         });
       }
-    });
+    }
 
     const orders = Array.from(ordersMap.values());
-
     return res.json({ orders, total: orders.length });
   } catch (e) {
     console.error('orders.getUserOrders error:', e);

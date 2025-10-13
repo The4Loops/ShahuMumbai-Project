@@ -1,10 +1,11 @@
-// routes/ordersRoutes.js
 const express = require('express');
 const router = express.Router();
-const orders = require('../controllers/ordersController');
+const Orders = require('../controllers/ordersController');
 
-router.get('/orders', orders.listOrders);
-router.get('/orders/user', orders.getUserOrders);
-router.patch('/orders/:orderNumber/status', orders.updateFulfillmentStatus);
+
+
+router.get('/', Orders.listOrders);
+router.patch('/:orderNumber/status', Orders.updateFulfillmentStatus);
+router.put('/:orderNumber/tracking',  Orders.updateTracking);
 
 module.exports = router;
