@@ -4,13 +4,7 @@ const jwt = require('jsonwebtoken');
 /* GET /api/orders?status=All|Pending|Shipped|Delivered&q=&limit=50&offset=0 */
 exports.listOrders = async (req, res) => {
   try {
-    const {
-      status = 'All',
-      q = '',
-      limit: limitStr = '50',
-      offset: offsetStr = '0',
-    } = req.query;
-
+    const { status = 'All', q = '', limit: limitStr = '50', offset: offsetStr = '0' } = req.query;
     const limit = Math.min(Math.max(parseInt(limitStr, 10) || 50, 1), 100);
     const offset = Math.max(parseInt(offsetStr, 10) || 0, 0);
 
@@ -54,7 +48,6 @@ exports.listOrders = async (req, res) => {
     parameters.forEach(p => request.input(p.name, p.type, p.value));
     request.input('offset', sql.Int, offset);
     request.input('limit', sql.Int, limit);
-
     const result = await request.query(query);
 
     const countQuery = `SELECT COUNT(*) AS total FROM dbo.Orders${whereClause}`;
@@ -64,10 +57,9 @@ exports.listOrders = async (req, res) => {
     const total = countResult.recordset[0].total;
 
     const orders = result.recordset.map(o => ({
-      // front-end expects id = OrderNumber
       id: o.OrderNumber,
       customer: o.CustomerName || o.CustomerEmail || 'Guest',
-      status: (o.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()), // Pending|Shipped|Delivered
+      status: (o.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()),
       placed_at: o.PlacedAt,
       TrackingNumber: o.TrackingNumber || null,
       Carrier: o.Carrier || null,
@@ -81,7 +73,7 @@ exports.listOrders = async (req, res) => {
   }
 };
 
-/* PATCH /api/orders/:orderNumber/status { fulfillment_status: "Pending|Shipped|Delivered" } */
+/* PATCH /api/orders/:orderNumber/status */
 exports.updateFulfillmentStatus = async (req, res) => {
   try {
     const orderNumber = req.params.orderNumber;
@@ -94,7 +86,6 @@ exports.updateFulfillmentStatus = async (req, res) => {
       return res.status(400).json({ error: 'invalid_status' });
     }
 
-    // Build dynamic update for timestamps
     let query = `
       UPDATE dbo.Orders
       SET FulFillmentStatus = @status,
@@ -139,13 +130,12 @@ exports.updateFulfillmentStatus = async (req, res) => {
   }
 };
 
-/* PUT /api/orders/:orderNumber/tracking  { trackingNumber: string, carrier?: string } */
+/* PUT /api/orders/:orderNumber/tracking */
 exports.updateTracking = async (req, res) => {
   try {
     const orderNumber = req.params.orderNumber;
     const { trackingNumber, carrier } = req.body || {};
     if (!orderNumber) return res.status(400).json({ error: 'missing_order_number' });
-
     if (!trackingNumber || typeof trackingNumber !== 'string' || trackingNumber.trim().length === 0) {
       return res.status(400).json({ error: 'invalid_tracking_number' });
     }
@@ -159,7 +149,6 @@ exports.updateTracking = async (req, res) => {
     request.input('carrier', sql.NVarChar(50), carrier ? carrier.trim() : null);
     request.input('now', sql.DateTime2, new Date());
 
-    // Set tracking + auto flip to 'shipped' if not delivered yet
     const query = `
       UPDATE dbo.Orders
       SET TrackingNumber   = @trackingNumber,
@@ -176,12 +165,10 @@ exports.updateTracking = async (req, res) => {
              INSERTED.ShippedAt
       WHERE OrderNumber = @orderNumber
     `;
-
     const result = await request.query(query);
     if (!result.rowsAffected || result.rowsAffected[0] === 0) {
       return res.status(404).json({ error: 'Order not found' });
     }
-
     return res.json({ ok: true, order: result.recordset[0] });
   } catch (e) {
     console.error('orders.updateTracking error:', e);
@@ -189,15 +176,13 @@ exports.updateTracking = async (req, res) => {
   }
 };
 
-/* GET /api/user/orders  (requires Bearer JWT) */
+/* GET /api/user/orders (Bearer) */
 exports.getUserOrders = async (req, res) => {
   try {
-    // Extract JWT token from Authorization header
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ error: 'missing_or_invalid_token' });
     }
-
     const token = authHeader.split(' ')[1];
     let userId;
     try {
@@ -210,31 +195,16 @@ exports.getUserOrders = async (req, res) => {
 
     const query = `
       SELECT 
-        o.OrderId,
-        o.OrderNumber,
-        o.CustomerName,
-        o.CustomerEmail,
-        o.FulFillmentStatus,
-        o.PlacedAt,
-        o.ShippedAt,
-        o.DeliveredAt,
-        o.SubTotal,
-        o.ShippingTotal,
-        o.TaxTotal,
-        o.TrackingNumber,
-        o.Carrier,
-        u.UserId,
-        u.FullName,
-        u.Email,
-        p.ProductId,
-        p.Name,
-        p.Price,  
-        oi.Qty,
-        oi.UnitPrice
+        o.OrderId, o.OrderNumber, o.CustomerName, o.CustomerEmail,
+        o.FulFillmentStatus, o.PlacedAt, o.ShippedAt, o.DeliveredAt,
+        o.SubTotal, o.ShippingTotal, o.TaxTotal, o.TrackingNumber, o.Carrier,
+        u.UserId, u.FullName, u.Email,
+        p.ProductId, p.Name, p.Price,  
+        oi.Qty, oi.UnitPrice
       FROM dbo.Orders o
-      INNER JOIN dbo.Users u      ON o.UserId = u.UserId
+      INNER JOIN dbo.Users u       ON o.UserId = u.UserId
       LEFT  JOIN dbo.OrderItems oi ON o.OrderId = oi.OrderId
-      LEFT  JOIN dbo.Products p     ON oi.ProductId = p.ProductId
+      LEFT  JOIN dbo.Products p    ON oi.ProductId = p.ProductId
       WHERE o.UserId = @userId
       ORDER BY o.PlacedAt DESC
     `;
@@ -249,10 +219,7 @@ exports.getUserOrders = async (req, res) => {
       if (!ordersMap.has(key)) {
         ordersMap.set(key, {
           id: row.OrderNumber,
-          customer: {
-            name: row.CustomerName || row.CustomerEmail || 'Guest',
-            email: row.Email || row.CustomerEmail || null,
-          },
+          customer: { name: row.CustomerName || row.CustomerEmail || 'Guest', email: row.Email || row.CustomerEmail || null },
           status: (row.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()),
           placed_at: row.PlacedAt,
           shipped_at: row.ShippedAt || null,
@@ -275,9 +242,7 @@ exports.getUserOrders = async (req, res) => {
         });
       }
     }
-
-    const orders = Array.from(ordersMap.values());
-    return res.json({ orders, total: orders.length });
+    return res.json({ orders: Array.from(ordersMap.values()), total: ordersMap.size });
   } catch (e) {
     console.error('orders.getUserOrders error:', e);
     return res.status(500).json({ error: 'internal_error' });

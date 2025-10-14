@@ -179,6 +179,7 @@ const AuthForm = () => {
 
         try {
           localStorage.setItem("token", token);
+          api.defaults.headers.common.Authorization = `Bearer ${token}`;
         } catch (storageError) {
           toast.error("Failed to store authentication token. Please try again.");
           return;
