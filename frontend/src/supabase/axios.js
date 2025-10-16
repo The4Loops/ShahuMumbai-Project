@@ -23,4 +23,9 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+if (typeof window !== "undefined") {
+  // eslint-disable-next-line no-console
+  console.log("[axios] baseURL =", api.defaults.baseURL);
+}
+
 export default api;
