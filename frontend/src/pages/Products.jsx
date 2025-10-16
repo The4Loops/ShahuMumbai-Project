@@ -225,6 +225,57 @@ const Products = () => {
     })),
   };
 
+  // Animation variants for product cards (staggered entrance)
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: isMobile ? 0.2 : 0.1,
+      },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20, scale: 0.95 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      scale: 1,
+      transition: {
+        duration: 0.4,
+        ease: [0.22, 1, 0.36, 1], // Smooth ease-out
+      },
+    },
+  };
+
+  // Smooth resize observer for mobile responsiveness
+  useEffect(() => {
+    let resizeObserver;
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver((entries) => {
+        for (let entry of entries) {
+          if (entry.contentRect) {
+            // Trigger subtle re-render or animation on resize for smoothness
+            window.requestAnimationFrame(() => {
+              // Optional: Force a minor state update if needed for layout shift prevention
+            });
+          }
+        }
+      });
+      const grid = document.querySelector('.products-grid');
+      if (grid) {
+        resizeObserver.observe(grid);
+      }
+    }
+    return () => {
+      if (resizeObserver) {
+        resizeObserver.disconnect();
+      }
+    };
+  }, [isMobile]);
+
   return (
     <Layout>
       <Helmet>
@@ -335,7 +386,12 @@ const Products = () => {
 
       <div className="pt-[10px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
         {/* Banner */}
-        <div className="max-w-7xl mx-auto">
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="max-w-7xl mx-auto"
+        >
           <div
             className="relative overflow-hidden rounded-2xl border-2 border-black"
             style={{
@@ -364,10 +420,15 @@ const Products = () => {
               </p>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Controls */}
-        <div className="max-w-7xl mx-auto mt-4 xs:mt-6">
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
+          className="max-w-7xl mx-auto mt-4 xs:mt-6"
+        >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <p className="text-[#4a2c17] text-sm xs:text-base">
               Showing{" "}
@@ -383,15 +444,19 @@ const Products = () => {
               <button
                 ref={menuBtnRef}
                 onClick={() => setMenuOpen((o) => !o)}
-                className="relative flex items-center gap-2 px-3 xs:px-4 py-2 border-2 border-black rounded-lg bg-[#fdf6e9] hover:bg-[#eadfce] products-filter-button w-full sm:w-auto justify-center sm:justify-start"
+                className="relative flex items-center gap-2 px-3 xs:px-4 py-2 border-2 border-black rounded-lg bg-[#fdf6e9] hover:bg-[#eadfce] products-filter-button w-full sm:w-auto justify-center sm:justify-start transition-all duration-300 ease-in-out"
               >
                 <FiFilter size={16} />
                 <span className="text-sm font-semibold">Filter & Sort</span>
-                <FiChevronDown className={`transition ${menuOpen ? "rotate-180" : ""}`} />
+                <FiChevronDown className={`transition-transform duration-300 ${menuOpen ? "rotate-180" : ""}`} />
                 {activeCount > 0 && (
-                  <span className="absolute -top-2 -right-2 text-[10px] leading-none bg-black text-white rounded-full px-1.5 py-0.5 border-2 border-black">
+                  <motion.span
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-2 -right-2 text-[10px] leading-none bg-black text-white rounded-full px-1.5 py-0.5 border-2 border-black"
+                  >
                     {activeCount}
-                  </span>
+                  </motion.span>
                 )}
               </button>
 
@@ -428,7 +493,7 @@ const Products = () => {
                               );
                             }}
                             placeholder="Search products..."
-                            className="w-full px-8 xs:px-9 py-1.5 xs:py-2 border border-black/60 rounded bg-[#EDE1DF] text-xs xs:text-sm focus:outline-none"
+                            className="w-full px-8 xs:px-9 py-1.5 xs:py-2 border border-black/60 rounded bg-[#EDE1DF] text-xs xs:text-sm focus:outline-none transition-all duration-200"
                           />
                         </div>
                       </div>
@@ -441,7 +506,7 @@ const Products = () => {
                           </label>
                           {selectedCategories.size > 0 && (
                             <button
-                              className="text-[10px] xs:text-xs underline text-[#4a2c17]/80"
+                              className="text-[10px] xs:text-xs underline text-[#4a2c17]/80 hover:text-[#4a2c17] transition-colors duration-200"
                               onClick={() => setSelectedCategories(new Set())}
                             >
                               Clear
@@ -452,9 +517,12 @@ const Products = () => {
                           {categoryOptions.map((cat) => {
                             const active = selectedCategories.has(cat);
                             return (
-                              <label
+                              <motion.label
                                 key={cat}
-                                className={`flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1.5 xs:py-2 rounded border text-xs xs:text-sm ${
+                                initial={false}
+                                whileHover={{ scale: 1.02 }}
+                                whileTap={{ scale: 0.98 }}
+                                className={`flex items-center gap-1 xs:gap-2 px-2 xs:px-3 py-1.5 xs:py-2 rounded border text-xs xs:text-sm cursor-pointer transition-all duration-200 ${
                                   active
                                     ? "bg-black text-white border-black"
                                     : "border-black hover:bg-[#eadfce]"
@@ -467,7 +535,7 @@ const Products = () => {
                                   onChange={() => toggleCategory(cat)}
                                 />
                                 <span>{cat}</span>
-                              </label>
+                              </motion.label>
                             );
                           })}
                         </div>
@@ -484,17 +552,19 @@ const Products = () => {
                             { v: "price-asc", label: "Price ↑" },
                             { v: "price-desc", label: "Price ↓" },
                           ].map((opt) => (
-                            <button
+                            <motion.button
                               key={opt.v}
                               onClick={() => setSort(opt.v)}
-                              className={`px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm rounded border ${
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              className={`px-2 xs:px-3 py-1.5 xs:py-2 text-xs xs:text-sm rounded border cursor-pointer transition-all duration-200 ${
                                 sort === opt.v
                                   ? "bg-black text-white border-black"
                                   : "border-black hover:bg-[#eadfce]"
                               }`}
                             >
                               {opt.label}
-                            </button>
+                            </motion.button>
                           ))}
                         </div>
                       </div>
@@ -504,78 +574,120 @@ const Products = () => {
                     <div className="flex items-center justify-between gap-2 p-2 xs:p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
                       <button
                         onClick={clearFilters}
-                        className="flex items-center gap-1 text-[10px] xs:text-sm underline text-[#4a2c17]"
+                        className="flex items-center gap-1 text-[10px] xs:text-sm underline text-[#4a2c17] hover:text-[#4a2c17]/80 transition-colors duration-200"
                       >
                         <FiX /> Reset
                       </button>
-                      <button
+                      <motion.button
                         onClick={() => setMenuOpen(false)}
-                        className="px-3 xs:px-4 py-1.5 xs:py-2 bg-black text-white rounded-lg font-bold text-xs xs:text-sm hover:bg-gray-800"
+                        whileHover={{ scale: 1.05 }}
+                        whileTap={{ scale: 0.95 }}
+                        className="px-3 xs:px-4 py-1.5 xs:py-2 bg-black text-white rounded-lg font-bold text-xs xs:text-sm hover:bg-gray-800 transition-all duration-200"
                       >
                         Apply
-                      </button>
+                      </motion.button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </div>
           </div>
-        </div>
+        </motion.div>
 
         {/* Grid */}
-        <div className="max-w-7xl mx-auto mt-4 xs:mt-6 products-grid">
+        <motion.div
+          className="max-w-7xl mx-auto mt-4 xs:mt-6 products-grid"
+          variants={containerVariants}
+          initial="hidden"
+          animate={loading ? "hidden" : "visible"}
+          transition={{ duration: isMobile ? 0.6 : 0.4 }}
+        >
           <div className="grid gap-4 xs:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
             {loading ? (
               Array.from({ length: 6 }).map((_, i) => (
-                <div
+                <motion.div
                   key={i}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: i * 0.1 }}
                   className="h-80 bg-[#fdf6e9] border border-[#9c6644]/30 rounded-lg animate-pulse w-full max-w-[300px] mx-auto"
                 />
               ))
             ) : paged.length > 0 ? (
-              paged.map((product) => <ProductCard key={product.id} product={product} />)
+              paged.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  variants={itemVariants}
+                  initial="hidden"
+                  animate="visible"
+                  transition={{ delay: index * 0.05 }}
+                  whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                  className="w-full"
+                >
+                  <ProductCard product={product} />
+                </motion.div>
+              ))
             ) : (
-              <p className="text-center col-span-full text-[#6B4226] text-base xs:text-lg">
+              <motion.p 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="text-center col-span-full text-[#6B4226] text-base xs:text-lg"
+              >
                 No products found
-              </p>
+              </motion.p>
             )}
           </div>
 
           {/* Pagination */}
-          <div className="flex flex-wrap items-center justify-center gap-1 xs:gap-2 mt-6 xs:mt-8">
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page === 1}
-              className="px-2 xs:px-3 py-1.5 xs:py-2 border-2 border-black rounded text-xs xs:text-sm disabled:opacity-50 hover:bg-[#fdf6e9]"
-            >
-              Prev
-            </button>
-            {Array.from({ length: totalPages }).map((_, idx) => {
-              const n = idx + 1;
-              const isActive = n === page;
-              return (
-                <button
-                  key={n}
-                  onClick={() => setPage(n)}
-                  className={`px-2 xs:px-3 py-1.5 xs:py-2 rounded border-2 text-xs xs:text-sm ${
-                    isActive
-                      ? "bg-black text-white border-black"
-                      : "border-black hover:bg-[#fdf6e9]"
-                  }`}
+          <AnimatePresence mode="wait">
+            {totalPages > 1 && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="flex flex-wrap items-center justify-center gap-1 xs:gap-2 mt-6 xs:mt-8"
+              >
+                <motion.button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  whileHover={!page === 1 ? { scale: 1.05 } : {}}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-2 xs:px-3 py-1.5 xs:py-2 border-2 border-black rounded text-xs xs:text-sm disabled:opacity-50 hover:bg-[#fdf6e9] transition-all duration-200"
                 >
-                  {n}
-                </button>
-              );
-            })}
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page === totalPages}
-              className="px-2 xs:px-3 py-1.5 xs:py-2 border-2 border-black rounded text-xs xs:text-sm disabled:opacity-50 hover:bg-[#fdf6e9]"
-            >
-              Next
-            </button>
-          </div>
-        </div>
+                  Prev
+                </motion.button>
+                {Array.from({ length: totalPages }).map((_, idx) => {
+                  const n = idx + 1;
+                  const isActive = n === page;
+                  return (
+                    <motion.button
+                      key={n}
+                      onClick={() => setPage(n)}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      className={`px-2 xs:px-3 py-1.5 xs:py-2 rounded border-2 text-xs xs:text-sm cursor-pointer transition-all duration-200 ${
+                        isActive
+                          ? "bg-black text-white border-black"
+                          : "border-black hover:bg-[#fdf6e9]"
+                      }`}
+                    >
+                      {n}
+                    </motion.button>
+                  );
+                })}
+                <motion.button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  whileHover={page === totalPages ? {} : { scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className="px-2 xs:px-3 py-1.5 xs:py-2 border-2 border-black rounded text-xs xs:text-sm disabled:opacity-50 hover:bg-[#fdf6e9] transition-all duration-200"
+                >
+                  Next
+                </motion.button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
       </div>
     </Layout>
   );

@@ -5,15 +5,17 @@ import Hero from "../components/Hero";
 import Featured from "../components/Featured";
 import Collections from "../components/Collections";
 import UpcomingProducts from "../components/UpcomingProduct";
+import { useLocation } from "react-router-dom";
 
 function HomePage() {
+  const location = useLocation();
   const url =
     typeof window !== "undefined"
       ? window.location.origin + "/"
       : "https://www.shahumumbai.com/";
 
   return (
-    <Layout>
+    <Layout location={location}>
       <Helmet>
         {/* Core SEO */}
         <title>Shahu Mumbai — Authentic Handwoven Sarees</title>

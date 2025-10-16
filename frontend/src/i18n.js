@@ -61,17 +61,14 @@ i18n
       lookupLocalStorage: "i18nextLng",
       caches: ["localStorage"],
       convertDetectedLanguage: (lng) => {
-        console.log("Detected language:", lng); // Debug
         const normalizedLng = lng.split("-")[0];
         const resolvedLng = LANGUAGE_ALIASES[lng] || LANGUAGE_ALIASES[normalizedLng] || lng;
-        console.log("Resolved language:", resolvedLng); // Debug
         return resolvedLng;
       }
     }
   });
 
 i18n.on("languageChanged", (lng) => {
-  console.log("Language changed to:", lng); // Debug
   document.documentElement.setAttribute("lang", lng);
 });
 

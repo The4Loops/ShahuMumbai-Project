@@ -3,15 +3,9 @@ import { useNavigate } from "react-router-dom";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
-import VintageLoader from "../Loader";
 
 const AuthCallback = () => {
-  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-
-   const handleLoadingComplete = () => {
-    setIsLoading(false);
-  };
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.hash.substring(1));

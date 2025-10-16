@@ -22,7 +22,7 @@ const ProductCard = ({ product }) => {
           <h3 className="text-2xl font-bold text-[#6B4226] tracking-wide">{name}</h3>
           <p className="text-sm italic text-[#A3B18A]">{category}</p>
           <p className="text-[1rem] text-[#3E2C23] leading-relaxed">{description}</p>
-          <p className="text-lg font-semibold text-[#6B4226] mt-1">₹{price}</p>
+          <p className="text-lg font-semibold text-[#6B4226] mt-1">${price}</p>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#DDB892] group-hover:bg-[#B77E65] transition-colors duration-300" />
       </Link>

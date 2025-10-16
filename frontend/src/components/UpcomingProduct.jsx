@@ -60,8 +60,8 @@ function UpcomingCarousel() {
     try {
       // Create order from backend
       const { data } = await api.post("/api/payment/create-order", {
-        amount: (selectedProduct.price / 2) * 100, // 50% in paise
-        currency: "INR",
+        amount: (selectedProduct.price / 2) * 100, // 50% in cents (for USD)
+        currency: "USD", // Changed to USD
       });
 
       const options = {
@@ -122,19 +122,32 @@ function UpcomingCarousel() {
     ],
   };
 
+  // Skeleton for loading state
+  const SkeletonSlide = () => (
+    <div className="px-3">
+      <div className="relative bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
+        <div className="w-full h-52 bg-[#F1E7E5]/50 rounded-t-xl"></div>
+        <div className="p-4">
+          <div className="h-6 bg-[#F1E7E5]/50 rounded mb-2 w-3/4"></div>
+          <div className="h-4 bg-[#F1E7E5]/50 rounded w-1/2"></div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <section className="py-16 px-6 bg-[#F1E7E5] text-center relative">
       <h2 className="text-3xl font-bold mb-6 text-[#4B2C20]">
         Upcoming Products
       </h2>
 
-      {loading && <p className="text-[#4B2C20]">Loading...</p>}
-      {error && <p className="text-red-600">{error}</p>}
-      {!loading && products.length === 0 && !error && (
-        <p className="text-[#4B2C20]">No upcoming products available.</p>
-      )}
-
-      {!loading && products.length > 0 && (
+      {(loading || products.length === 0) && !error ? (
+        <Slider {...settings} className="max-w-7xl mx-auto">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonSlide key={i} />
+          ))}
+        </Slider>
+      ) : (
         <Slider {...settings} className="max-w-7xl mx-auto">
           {products.map((product) => (
             <div key={product.id} className="px-3">
@@ -191,10 +204,10 @@ function UpcomingCarousel() {
               </p>
               <p className="mb-2 text-[#4B2C20]">
                 Price:{" "}
-                <span className="font-semibold">₹{selectedProduct.Price}</span>
+                <span className="font-semibold">${selectedProduct.Price}</span>
               </p>
               <p className="text-green-800 font-bold text-lg">
-                Pay 50% Now: ₹{selectedProduct.Price / 2}
+                Pay 50% Now: ${selectedProduct.Price / 2}
               </p>
             </div>
 

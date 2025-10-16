@@ -8,17 +8,17 @@ import placeholderImg from "../assets/products/coat.jpg";
 function Featured() {
   const navigate = useNavigate();
   const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start as true to show skeletons immediately on mount
 
   // Fetch top 4 latest products
   const fetchLatestProducts = async () => {
-    setIsLoading(true);
     try {
       const response = await api.get("/api/products/getLatestProducts");
-      setProducts(response.data);
+      setProducts(response.data || []); // Ensure array even if empty
     } catch (error) {
       toast.dismiss();
       toast.error(error.response?.data?.message || "Failed to fetch latest products");
+      setProducts([]); // Set empty on error
     } finally {
       setIsLoading(false);
     }
@@ -28,9 +28,19 @@ function Featured() {
     fetchLatestProducts();
   }, []);
 
+  const SkeletonCard = () => (
+    <div className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md border border-[#E4D5C9] p-6 animate-pulse">
+      <div className="absolute top-4 left-4 w-10 h-5 bg-[#E3BDB4]/50 rounded-full"></div>
+      <div className="w-28 h-28 mx-auto mb-6 rounded-full bg-[#F1E6E1]/50"></div>
+      <div className="h-5 bg-[#4B2C20]/20 rounded mb-2 mx-auto w-3/4"></div>
+      <div className="h-4 bg-[#4B2C20]/20 rounded w-1/2 mx-auto"></div>
+    </div>
+  );
+
+  const showSkeletons = isLoading || products.length === 0;
+
   return (
     <section className="py-20 px-6 bg-[#F1E7E5] text-center relative overflow-hidden">
-      {/* Heading */}
       <motion.h2
         initial={{ opacity: 0, y: 20 }}
         whileInView={{ opacity: 1, y: 0 }}
@@ -43,15 +53,13 @@ function Featured() {
         Handpicked vintage pieces that capture timeless style and craftsmanship.
       </p>
 
-      {/* Loading State */}
-      {isLoading ? (
-        <div className="text-[#4B2C20] text-lg">Loading...</div>
-      ) : products.length === 0 ? (
-        <div className="text-[#4B2C20] text-lg">No products found.</div>
-      ) : (
-        /* Grid */
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
-          {products.map((product, i) => (
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
+        {showSkeletons ? (
+          Array.from({ length: 4 }).map((_, i) => (
+            <SkeletonCard key={i} />
+          ))
+        ) : (
+          products.map((product, i) => (
             <motion.div
               key={product.ProductId}
               initial={{ opacity: 0, y: 40 }}
@@ -61,14 +69,12 @@ function Featured() {
               className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer "
               onClick={()=>navigate(`/products/${product.ProductId}`)}
             >
-              {/* Tag */}
               {product.is_new && (
                 <span className="absolute top-4 left-4 text-xs bg-[#E3BDB4] text-[#4B2C20] px-3 py-1 rounded-full shadow">
                   New
                 </span>
               )}
 
-              {/* Image */}
               <div className="w-28 h-28 mx-auto mb-6 flex items-center justify-center rounded-full bg-[#F1E6E1] shadow-inner overflow-hidden">
                 <img
                   src={
@@ -80,12 +86,10 @@ function Featured() {
                 />
               </div>
 
-              {/* Title */}
               <h3 className="text-lg font-semibold text-[#4B2C20] mb-2">
                 {product.Name}
               </h3>
 
-              {/* Price */}
               <p className="text-[#4B2C20] font-semibold text-base">
                 {product.Price}{" "}
                 {product.old_price && (
@@ -95,11 +99,10 @@ function Featured() {
                 )}
               </p>
             </motion.div>
-          ))}
-        </div>
-      )}
+          ))
+        )}
+      </div>
 
-      {/* Button */}
       <motion.button
         whileTap={{ scale: 0.95 }}
         onClick={() => navigate("/products")}

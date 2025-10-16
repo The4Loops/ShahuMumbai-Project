@@ -31,17 +31,16 @@ const normalizeImageUrl = (u) => {
   return `${IMAGE_BASE}/${u}`;
 };
 
-const pickImageUrl = (img) =>
-  normalizeImageUrl(
-    img?.image_url ||
-      img?.url ||
-      img?.publicUrl ||
-      img?.public_url ||
-      img?.Location ||
-      img?.location ||
-      img?.path ||
-      ""
-  );
+const pickImageUrl = (img) => normalizeImageUrl(
+  img?.image_url ||  // Add this first
+  img?.imageurl || 
+  img?.url || 
+  img?.publicUrl || 
+  img?.publicurl || 
+  img?.Location || 
+  img?.location || 
+  img?.path
+);
 
 const categoryName = (p) =>
   p?.categories?.name ||
@@ -90,9 +89,14 @@ const QuantitySelect = ({ max = 10, value, onChange }) => (
 
 const StarRating = ({ value = 0, size = 18 }) => {
   const full = Math.floor(value);
-  const stars = Array.from({ length: 5 }, (_, i) => (i < full ? "full" : "empty"));
+  const stars = Array.from({ length: 5 }, (_, i) =>
+    i < full ? "full" : "empty"
+  );
   return (
-    <span className="inline-flex items-center gap-0.5" aria-label={`Rating: ${value} out of 5`}>
+    <span
+      className="inline-flex items-center gap-0.5"
+      aria-label={`Rating: ${value} out of 5`}
+    >
       {stars.map((t, i) =>
         t === "full" ? (
           <AiFillStar key={i} size={size} className="text-[#D4A5A5]" />
@@ -108,7 +112,7 @@ const ProductDetails = () => {
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [qty, setQty] = useState(1);
   const [isInWishlist, setIsInWishlist] = useState(false);
@@ -271,8 +275,7 @@ const ProductDetails = () => {
             title: product.Name,
             category: categoryName(product),
             price:
-              Number(product.Price) -
-              (Number(product.DiscountPrice || 0) || 0),
+              Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
           });
         } catch {}
       }
@@ -338,7 +341,9 @@ const ProductDetails = () => {
 
       toast.dismiss();
       toast.success(
-        `${product.Name}${selectedColor ? ` (${selectedColor})` : ""} added to cart!`
+        `${product.Name}${
+          selectedColor ? ` (${selectedColor})` : ""
+        } added to cart!`
       );
 
       // 🔔 notify navbar (optimistic bump by units)
@@ -352,8 +357,7 @@ const ProductDetails = () => {
           title: product.Name,
           category: categoryName(product),
           price:
-            Number(product.Price) -
-            (Number(product.DiscountPrice || 0) || 0),
+            Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
           quantity: qty,
           color: selectedColor || null,
         });
@@ -376,20 +380,27 @@ const ProductDetails = () => {
     product?.shortdescription ||
     product?.description ||
     "Discover product details at Shahu Mumbai.";
-  const metaDescription =
-    (typeof descSource === "string" ? descSource : "")
-      .replace(/\s+/g, " ")
-      .trim()
-      .slice(0, 300);
+  const metaDescription = (typeof descSource === "string" ? descSource : "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 300);
 
-  if (loading)
-    return <p className="p-6 text-center text-[#6B4226]">Loading...</p>;
-  if (error || !product)
+  if (error) {
     return (
-      <p className="p-6 text-center text-red-500">
-        {error || "Product not found"}
-      </p>
+      <Layout>
+        <Helmet>
+          <title>Error - Shahu Mumbai</title>
+        </Helmet>
+        <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5]">
+          <p className="p-6 text-center text-red-500">{error}</p>
+        </div>
+      </Layout>
     );
+  }
+
+  if (!product) {
+    return null; // Return nothing while data is loading
+  }
 
   if (isUpcoming) {
     return (
@@ -401,10 +412,7 @@ const ProductDetails = () => {
             content={`Coming soon: ${product.Name} from Shahu Mumbai.`}
           />
           <link rel="canonical" href={canonical} />
-          <meta
-            property="og:title"
-            content={`${product.Name} — Coming Soon`}
-          />
+          <meta property="og:title" content={`${product.Name} — Coming Soon`} />
           <meta
             property="og:description"
             content="Launching soon at Shahu Mumbai."
@@ -444,14 +452,15 @@ const ProductDetails = () => {
     prevArrow: <PrevArrow />,
   };
 
-  const imgs = Array.isArray(product.product_images)
-    ? product.product_images
-    : [];
+  const imgs = Array.isArray(product.product_images) ? product.product_images : [];
+
   const orderedImages = [
-    ...imgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
-    ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
+    ...imgs.filter((i) => asBool(i?.ishero)).map(pickImageUrl),
+    ...imgs.filter((i) => !asBool(i?.ishero)).map(pickImageUrl),
   ].filter(Boolean);
-  const images = orderedImages;
+
+  // Remove duplicates
+  const images = [...new Set(orderedImages)];
   const hero =
     images[0] || `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
 
@@ -492,7 +501,11 @@ const ProductDetails = () => {
             },
           ]
         : []),
-      { "@type": "PropertyValue", name: "Category", value: categoryName(product) },
+      {
+        "@type": "PropertyValue",
+        name: "Category",
+        value: categoryName(product),
+      },
     ],
     offers: {
       "@type": "Offer",
@@ -548,7 +561,12 @@ const ProductDetails = () => {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
-      { "@type": "ListItem", position: 2, name: "Products", item: `${baseUrl}/products` },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Products",
+        item: `${baseUrl}/products`,
+      },
       { "@type": "ListItem", position: 3, name: product.Name, item: canonical },
     ],
   };
@@ -653,14 +671,14 @@ const ProductDetails = () => {
           {/* Center: Gallery */}
           <div className="lg:col-span-6 order-1 lg:order-2">
             <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-2 pb-8 relative">
-             <Slider {...sliderSettings} ref={sliderRef}>
+              <Slider {...sliderSettings} ref={sliderRef}>
                 {images.length ? (
                   images.map((img, index) => (
                     <div key={index} className="px-2">
                       <img
                         src={img}
                         alt={`${product.Name} view ${index + 1}`}
-                        className="w-full h-auto max-h-[70vh] object-contain rounded-md border border-[#D4A5A5] shadow-sm bg-white"
+                        className="w-full h-auto max-h-[70vh] object-cover rounded-md border border-[#D4A5A5] shadow-sm bg-white"
                         onError={(e) => {
                           e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
                         }}
@@ -779,10 +797,10 @@ const ProductDetails = () => {
                   {hasDiscount ? (
                     <div className="flex items-baseline gap-3">
                       <p className="text-3xl font-extrabold text-[#6B4226]">
-                        ₹{salePrice.toFixed(2)}
+                        ${salePrice.toFixed(2)}
                       </p>
                       <p className="text-base text-gray-500 line-through">
-                        ₹{mrp.toFixed(2)}
+                        ${mrp.toFixed(2)}
                       </p>
                       <p className="text-base text-[#A3B18A] font-semibold">
                         {discountPercentage}% OFF
@@ -790,7 +808,7 @@ const ProductDetails = () => {
                     </div>
                   ) : (
                     <p className="text-3xl font-extrabold text-[#6B4226]">
-                      ₹{mrp.toFixed(2)}
+                      ${mrp.toFixed(2)}
                     </p>
                   )}
                 </div>
@@ -846,9 +864,15 @@ const ProductDetails = () => {
                         isInWishlist
                           ? "bg-[#D4A5A5] text-white"
                           : "bg-black hover:bg-slate-600 text-[#D4A5A5]"
-                      } ${wishlistSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+                      } ${
+                        wishlistSubmitting
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
                       aria-label={
-                        isInWishlist ? "Remove from wishlist" : "Add to wishlist"
+                        isInWishlist
+                          ? "Remove from wishlist"
+                          : "Add to wishlist"
                       }
                       onClick={handleToggleWishlist}
                       disabled={wishlistSubmitting}
@@ -906,9 +930,7 @@ const ProductDetails = () => {
               {product.BrandDesigner && (
                 <div className="mt-4 text-md text-[#6B4226]">
                   Designer:{" "}
-                  <span className="font-semibold">
-                    {product.BrandDesigner}
-                  </span>
+                  <span className="font-semibold">{product.BrandDesigner}</span>
                 </div>
               )}
             </div>
@@ -956,15 +978,20 @@ const ProductDetails = () => {
                   <div className="flex items-center gap-1 xs:gap-2">
                     <StarRating value={avgRating} />
                     <span className="text-xs xs:text-sm text-[#3E2C23]">
-                      {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                      {avgRating}/5 • {reviewCount} review
+                      {reviewCount === 1 ? "" : "s"}
                     </span>
                   </div>
                 </div>
 
                 {reviewLoading ? (
-                  <p className="text-[#6B4226] text-sm xs:text-base">Loading reviews…</p>
+                  <p className="text-[#6B4226] text-sm xs:text-base">
+                    Loading reviews…
+                  </p>
                 ) : reviewError ? (
-                  <p className="text-red-500 text-sm xs:text-base">{reviewError}</p>
+                  <p className="text-red-500 text-sm xs:text-base">
+                    {reviewError}
+                  </p>
                 ) : reviews.length === 0 ? (
                   <p className="text-[#3E2C23] text-sm xs:text-base">
                     No reviews yet. Be the first to review!
@@ -973,19 +1000,28 @@ const ProductDetails = () => {
                   <ul className="space-y-2 xs:space-y-3 sm:space-y-4">
                     {reviews.map((r) => (
                       <li
-                        key={r.ReviewId || `${r.userid}-${r.productid}-${r.CreatedAt || r.created_at || Math.random()}`}
+                        key={
+                          r.ReviewId ||
+                          `${r.userid}-${r.productid}-${
+                            r.CreatedAt || r.created_at || Math.random()
+                          }`
+                        }
                         className="border border-[#F1E7E5] rounded-lg p-3 xs:p-4"
                       >
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-1 xs:gap-2">
-                            <StarRating value={Number(r.Rating || r.rating) || 0}/>
+                            <StarRating
+                              value={Number(r.Rating || r.rating) || 0}
+                            />
                             <span className="text-xs xs:text-sm text-[#6B4226] font-semibold">
                               {r.FullName || r?.users?.full_name || "Anonymous"}
                             </span>
                           </div>
                           <time className="text-[10px] xs:text-xs text-[#3E2C23] opacity-70">
                             {r.CreatedAt || r.created_at
-                              ? new Date(r.CreatedAt || r.created_at).toLocaleDateString("en-IN")
+                              ? new Date(
+                                  r.CreatedAt || r.created_at
+                                ).toLocaleDateString("en-IN")
                               : ""}
                           </time>
                         </div>
@@ -1084,7 +1120,9 @@ const ProductDetails = () => {
                   .filter((i) => asBool(i?.is_hero === "Y" ? true : i?.is_hero))
                   .map(pickImageUrl),
                 ...rImgs
-                  .filter((i) => !asBool(i?.is_hero === "Y" ? true : i?.is_hero))
+                  .filter(
+                    (i) => !asBool(i?.is_hero === "Y" ? true : i?.is_hero)
+                  )
                   .map(pickImageUrl),
               ].filter(Boolean);
               const relatedImage =
@@ -1097,7 +1135,10 @@ const ProductDetails = () => {
                 : Number(related.Price);
 
               return (
-                <div key={related.id || related.ProductId} className="w-[260px]">
+                <div
+                  key={related.id || related.ProductId}
+                  className="w-[260px]"
+                >
                   <RelatedCard
                     product={{
                       id: related.id || related.ProductId,

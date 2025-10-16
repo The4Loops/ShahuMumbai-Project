@@ -1,5 +1,5 @@
-import { Routes, Route } from "react-router-dom";
-import React, { useState } from "react"; // Add useState
+import { Routes, Route, Suspense } from "react-router-dom";
+import React, { useState, lazy, Suspense as ReactSuspense } from "react"; // Updated imports
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import "./App.css";
 
@@ -37,6 +37,21 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import ShippingPolicy from './pages/ShippingPolicy';
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 
+const PageSkeleton = () => (
+  <div className="min-h-screen bg-[#EDE1DF] flex items-center justify-center p-4">
+    <div className="w-full max-w-4xl space-y-8 animate-pulse">
+      <div className="h-16 bg-[#fdf6e9]/50 rounded-lg"></div>
+      <div className="h-64 bg-[#fdf6e9]/50 rounded-2xl"></div>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-64 bg-[#fdf6e9]/50 rounded-xl"></div>
+        ))}
+      </div>
+      <div className="h-20 bg-[#fdf6e9]/50 rounded-lg"></div>
+    </div>
+  </div>
+);
+
 function App() {
   useAutoLogout();
   const [isLoading, setIsLoading] = useState(true); // Track loading state
@@ -46,14 +61,12 @@ function App() {
       ? window.location.origin
       : "https://www.shahumumbai.com";
 
-  // Callback to handle when the loader finishes
   const handleLoadingComplete = () => {
     setIsLoading(false);
   };
 
   return (
     <HelmetProvider>
-      {/* Global, invisible defaults */}
       <Helmet>
         <html lang="en" />
         <meta charSet="utf-8" />
@@ -77,10 +90,8 @@ function App() {
         </script>
       </Helmet>
 
-      {/* Show loader while isLoading is true */}
       {isLoading && <VintageLoader onFinish={handleLoadingComplete} />}
 
-      {/* Router-aware analytics */}
       <PageTracker />
 
       <ToastContainer
@@ -94,38 +105,39 @@ function App() {
         pauseOnHover
       />
 
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/home" element={<HomePage />} />
-        <Route path="/account" element={<Account />} />
-        <Route path="/products" element={<Products />} />
-        <Route path="/cart" element={<Cart />} />
-        <Route path="/Services" element={<ServicePage />} />
-        <Route path="/contactus" element={<ContactUs />} />
-        <Route path="/ourphilosophy" element={<OurPhilosophy />} />
-        <Route path="/heritagetimeline" element={<HeritageTimeline />} />
-        <Route path="/ourstudios" element={<OurStudios />} />
-        <Route path="/contemporaryartisans" element={<ContemporaryArtisans />} />
-        <Route path="/auth/callback" element={<Callback />} />
-        <Route path="/about" element={<About />} />
-        <Route path="/products/:id" element={<ProductDetails />} />
-        <Route path="/admin" element={<AdminPanel />} />
-        <Route path="/myorder" element={<MyOrder />} />
-        <Route path="/wishlist" element={<Wishlist />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/checkout" element={<Checkout />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/blogs/:id" element={<BlogsView />} />
-        <Route path="/returns" element={<Returns />} />
-        <Route path="/waitlist" element={<WaitlistProductCard />} />
-        <Route path="/collections/:id" element={<CollectionsPage />} />
-        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-        <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-        <Route path="/shipping-policy" element={<ShippingPolicy />} />
-        <Route path="/cancellation-refund-policy" element={<CancellationRefundPolicy />} />
-      </Routes>
+      <ReactSuspense fallback={<PageSkeleton />}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/Services" element={<ServicePage />} />
+          <Route path="/contactus" element={<ContactUs />} />
+          <Route path="/ourphilosophy" element={<OurPhilosophy />} />
+          <Route path="/heritagetimeline" element={<HeritageTimeline />} />
+          <Route path="/ourstudios" element={<OurStudios />} />
+          <Route path="/contemporaryartisans" element={<ContemporaryArtisans />} />
+          <Route path="/auth/callback" element={<Callback />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/products/:id" element={<ProductDetails />} />
+          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/myorder" element={<MyOrder />} />
+          <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blogs/:id" element={<BlogsView />} />
+          <Route path="/returns" element={<Returns />} />
+          <Route path="/waitlist" element={<WaitlistProductCard />} />
+          <Route path="/collections/:id" element={<CollectionsPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
+          <Route path="/cancellation-refund-policy" element={<CancellationRefundPolicy />} />
+        </Routes>
+      </ReactSuspense>
 
-      {/* Only show NewsletterPopup after loading is complete */}
       {!isLoading && <NewsletterPopup />}
     </HelmetProvider>
   );

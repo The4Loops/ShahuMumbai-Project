@@ -15,39 +15,44 @@ function Collections() {
 
   const itemsPerPage = 3;
 
-  // ✅ Fetch collections from API
   useEffect(() => {
     const fetchCollections = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await api.get('/api/collections'); // Adjust endpoint as needed
+        const response = await api.get("/api/collections");
         const data = response.data;
-        
-        // ✅ Process API data to match component structure
-        const processedCollections = Array.isArray(data) 
+
+        const processedCollections = Array.isArray(data)
           ? data.map((collection) => ({
               id: collection.id || collection.collection_id,
-              title: collection.title || collection.name || 'Untitled Collection',
-              desc: collection.description || 'No description available',
+              title:
+                collection.title || collection.name || "Untitled Collection",
+              desc: collection.description || "No description available",
               count: collection.product_count || collection.count || "0+",
-              img: collection.cover_image || collection.cover_image || getFallbackImage(),
-              status: collection.status || collection.is_published ? "Published" : "Draft",
+              img: collection.cover_image || getFallbackImage(),
+              status:
+                collection.status || collection.is_published
+                  ? "Published"
+                  : "Draft",
             }))
           : (data.collections || []).map((collection) => ({
               id: collection.id || collection.collection_id,
-              title: collection.title || collection.name || 'Untitled Collection',
-              desc: collection.description || 'No description available',
+              title:
+                collection.title || collection.name || "Untitled Collection",
+              desc: collection.description || "No description available",
               count: collection.product_count || collection.count || "0+",
-              img: collection.cover_image || collection.cover_image || getFallbackImage(),
-              status: collection.status || collection.is_published ? "Published" : "Draft",
+              img: collection.cover_image || getFallbackImage(),
+              status:
+                collection.status || collection.is_published
+                  ? "Published"
+                  : "Draft",
             }));
 
         setCollections(processedCollections);
       } catch (err) {
-        console.error('Failed to fetch collections:', err);
-        setError(err?.response?.data?.message || 'Failed to load collections');
-        // ✅ Fallback to static data on error
+        console.error("Failed to fetch collections:", err);
+        setError(err?.response?.data?.message || "Failed to load collections");
         setCollections([]);
       } finally {
         setLoading(false);
@@ -57,37 +62,37 @@ function Collections() {
     fetchCollections();
   }, []);
 
-  // ✅ Helper function for fallback image
   const getFallbackImage = () => {
     const images = [img1, img2, img3];
     return images[Math.floor(Math.random() * images.length)];
   };
 
-  // ✅ Show loading state
+  const SkeletonSlide = () => (
+    <div className="px-3">
+      <div className="relative bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
+        <div className="w-full h-52 bg-[#F1E7E5]/50 rounded-t-xl"></div>
+        <div className="p-4">
+          <div className="h-6 bg-[#F1E7E5]/50 rounded mb-2 w-3/4"></div>
+          <div className="h-4 bg-[#F1E7E5]/50 rounded w-1/2"></div>
+        </div>
+      </div>
+    </div>
+  );
+
   if (loading) {
     return (
       <section className="relative bg-[#F1E7E5] py-16 px-6">
         <div className="max-w-7xl mx-auto text-center">
-          <div className="animate-pulse">
-            <div className="h-12 w-64 bg-gray-300 rounded mx-auto mb-4"></div>
-            <div className="h-4 bg-gray-300 rounded w-96 mx-auto mb-8"></div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="bg-white rounded-2xl p-6">
-                  <div className="h-72 bg-gray-300 rounded-xl mb-4"></div>
-                  <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                  <div className="h-6 bg-gray-300 rounded w-3/4 mb-2"></div>
-                  <div className="h-3 bg-gray-300 rounded w-1/2"></div>
-                </div>
-              ))}
-            </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonSlide key={i} />
+            ))}
           </div>
         </div>
       </section>
     );
   }
 
-  // ✅ Show error state
   if (error && collections.length === 0) {
     return (
       <section className="relative bg-[#F1E7E5] py-16 px-6">
@@ -107,13 +112,11 @@ function Collections() {
     );
   }
 
-  // ✅ Apply filter
   const filteredData =
     filter === "All"
       ? collections
       : collections.filter((item) => item.status === filter);
 
-  // ✅ Pagination logic
   const totalPages = Math.ceil(filteredData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginatedData = filteredData.slice(
@@ -124,7 +127,6 @@ function Collections() {
   return (
     <section className="relative bg-[#F1E7E5] py-16 px-6">
       <div className="max-w-7xl mx-auto text-center">
-        {/* Heading */}
         <h2 className="text-4xl md:text-5xl font-serif font-bold text-[#4A2C2A] mb-4">
           Our Collections
         </h2>
@@ -159,24 +161,21 @@ function Collections() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {paginatedData.map((col, i) => (
               <div
-                key={col.id || i} // Use id if available, fallback to index
+                key={col.id || i}
                 className="relative group rounded-2xl overflow-hidden shadow-lg transform transition duration-500 hover:scale-[1.03]"
               >
-                {/* Image */}
                 <img
                   src={col.img}
                   alt={`Collection - ${col.title}`}
                   loading="lazy"
                   onError={(e) => {
-                    e.target.src = getFallbackImage(); // Fallback image on error
+                    e.target.src = getFallbackImage();
                   }}
                   className="w-full h-72 object-cover transition-transform duration-500 group-hover:scale-110"
                 />
 
-                {/* Softer Overlay */}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent group-hover:from-black/60 transition-all"></div>
 
-                {/* Text */}
                 <div className="absolute bottom-6 left-6 text-left text-white">
                   <span className="block text-sm tracking-wide opacity-80 mb-1">
                     {col.count} ITEMS • {col.status}
@@ -184,7 +183,7 @@ function Collections() {
                   <h3 className="text-2xl font-semibold mb-2">{col.title}</h3>
                   <p className="text-sm opacity-90 mb-4 max-w-xs">{col.desc}</p>
                   <a
-                    href={`/collections/${col.id || ''}`} // Use dynamic URL with ID
+                    href={`/collections/${col.id || ""}`}
                     className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm px-4 py-2 text-sm font-medium hover:bg-white/30 transition"
                   >
                     Explore →
@@ -194,10 +193,11 @@ function Collections() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <p className="text-[#4A2C2A]/70 text-lg">
-              No collections found matching the current filter.
-            </p>
+          // 👇 Show 4 skeleton cards instead of 1
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-8">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <SkeletonSlide key={i} />
+            ))}
           </div>
         )}
 
@@ -225,9 +225,7 @@ function Collections() {
               </button>
             ))}
             <button
-              onClick={() =>
-                setCurrentPage((p) => Math.min(p + 1, totalPages))
-              }
+              onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
               disabled={currentPage === totalPages}
               className="px-4 py-2 rounded-md border bg-white text-[#4A2C2A] hover:bg-gray-100 disabled:opacity-50"
             >
