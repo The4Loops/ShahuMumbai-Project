@@ -12,8 +12,8 @@ const storage = new CloudinaryStorage({
 });
 
 // Multer Upload Middleware
-const uploadSingle = multer({ storage: storage }).single("image");
-const uploadMultiple = multer({ storage: storage }).array("images", 10); // Max 10 files
+const uploadSingle = multer({ storage: storage,limits: {fileSize: 5 * 1024 * 1024}, }).single("image");
+const uploadMultiple = multer({ storage: storage,limits: {fileSize: 5 * 1024 * 1024,files: 10,}, }).array("images", 10); // Max 10 files
 
 // Controller Functions
 const uploadFile = (req, res) => {
@@ -80,16 +80,18 @@ const uploadMultipleFiles = (req, res) => {
 
     res.status(200).json({ imageUrls });
   } catch (error) {
-    if (
-      error instanceof multer.MulterError &&
-      error.code === "LIMIT_UNEXPECTED_FILE"
-    ) {
-      return res
-        .status(400)
-        .json({
-          message:
-            "Unexpected field name. Expected 'images' for multiple uploads.",
+    if (error instanceof multer.MulterError) {
+      if (error.code === "LIMIT_FILE_SIZE") {
+        return res.status(400).json({ message: "File size exceeds 5MB limit" });
+      }
+      if (error.code === "LIMIT_UNEXPECTED_FILE") {
+        return res.status(400).json({
+          message: "Unexpected field name. Expected 'images' for multiple uploads.",
         });
+      }
+      if (error.code === "LIMIT_FILE_COUNT") {
+        return res.status(400).json({ message: "Too many files uploaded" });
+      }
     }
     res.status(500).json({ message: "Upload failed", error: error.message });
   }
