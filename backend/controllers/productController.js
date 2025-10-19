@@ -1,23 +1,6 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
 
-/* ---------------------------- color helpers ---------------------------- */
-const asArrayOfStrings = (val) => {
-  if (!val) return [];
-  if (Array.isArray(val)) return val.map(String).map((s) => s.trim()).filter(Boolean);
-  if (typeof val === "string") return [val.trim()].filter(Boolean);
-  return [];
-};
-const isValidColor = (s) =>
-  /^#([0-9A-F]{3}|[0-9A-F]{6})$/i.test(s) || /^[a-z][a-z0-9\s-]*$/i.test(s);
-const sanitizeColors = (arr) => {
-  const seen = new Set();
-  return asArrayOfStrings(arr)
-    .map((c) => c.toLowerCase())
-    .filter((c) => isValidColor(c))
-    .filter((c) => (seen.has(c) ? false : (seen.add(c), true)));
-};
-
 /* ------------------------------ Create -------------------------------- */
 exports.createProduct = async (req, res) => {
   try {
@@ -42,7 +25,6 @@ exports.createProduct = async (req, res) => {
       LaunchingDate,
       images,
       CollectionId,
-      Colors,
     } = req.body;
 
     if (
@@ -64,8 +46,6 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ message: 'At least one image must be set as hero image' });
     }
 
-    const cleanColors = sanitizeColors(Colors);
-
     const result = await req.dbPool.request()
       .input('Name', sql.NVarChar, Name)
       .input('Description', sql.NVarChar, Description)
@@ -80,19 +60,18 @@ exports.createProduct = async (req, res) => {
       .input('UploadedDate', sql.DateTime, new Date(UploadedDate))
       .input('LaunchingDate', sql.DateTime, LaunchingDate ? new Date(LaunchingDate) : new Date())
       .input('CollectionId', sql.Int, CollectionId || null)
-      .input('Colors', sql.NVarChar, JSON.stringify(cleanColors))
       .input('CreatedAt', sql.DateTime, new Date())
       .input('UpdatedAt', sql.DateTime, new Date())
       .query(`
         INSERT INTO products (
           Name, Description, ShortDescription, CategoryId, BrandDesigner, Price, DiscountPrice,
-          Stock, IsActive, IsFeatured, UploadedDate, LaunchingDate, CollectionId, Colors,
+          Stock, IsActive, IsFeatured, UploadedDate, LaunchingDate, CollectionId,
           CreatedAt, UpdatedAt
         )
         OUTPUT INSERTED.*
         VALUES (
           @Name, @Description, @ShortDescription, @CategoryId, @BrandDesigner, @Price, @DiscountPrice,
-          @Stock, @IsActive, @IsFeatured, @UploadedDate, @LaunchingDate, @CollectionId, @Colors,
+          @Stock, @IsActive, @IsFeatured, @UploadedDate, @LaunchingDate, @CollectionId,
           @CreatedAt, @UpdatedAt
         )
       `);
@@ -173,7 +152,6 @@ exports.getAllProducts = async (req, res) => {
           ...row,
           product_images: [],
           categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : [],
-          colors: Array.isArray(JSON.parse(row.Colors || '[]')) ? JSON.parse(row.Colors) : [],
         };
         delete acc[productId].image_id;
         delete acc[productId].category_name;
@@ -191,8 +169,7 @@ exports.getAllProducts = async (req, res) => {
     }, {});
 
     const normalized = Object.values(groupedProducts).map((p) => ({
-      ...p,
-      colors: Array.isArray(p.colors) ? p.colors : [],
+      ...p
     }));
 
     return res.status(200).json(normalized);
@@ -237,16 +214,7 @@ exports.getProductById = async (req, res) => {
           categories: [],
           colors: [],
         };
-        // Parse Colors safely
-        try {
-          acc.colors = row.Colors ? JSON.parse(row.Colors) : [];
-          if (!Array.isArray(acc.colors)) {
-            acc.colors = [];
-          }
-        } catch (parseError) {
-          console.error('Error parsing Colors:', parseError);
-          acc.colors = [];
-        }
+
         // Remove fields not needed in final response
         delete acc.image_id;
         delete acc.image_url;
@@ -308,7 +276,6 @@ exports.updateProduct = async (req, res) => {
       LaunchingDate,
       images,
       CollectionId,
-      Colors,
     } = req.body;
 
     // Validate required fields
@@ -347,10 +314,6 @@ exports.updateProduct = async (req, res) => {
 
     if (LaunchingDate) {
       updateFields.LaunchingDate = new Date(LaunchingDate);
-    }
-
-    if (typeof Colors !== 'undefined') {
-      updateFields.Colors = JSON.stringify(sanitizeColors(Colors));
     }
 
     let query = 'UPDATE products SET UpdatedAt = @UpdatedAt';
@@ -410,10 +373,6 @@ exports.updateProduct = async (req, res) => {
       query += ', CollectionId = @CollectionId';
       request.input('CollectionId', sql.Int, updateFields.CollectionId);
     }
-    if (updateFields.Colors !== undefined) {
-      query += ', Colors = @Colors';
-      request.input('Colors', sql.NVarChar, updateFields.Colors);
-    }
 
     query += ' OUTPUT INSERTED.* WHERE ProductId = @ProductId';
 
@@ -472,7 +431,14 @@ exports.deleteProduct = async (req, res) => {
         WHERE ProductId = @ProductId
       `);
 
-    if (result.rowsAffected[0] === 0) {
+      const result2 = await req.dbPool.request()
+      .input('ProductId', sql.Int, id)
+      .query(`
+        DELETE FROM ProductImages
+        WHERE ProductId = @ProductId
+      `);
+
+    if (result.rowsAffected[0] === 0 && result2.rowsAffected[0] === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
@@ -510,8 +476,7 @@ exports.getTopLatestProducts = async (req, res) => {
         acc[productId] = {
           ...row,
           product_images: [],
-          categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : [],
-          colors: Array.isArray(JSON.parse(row.Colors || '[]')) ? JSON.parse(row.Colors) : [],
+          categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : []
         };
         delete acc[productId].image_id;
         delete acc[productId].category_name;
@@ -528,7 +493,6 @@ exports.getTopLatestProducts = async (req, res) => {
 
     const normalized = Object.values(groupedProducts).map((p) => ({
       ...p,
-      colors: Array.isArray(p.colors) ? p.colors : [],
     }));
 
     return res.status(200).json(normalized);
@@ -592,8 +556,7 @@ exports.getUpcomingProducts = async (req, res) => {
         acc[productId] = {
           ...row,
           product_images: [],
-          categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : [],
-          colors: Array.isArray(JSON.parse(row.Colors || '[]')) ? JSON.parse(row.Colors) : [],
+          categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : []
         };
         delete acc[productId].image_id;
         delete acc[productId].category_name;
@@ -612,7 +575,6 @@ exports.getUpcomingProducts = async (req, res) => {
       ...p,
       product_images: p.product_images || [],
       categories: p.categories || null,
-      colors: Array.isArray(p.colors) ? p.colors : [],
     }));
 
     return res.status(200).json({

@@ -138,27 +138,16 @@ const ProductDetails = () => {
   const [reviewLoading, setReviewLoading] = useState(false);
   const [reviewError, setReviewError] = useState(null);
 
-  // Color (string)
-  const [selectedColor, setSelectedColor] = useState(null);
-
   // Check if product is upcoming
   const isUpcoming = product?.LaunchingDate
     ? new Date(product.LaunchingDate) > new Date()
     : false;
 
-  useEffect(() => {
     const fetchProduct = async () => {
       try {
         setLoading(true);
         const { data: p } = await api.get(`/api/products/${id}`);
         setProduct(p);
-
-        const colors = Array.isArray(p?.Colors)
-          ? p.Colors
-          : Array.isArray(p?.colors)
-          ? p.colors
-          : [];
-        setSelectedColor(colors[0] || null);
 
         const cat = categoryName(p);
         const { data: rel } = await api.get(
@@ -176,8 +165,7 @@ const ProductDetails = () => {
             title: p.Name,
             category: cat,
             price: Number(p.Price) - (Number(p.DiscountPrice || 0) || 0),
-            quantity: 1,
-            color: colors[0] || null,
+            quantity: 1
           });
         } catch {}
       } catch (err) {
@@ -224,17 +212,11 @@ const ProductDetails = () => {
       }
     };
 
+  useEffect(() => {
     fetchProduct();
     fetchReviews();
     checkWishlist();
   }, [id, token, userid]);
-
-  // Reset slider on color change
-  useEffect(() => {
-    try {
-      sliderRef.current?.slickGoTo(0);
-    } catch {}
-  }, [selectedColor]);
 
   const handleToggleWishlist = async () => {
     if (!token || !userid) {
@@ -305,12 +287,7 @@ const ProductDetails = () => {
       });
       toast.dismiss();
       toast.success("Review submitted successfully!");
-      setReviews([...reviews, response.data]);
-      const newAvg =
-        (avgRating * reviewCount + Number(reviewRating)) / (reviewCount + 1);
-      setAvgRating(Number(newAvg.toFixed(1)));
-      setReviewText("");
-      setReviewRating(5);
+      fetchReviews();
     } catch (e2) {
       toast.dismiss();
       toast.error(e2.response?.data?.message || "Failed to submit review.");
@@ -320,15 +297,6 @@ const ProductDetails = () => {
   };
 
   const handleAddToCart = async () => {
-    const colors = Array.isArray(product?.Colors)
-      ? product.Colors
-      : Array.isArray(product?.colors)
-      ? product.colors
-      : [];
-    if (colors.length && !selectedColor) {
-      toast.error("Please select a color.");
-      return;
-    }
     if (Number(product.Stock) === 0 || cartSubmitting) return;
 
     try {
@@ -341,9 +309,7 @@ const ProductDetails = () => {
 
       toast.dismiss();
       toast.success(
-        `${product.Name}${
-          selectedColor ? ` (${selectedColor})` : ""
-        } added to cart!`
+        `${product.Name} added to cart!`
       );
 
       // 🔔 notify navbar (optimistic bump by units)
@@ -358,8 +324,7 @@ const ProductDetails = () => {
           category: categoryName(product),
           price:
             Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
-          quantity: qty,
-          color: selectedColor || null,
+          quantity: qty
         });
       } catch {}
     } catch (e) {
@@ -488,19 +453,7 @@ const ProductDetails = () => {
     ...(product.BrandDesigner && {
       brand: { "@type": "Brand", name: product.BrandDesigner },
     }),
-    ...(Array.isArray(product.Colors) && product.Colors.length
-      ? { color: product.Colors.join(", ") }
-      : {}),
     additionalProperty: [
-      ...(Array.isArray(product.Colors) && product.Colors.length
-        ? [
-            {
-              "@type": "PropertyValue",
-              name: "Color options",
-              value: product.Colors.join(", "),
-            },
-          ]
-        : []),
       {
         "@type": "PropertyValue",
         name: "Category",
@@ -732,63 +685,6 @@ const ProductDetails = () => {
                   </span>
                 </div>
 
-                {/* Color selector */}
-                <div className="mt-3">
-                  <p className="text-sm italic text-[#A3B18A] mb-1">
-                    Color: {selectedColor || "—"}
-                  </p>
-
-                  {Array.isArray(product.colors) && product.colors.length ? (
-                    <div className="flex items-center gap-3">
-                      {product.colors.map((c) => {
-                        const isSelected = selectedColor === c;
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setSelectedColor(c)}
-                            title={c}
-                            aria-pressed={isSelected}
-                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center focus:outline-none ${
-                              isSelected
-                                ? "border-[#6B4226] ring-2 ring-[#6B4226]/25"
-                                : "border-transparent"
-                            }`}
-                            style={{ backgroundColor: c }}
-                          >
-                            <span className="sr-only">{c}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : Array.isArray(product.Colors) && product.Colors.length ? (
-                    <div className="flex items-center gap-3">
-                      {product.Colors.map((c) => {
-                        const isSelected = selectedColor === c;
-                        return (
-                          <button
-                            key={c}
-                            type="button"
-                            onClick={() => setSelectedColor(c)}
-                            title={c}
-                            aria-pressed={isSelected}
-                            className={`w-8 h-8 rounded-full border-2 flex items-center justify-center focus:outline-none ${
-                              isSelected
-                                ? "border-[#6B4226] ring-2 ring-[#6B4226]/25"
-                                : "border-transparent"
-                            }`}
-                            style={{ backgroundColor: c }}
-                          >
-                            <span className="sr-only">{c}</span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <p className="text-sm italic text-[#A3B18A]">—</p>
-                  )}
-                </div>
-
                 <p className="text-sm italic text-[#A3B18A] mt-1">
                   Category: {categoryName(product)}
                 </p>
@@ -849,9 +745,6 @@ const ProductDetails = () => {
                     }`}
                     aria-label="Buy now"
                     disabled={Number(product.Stock) === 0}
-                    onClick={() =>
-                      console.log("Buy now", { id, qty, color: selectedColor })
-                    }
                   >
                     Buy Now
                   </button>
@@ -885,9 +778,6 @@ const ProductDetails = () => {
                       type="button"
                       className="flex-1 bg-black hover:bg-slate-600 text-white px-4 py-3 rounded-md font-semibold shadow transition"
                       aria-label="Join waitlist"
-                      onClick={() =>
-                        console.log("Add to Waitlist", product.ProductId)
-                      }
                     >
                       Join Waitlist
                     </button>
@@ -941,16 +831,6 @@ const ProductDetails = () => {
                 Specifications
               </h3>
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
-                <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
-                  <dt>Color</dt>
-                  <dd className="font-medium">
-                    {Array.isArray(product.colors) && product.colors.length
-                      ? product.colors.join(", ")
-                      : Array.isArray(product.Colors) && product.Colors.length
-                      ? product.Colors.join(", ")
-                      : "—"}
-                  </dd>
-                </div>
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Category</dt>
                   <dd className="font-medium">{categoryName(product)}</dd>

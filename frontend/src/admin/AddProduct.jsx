@@ -98,7 +98,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
       isactive: true,
       isfeatured: false,
       collection_id: null,
-      colors: [],
       launchingdate: new Date(),
     },
   });
@@ -112,7 +111,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
   const [collections, setCollections] = useState([]);
   const [loadingCollections, setLoadingCollections] = useState(true);
   const [existingImages, setExistingImages] = useState([]);
-  const [colorInput, setColorInput] = useState("");
 
   // Load categories
   useEffect(() => {
@@ -155,7 +153,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
       try {
         const { data } = await api.get(PRODUCT_GET_URL(editId));
         const p = data || {};
-        const normalizedColors = Array.isArray(p.colors) ? p.colors : [];
 
         reset({
           name: p.name ?? "",
@@ -169,7 +166,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
           isactive: !!p.isactive,
           isfeatured: !!p.isfeatured,
           collection_id: p.collectionid ?? null,
-          colors: normalizedColors,
           uploadeddate: p.uploadeddate ? new Date(p.uploadeddate) : new Date(),
         });
 
@@ -202,33 +198,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
   const discountprice = watch("discountprice");
   const categoryid = watch("categoryid");
   const collection_id = watch("collection_id");
-  const colors = watch("colors") || [];
-
-  // color tag actions
-  const addColor = () => {
-    const raw = colorInput;
-    if (!raw || !raw.trim()) return;
-    const candidate = normalizeColor(raw);
-    const valid = isHex(candidate) || isCssNamed(candidate);
-    if (!valid) {
-      toast.error(
-        "Use a valid hex (#173F5F) or a CSS color name (e.g., navy)."
-      );
-      return;
-    }
-    if (colors.map((c) => c.toLowerCase()).includes(candidate.toLowerCase())) {
-      toast.info("Color already added.");
-      return;
-    }
-    const next = [...colors, candidate];
-    setValue("colors", next, { shouldDirty: true });
-    setColorInput("");
-  };
-
-  const removeColor = (idx) => {
-    const next = colors.filter((_, i) => i !== idx);
-    setValue("colors", next, { shouldDirty: true });
-  };
 
   const onSubmit = async (form) => {
     setIsSubmitting(true);
@@ -307,7 +276,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
         IsActive: !!form.isactive,
         IsFeatured: !!form.isfeatured,
         CollectionId: form.collection_id || null,
-        Colors: Array.isArray(form.colors) ? form.colors : [],
         LaunchingDate: form.launchingdate
           ? new Date(form.launchingdate).toISOString()
           : new Date().toISOString(), // Added launchingdate
@@ -329,7 +297,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
           setSelectedImages([]);
           setExistingImages([]);
           setHeroImageIndex(null);
-          setColorInput("");
           onSaved?.();
         }
       } else {
@@ -582,7 +549,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         {/* Price */}
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">
-            Price (₹) *
+            Price ($) *
           </label>
           <input
             type="number"
@@ -605,7 +572,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         {/* Discount Price */}
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">
-            Discount Price (₹)
+            Discount Price ($)
           </label>
           <input
             type="number"
@@ -670,60 +637,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
               />
             )}
           />
-        </div>
-        {/* Colors (tag box) */}
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-[#6B4226] mb-1">
-            Colors
-          </label>
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={colorInput}
-              onChange={(e) => setColorInput(e.target.value)}
-              placeholder="#173F5F or navy"
-              className={inputBase}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addColor();
-                }
-              }}
-            />
-            <button
-              type="button"
-              onClick={addColor}
-              className="px-4 py-2 rounded-md bg-[#D4A5A5] text-white font-semibold hover:opacity-90"
-            >
-              Add
-            </button>
-          </div>
-
-          {colors.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {colors.map((c, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-[#E6DCD2] bg-white"
-                  title={c}
-                >
-                  <span
-                    className="inline-block w-4 h-4 rounded-full border border-[#E6DCD2]"
-                    style={{ backgroundColor: c }}
-                  />
-                  <span className="text-sm text-[#6B4226]">{c}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeColor(idx)}
-                    className="ml-1 text-xs text-[#6B4226]/70 hover:text-[#6B4226]"
-                    aria-label={`Remove ${c}`}
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Toggles */}
