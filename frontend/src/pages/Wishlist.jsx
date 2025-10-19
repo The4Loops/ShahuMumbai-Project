@@ -264,7 +264,7 @@ const Wishlist = () => {
                   </div>
                   <div className="font-semibold text-sm mb-2 line-clamp-2">{item.products.name}</div>
                   <div className="mb-2">
-                    <span className="text-lg font-bold text-gray-800">${salePrice.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-gray-800">₹{salePrice.toFixed(2)}</span>
                     {hasDiscount && (
                       <span className="line-through text-sm text-gray-400 ml-2">
                         ${item.products.price.toFixed(2)}

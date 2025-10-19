@@ -204,7 +204,7 @@ function UpcomingCarousel() {
               </p>
               <p className="mb-2 text-[#4B2C20]">
                 Price:{" "}
-                <span className="font-semibold">${selectedProduct.Price}</span>
+                <span className="font-semibold">₹{selectedProduct.Price}</span>
               </p>
               <p className="text-green-800 font-bold text-lg">
                 Pay 50% Now: ${selectedProduct.Price / 2}

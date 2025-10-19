@@ -21,7 +21,7 @@ const RelatedCard = ({ product }) => {
       <div className="p-4 font-serif flex flex-col gap-1">
         <h3 className="text-lg font-semibold text-[#6B4226]">{name}</h3>
         <p className="text-sm text-[#A3B18A] italic">{category}</p>
-        <p className="text-md font-bold text-[#6B4226]">${price}</p>
+        <p className="text-md font-bold text-[#6B4226]">₹{price}</p>
       </div>
     </Link>
   );
