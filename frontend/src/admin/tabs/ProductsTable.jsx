@@ -11,12 +11,11 @@ function ProductsTab() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState(null);
   const { openProductEditor } = useAdminActions();
-
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
-  const [modalProduct, setModalProduct] = useState(null); // Add/Edit modal
+  const [modalProduct, setModalProduct] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
-  const [deleteProduct, setDeleteProduct] = useState(null); // Delete confirmation
+  const [deleteProduct, setDeleteProduct] = useState(null);
   const [collections, setCollections] = useState([]);
   const [loadingCollections, setLoadingCollections] = useState(true);
   const [collectionsError, setCollectionsError] = useState(null);
@@ -30,24 +29,14 @@ function ProductsTab() {
   ]);
 
   const getStatus = (stock) => {
-    if (stock > 20)
-      return { label: "In Stock", color: "bg-green-100 text-green-700" };
-    if (stock > 0)
-      return { label: "Low Stock", color: "bg-yellow-100 text-yellow-700" };
+    if (stock > 20) return { label: "In Stock", color: "bg-green-100 text-green-700" };
+    if (stock > 0) return { label: "Low Stock", color: "bg-yellow-100 text-yellow-700" };
     return { label: "Out of Stock", color: "bg-red-100 text-red-700" };
   };
 
-  const isUuid = (s) =>
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-      s
-    );
-
   const handleOpenEdit = (product) => {
-    if (!isUuid(product.id)) {
-      alert("This item is a demo row. Load real products first.");
-      return;
-    }
-    openProductEditor(product.id); // stays within AdminPanel tabs
+    // Removed UUID check since ProductId is a number
+    openProductEditor(product.id);
   };
 
   const handleSave = async () => {
@@ -76,12 +65,18 @@ function ProductsTab() {
     }
   };
 
-  const confirmDelete = () => {
-    setProducts((prev) => prev.filter((p) => p.id !== deleteProduct.id));
-    setDeleteProduct(null);
+  const confirmDelete = async () => {
+    try {
+      await api.delete(`/api/products/${deleteProduct.id}`);
+      setProducts((prev) => prev.filter((p) => p.id !== deleteProduct.id));
+      setDeleteProduct(null);
+    } catch (e) {
+      console.error("Delete failed:", e);
+      alert("Failed to delete product.");
+    }
   };
 
-   useEffect(() => {
+  useEffect(() => {
     let alive = true;
 
     const fetchProductsAndCollections = async () => {
@@ -100,11 +95,15 @@ function ProductsTab() {
           : productData?.items || [];
         setProducts(
           productList.map((p) => ({
-            id: p.id,
-            name: p.name,
-            category: p.category_name || p.category || "",
-            price: typeof p.price === "number" ? `₹${p.price}` : p.price ?? "",
-            stock: p.stock ?? 0,
+            id: p.ProductId,
+            name: p.Name,
+            category: p.categories?.length > 0 ? p.categories[0].Name : "Uncategorized",
+            price: `₹${p.Price.toFixed(2)}`,
+            stock: p.Stock ?? 0,
+            images: p.product_images || [], // Include images for view modal
+            description: p.Description || "",
+            shortDescription: p.ShortDescription || "",
+            brand: p.BrandDesigner || "",
           }))
         );
 
@@ -119,14 +118,14 @@ function ProductsTab() {
       } catch (e) {
         if (!alive) return;
         console.error("Load failed:", {
-          url: (api.defaults?.baseURL || "") + "/api/products",
+          url: (api.defaults?.baseURL || "") + e.response?.config?.url,
           status: e.response?.status,
           payload: e.response?.data,
           message: e.message,
         });
         if (e.response?.config?.url.includes("/api/products")) {
           setProductsError(e.response?.data?.message || "Failed to load products");
-        } else if (e.response?.config?.url.includes("/api/admin/collections")) {
+        } else if (e.response?.config?.url.includes("/api/collections")) {
           setCollectionsError(
             e.response?.data?.message || "Failed to load collections"
           );
@@ -146,7 +145,6 @@ function ProductsTab() {
     };
   }, []);
 
-
   return (
     <div className="p-4">
       {/* Search */}
@@ -163,7 +161,7 @@ function ProductsTab() {
         </div>
       </div>
 
-      {/* Load/Error status (place HERE) */}
+      {/* Load/Error status */}
       {loadingProducts && (
         <div className="mb-3 text-sm text-gray-500">Loading products…</div>
       )}
@@ -209,6 +207,9 @@ function ProductsTab() {
                           <div className="font-medium text-gray-700">
                             {product.name}
                           </div>
+                          <div className="text-sm text-gray-500">
+                            {product.brand}
+                          </div>
                         </div>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
@@ -236,7 +237,7 @@ function ProductsTab() {
                           <Eye size={18} className="text-blue-600" />
                         </button>
                         <button
-                          onClick={() => openProductEditor(product.id)}
+                          onClick={() => handleOpenEdit(product)}
                           className="p-2 rounded hover:bg-gray-100 transition"
                           title="Edit"
                         >
@@ -305,7 +306,7 @@ function ProductsTab() {
                     <Eye size={18} className="text-blue-600" />
                   </button>
                   <button
-                    onClick={() => openProductEditor(product.id)}
+                    onClick={() => handleOpenEdit(product)}
                     className="p-2 rounded hover:bg-gray-100 transition"
                   >
                     <Edit size={18} className="text-green-600" />
@@ -352,6 +353,9 @@ function ProductsTab() {
                   <strong>Name:</strong> {selectedProduct.name}
                 </p>
                 <p>
+                  <strong>Brand:</strong> {selectedProduct.brand}
+                </p>
+                <p>
                   <strong>Category:</strong> {selectedProduct.category}
                 </p>
                 <p>
@@ -364,6 +368,30 @@ function ProductsTab() {
                   <strong>Status:</strong>{" "}
                   {getStatus(selectedProduct.stock).label}
                 </p>
+                <p>
+                  <strong>Description:</strong> {selectedProduct.description}
+                </p>
+                <p>
+                  <strong>Short Description:</strong>{" "}
+                  {selectedProduct.shortDescription}
+                </p>
+                {selectedProduct.images?.length > 0 && (
+                  <div>
+                    <strong>Images:</strong>
+                    <div className="flex gap-2 mt-2 overflow-x-auto">
+                      {selectedProduct.images.map((img) => (
+                        <img
+                          key={img.id}
+                          src={img.image_url}
+                          alt={selectedProduct.name}
+                          className={`w-24 h-24 object-cover rounded-md ${
+                            img.is_hero ? "border-2 border-blue-500" : ""
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </motion.div>
           </motion.div>
@@ -371,27 +399,44 @@ function ProductsTab() {
       </AnimatePresence>
 
       {/* Add/Edit Product Modal */}
-      {/* Add/Edit Product Modal */}
       <AnimatePresence>
         {modalProduct && (
-          <motion.div /* ...same props... */>
-            <motion.div /* ...same props... */>
-              {/* ...header... */}
+          <motion.div
+            className="fixed inset-0 flex items-end md:items-center justify-center bg-black bg-opacity-50 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-t-xl md:rounded-lg shadow-xl p-6 w-full md:w-96 relative"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+            >
+              <button
+                onClick={() => setModalProduct(null)}
+                className="absolute top-3 right-3 text-gray-400 hover:text-gray-600"
+              >
+                <X size={20} />
+              </button>
+              <h2 className="text-xl font-semibold mb-4">
+                {isEditing ? "Edit Product" : "Add Product"}
+              </h2>
               <div className="space-y-4">
-                {["name", "category", "price", "stock"].map((field) => (
+                {["name", "brand", "category", "price", "stock", "description", "shortDescription"].map((field) => (
                   <div key={field} className="flex flex-col">
                     <label className="text-gray-600 font-medium capitalize mb-1">
                       {field}
                     </label>
                     <input
-                      type={field === "stock" ? "number" : "text"}
+                      type={field === "stock" || field === "price" ? "number" : "text"}
                       value={modalProduct[field] ?? ""}
                       onChange={(e) =>
                         setModalProduct({
                           ...modalProduct,
                           [field]:
-                            field === "stock"
-                              ? parseInt(e.target.value || "0", 10)
+                            field === "stock" || field === "price"
+                              ? parseFloat(e.target.value || "0")
                               : e.target.value,
                         })
                       }
@@ -399,8 +444,6 @@ function ProductsTab() {
                     />
                   </div>
                 ))}
-
-                {/* Inserted Collection dropdown */}
                 <div className="flex flex-col">
                   <label className="text-gray-600 font-medium mb-1">
                     Collection
@@ -423,12 +466,6 @@ function ProductsTab() {
                       </option>
                     ))}
                   </select>
-                  {collectionsError && (
-                    <span className="text-xs text-red-600 mt-1">
-                      {collectionsError}
-                    </span>
-                  )}
-
                   {loadingCollections && (
                     <span className="text-xs text-gray-500 mt-1">
                       Loading collections…
@@ -440,7 +477,6 @@ function ProductsTab() {
                     </span>
                   )}
                 </div>
-
                 <div className="flex justify-end gap-2 mt-4">
                   <button
                     onClick={() => setModalProduct(null)}
