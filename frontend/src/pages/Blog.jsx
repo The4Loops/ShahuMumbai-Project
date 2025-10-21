@@ -314,7 +314,7 @@ const Blog = () => {
                     <img
                       src={blog.CoverImage}
                       alt={blog.Title}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                     />
                   ) : (
                     <div className="h-full bg-gradient-to-r from-[#8d6e63] to-[#bcaaa4]"></div>

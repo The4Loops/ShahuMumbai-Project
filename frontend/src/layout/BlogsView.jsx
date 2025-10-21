@@ -212,7 +212,7 @@ const BlogsView = () => {
           <img
             src={blog.CoverImage}
             alt={blog.Title}
-            className="w-full h-48 sm:h-64 object-cover rounded-xl shadow-md"
+            className="w-full h-48 sm:h-64 object-contain rounded-xl shadow-md"
           />
         )}
 
