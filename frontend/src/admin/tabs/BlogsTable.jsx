@@ -1,3 +1,4 @@
+// BlogsTable.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../supabase/axios";
@@ -7,14 +8,13 @@ const FALLBACK_IMAGE = "";
 
 function BlogsTable() {
   const [blogs, setBlogs] = useState([]);
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("ALL");
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedBlog, setSelectedBlog] = useState(null);
   const blogsPerPage = 6;
   const navigate = useNavigate();
 
-  // Fetch blogs
   const fetchBlogs = async () => {
     setLoading(true);
     toast.dismiss();
@@ -54,10 +54,8 @@ function BlogsTable() {
     fetchBlogs();
   }, []);
 
-  // Delete blog
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this blog?")) return;
-
     try {
       await api.delete(`/api/admin/blogs/${id}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
@@ -71,19 +69,16 @@ function BlogsTable() {
     }
   };
 
-  // Filter blogs
   const filteredBlogs =
-    statusFilter === "All"
+    statusFilter === "ALL"
       ? blogs
-      : blogs.filter((b) => b.status === statusFilter);
+      : blogs.filter((b) => (b.status || "").toUpperCase() === statusFilter);
 
-  // Pagination
   const indexOfLastBlog = currentPage * blogsPerPage;
   const indexOfFirstBlog = indexOfLastBlog - blogsPerPage;
   const currentBlogs = filteredBlogs.slice(indexOfFirstBlog, indexOfLastBlog);
   const totalPages = Math.ceil(filteredBlogs.length / blogsPerPage);
 
-  // Helper to build full image URL
   const getImageUrl = (path) => {
     if (!path) return FALLBACK_IMAGE;
     if (path.startsWith("http")) return path;
@@ -94,7 +89,6 @@ function BlogsTable() {
     <div className="p-6">
       <h2 className="text-2xl font-bold mb-4">Blogs</h2>
 
-      {/* Filter */}
       <div className="flex items-center gap-4 mb-6">
         <label className="font-medium">Filter by Status:</label>
         <select
@@ -105,13 +99,12 @@ function BlogsTable() {
           }}
           className="border border-gray-300 rounded-lg px-3 py-2"
         >
-          <option value="All">All</option>
-          <option value="Published">Published</option>
-          <option value="Draft">Draft</option>
+          <option value="ALL">All</option>
+          <option value="PUBLISHED">Published</option>
+          <option value="DRAFT">Draft</option>
         </select>
       </div>
 
-      {/* Cards */}
       {loading ? (
         <p>Loading blogs...</p>
       ) : currentBlogs.length === 0 ? (
@@ -148,12 +141,12 @@ function BlogsTable() {
               <div className="mt-auto flex justify-between items-center">
                 <span
                   className={`px-2 py-1 rounded-full text-xs font-medium ${
-                    blog.status === "Published"
+                    (blog.status || "").toUpperCase() === "PUBLISHED"
                       ? "bg-green-100 text-green-700"
                       : "bg-yellow-100 text-yellow-700"
                   }`}
                 >
-                  {blog.status}
+                  {(blog.status || "").toUpperCase() === "PUBLISHED" ? "Published" : "Draft"}
                 </span>
                 <span className="text-sm text-gray-500">
                   {new Date(blog.created_at).toLocaleDateString()}
@@ -164,7 +157,6 @@ function BlogsTable() {
         </div>
       )}
 
-      {/* Pagination */}
       {totalPages > 1 && (
         <div className="flex justify-center items-center gap-3 mt-6">
           <button
@@ -187,7 +179,6 @@ function BlogsTable() {
         </div>
       )}
 
-      {/* Modal */}
       {selectedBlog && (
         <div
           className="fixed inset-0 flex items-center justify-center bg-black/50 z-50"
@@ -218,7 +209,26 @@ function BlogsTable() {
               <span
                 onClick={() =>
                   navigate(`/admin/addblogpost/${selectedBlog.id}`, {
-                    state: { blog: selectedBlog },
+                    state: {
+                      blog: {
+                        BlogId: selectedBlog.id,
+                        Title: selectedBlog.title,
+                        Slug: selectedBlog.slug,
+                        CoverImage: selectedBlog.cover_image,
+                        Category: selectedBlog.category,
+                        Excerpt: selectedBlog.excerpt,
+                        Content: selectedBlog.content,
+                        Status: (selectedBlog.status || "").toUpperCase(),
+                        PublishAt: selectedBlog.publish_at || selectedBlog.created_at || "",
+                        MetaTitle: selectedBlog.meta_title || "",
+                        MetaDescription: selectedBlog.meta_description || "",
+                        Tags: Array.isArray(selectedBlog.tags)
+                          ? selectedBlog.tags
+                          : typeof selectedBlog.tags === "string"
+                          ? selectedBlog.tags.split(",").map((s) => s.trim()).filter(Boolean)
+                          : [],
+                      },
+                    },
                   })
                 }
                 className="cursor-pointer text-blue-600 hover:underline"

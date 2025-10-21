@@ -1,3 +1,4 @@
+// AddBlogPost.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
@@ -12,13 +13,42 @@ const slugify = (text) =>
     .replace(/[^a-z0-9-]/g, "")
     .replace(/-+/g, "-");
 
+const safeParseJSON = (s) => {
+  try { return JSON.parse(s); } catch { return []; }
+};
+
+const normalizeBlog = (raw) => {
+  if (!raw) return null;
+  return {
+    BlogId: raw.BlogId ?? raw.id ?? raw.blogId ?? null,
+    Title: raw.Title ?? raw.title ?? "",
+    Slug: raw.Slug ?? raw.slug ?? "",
+    Excerpt: raw.Excerpt ?? raw.excerpt ?? "",
+    Content: raw.Content ?? raw.content ?? "",
+    CoverImage: raw.CoverImage ?? raw.cover_image ?? null,
+    Category: raw.Category ?? raw.category ?? "",
+    Tags: Array.isArray(raw.Tags)
+      ? raw.Tags
+      : Array.isArray(raw.tags)
+      ? raw.tags
+      : typeof raw.Tags === "string"
+      ? safeParseJSON(raw.Tags)
+      : typeof raw.tags === "string"
+      ? safeParseJSON(raw.tags)
+      : [],
+    Status: (raw.Status ?? raw.status ?? "DRAFT").toUpperCase(),
+    PublishAt: raw.PublishAt ?? raw.publish_at ?? raw.publishAt ?? "",
+    MetaTitle: raw.MetaTitle ?? raw.meta_title ?? "",
+    MetaDescription: raw.MetaDescription ?? raw.meta_description ?? "",
+  };
+};
+
 const AddBlogPost = () => {
   const location = useLocation();
   const { id } = useParams();
 
   const [loading, setLoading] = useState(false);
 
-  // Blog passed via navigation (optional)
   const editingBlog = location.state?.blog || null;
 
   const [title, setTitle] = useState("");
@@ -44,14 +74,12 @@ const AddBlogPost = () => {
     []
   );
 
-  // Prefill if editingBlog passed via state
   useEffect(() => {
     if (editingBlog) {
-      prefillForm(editingBlog);
+      prefillForm(normalizeBlog(editingBlog));
     }
   }, [editingBlog]);
 
-  // Fetch if no blog passed but id exists
   useEffect(() => {
     const fetchBlogById = async () => {
       if (!id || editingBlog) return;
@@ -60,7 +88,7 @@ const AddBlogPost = () => {
         const response = await api.get(`/api/blogs/${id}`, {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         });
-        prefillForm(response.data);
+        prefillForm(normalizeBlog(response.data));
       } catch (err) {
         console.error("Error fetching blog:", err);
         toast.error("Failed to load blog for editing.");
@@ -72,7 +100,8 @@ const AddBlogPost = () => {
   }, [id, editingBlog]);
 
   const prefillForm = (blog) => {
-    setSelectedDraftId(blog.BlogId);
+    if (!blog) return;
+    setSelectedDraftId(blog.BlogId || null);
     setTitle(blog.Title || "");
     setSlug(blog.Slug || "");
     setSlugTouched(true);
@@ -80,8 +109,8 @@ const AddBlogPost = () => {
     setContent(blog.Content || "");
     setCoverPreview(blog.CoverImage || null);
     setCategory(blog.Category || "");
-    setTags(blog.Tags ? blog.Tags.join(", ") : "");
-    setStatus(blog.Status || "DRAFT");
+    setTags(Array.isArray(blog.Tags) ? blog.Tags.join(", ") : (blog.Tags || ""));
+    setStatus((blog.Status || "DRAFT").toUpperCase());
     setPublishAt(blog.PublishAt || "");
     setMetaTitle(blog.MetaTitle || "");
     setMetaDescription(blog.MetaDescription || "");
@@ -227,7 +256,7 @@ const AddBlogPost = () => {
   };
 
   const loadDraft = (draft) => {
-    prefillForm(draft);
+    prefillForm(normalizeBlog(draft));
   };
 
   if (loading) return <p className="p-6">Loading blog...</p>;
@@ -239,7 +268,6 @@ const AddBlogPost = () => {
       </h2>
 
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Left side */}
         <div>
           <label className="block font-medium">Title</label>
           <input
@@ -307,7 +335,6 @@ const AddBlogPost = () => {
           )}
         </div>
 
-        {/* Right side */}
         <div>
           <label className="block font-medium">Status</label>
           <select

@@ -1,5 +1,5 @@
 import { Routes, Route, Suspense } from "react-router-dom";
-import React, { useState, lazy, Suspense as ReactSuspense } from "react"; // Updated imports
+import React, { useState, lazy, Suspense as ReactSuspense } from "react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import "./App.css";
 
@@ -31,11 +31,12 @@ import PageTracker from "./PageTracker";
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
-import VintageLoader from "./Loader"; // Import the loader
+import VintageLoader from "./Loader";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
-import ShippingPolicy from './pages/ShippingPolicy';
+import ShippingPolicy from "./pages/ShippingPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
+import AddBlogPost from "./admin/AddBlogPost";
 
 const PageSkeleton = () => (
   <div className="min-h-screen bg-[#EDE1DF] flex items-center justify-center p-4">
@@ -54,7 +55,7 @@ const PageSkeleton = () => (
 
 function App() {
   useAutoLogout();
-  const [isLoading, setIsLoading] = useState(true); // Track loading state
+  const [isLoading, setIsLoading] = useState(true);
 
   const siteUrl =
     typeof window !== "undefined"
@@ -122,6 +123,8 @@ function App() {
           <Route path="/about" element={<About />} />
           <Route path="/products/:id" element={<ProductDetails />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/admin/addblogpost" element={<AddBlogPost />} />
+          <Route path="/admin/addblogpost/:id" element={<AddBlogPost />} />
           <Route path="/myorder" element={<MyOrder />} />
           <Route path="/wishlist" element={<Wishlist />} />
           <Route path="/profile" element={<Profile />} />
