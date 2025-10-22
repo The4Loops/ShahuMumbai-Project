@@ -1,6 +1,20 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
 
+// Helper to get exchange rate from DB
+const getExchangeRate = async (dbPool, currency = 'USD') => {
+  try {
+    const result = await dbPool.request()
+      .input('CurrencyCode', sql.VarChar(3), currency)
+      .query('SELECT ExchangeRate FROM Currencies WHERE CurrencyCode = @CurrencyCode');
+    
+    return result.recordset[0]?.ExchangeRate || 1.0; // Fallback to USD
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    return 1.0; // Fallback on error
+  }
+};
+
 /* ------------------------------ Create -------------------------------- */
 exports.createProduct = async (req, res) => {
   try {
@@ -112,6 +126,9 @@ exports.createProduct = async (req, res) => {
 /* ------------------------------- Read All ------------------------------ */
 exports.getAllProducts = async (req, res) => {
   try {
+    const { currency = 'USD' } = req.query;
+    const exchangeRate = await getExchangeRate(req.dbPool, currency);
+
     let query = `
       SELECT 
         p.*,
@@ -144,12 +161,15 @@ exports.getAllProducts = async (req, res) => {
 
     const result = await request.query(query);
 
-    // Group images and categories per product
+    // Group images and categories per product, apply currency conversion
     const groupedProducts = result.recordset.reduce((acc, row) => {
       const productId = row.ProductId;
       if (!acc[productId]) {
         acc[productId] = {
           ...row,
+          Price: parseFloat(row.Price * exchangeRate).toFixed(2),
+          DiscountPrice: row.DiscountPrice ? parseFloat(row.DiscountPrice * exchangeRate).toFixed(2) : null,
+          currency,
           product_images: [],
           categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : [],
         };
@@ -182,7 +202,8 @@ exports.getAllProducts = async (req, res) => {
 /* ------------------------------- Read One ------------------------------ */
 exports.getProductById = async (req, res) => {
   try {
-    const { id } = req.params;
+    const { id, currency = 'USD' } = req.params.currency ? req.params : { ...req.params, currency: req.query.currency || 'USD' }; // Support both param and query
+    const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
     const result = await req.dbPool.request()
       .input('ProductId', sql.Int, id)
@@ -204,12 +225,15 @@ exports.getProductById = async (req, res) => {
       return res.status(404).json({ message: 'Product not found' });
     }
 
-    // Group product data, images, and categories
+    // Group product data, images, and categories, apply currency conversion
     const product = result.recordset.reduce((acc, row) => {
       // Initialize product object on first row
       if (!acc.ProductId) {
         acc = {
           ...row,
+          Price: parseFloat(row.Price * exchangeRate).toFixed(2),
+          DiscountPrice: row.DiscountPrice ? parseFloat(row.DiscountPrice * exchangeRate).toFixed(2) : null,
+          currency,
           product_images: [],
           categories: [],
           colors: [],
@@ -390,16 +414,24 @@ exports.updateProduct = async (req, res) => {
         .query('DELETE FROM ProductImages WHERE ProductId = @product_id');
 
       // Insert new images
-      const imageRequest = req.dbPool.request();
-      images.forEach((img) => {
-        imageRequest.input('product_id', sql.Int, id);
-        imageRequest.input('image_url', sql.NVarChar, img.url);
-        imageRequest.input('is_hero', sql.Char(1), img.is_hero == true ? 'Y' : 'N');
-      });
-      await imageRequest.query(`
-        INSERT INTO ProductImages (ProductId, ImageUrl, isHero)
-        VALUES (@product_id, @image_url, @is_hero)
-      `);
+      let totalImagesInserted = 0;
+      for (const img of images) {
+        const imageRequest = req.dbPool.request()
+          .input('product_id', sql.Int, id)
+          .input('image_url', sql.NVarChar, img.url)
+          .input('is_hero', sql.Char(1), img.is_hero == true ? 'Y' : 'N')
+          .query(`
+            INSERT INTO ProductImages (ProductId, ImageUrl, isHero)
+            VALUES (@product_id, @image_url, @is_hero)
+          `);
+        const imageResult = await imageRequest;
+        if (imageResult.rowsAffected[0] === 1) {
+          totalImagesInserted++;
+        }
+      }
+      if (totalImagesInserted !== images.length) {
+        return res.status(400).json({ message: 'Error inserting images' });
+      }
     }
 
     return res.status(200).json({ message: 'Product updated successfully', product });
@@ -431,7 +463,7 @@ exports.deleteProduct = async (req, res) => {
         WHERE ProductId = @ProductId
       `);
 
-      const result2 = await req.dbPool.request()
+    const result2 = await req.dbPool.request()
       .input('ProductId', sql.Int, id)
       .query(`
         DELETE FROM ProductImages
@@ -452,6 +484,9 @@ exports.deleteProduct = async (req, res) => {
 /* ------------------------- Top Latest (Home) --------------------------- */
 exports.getTopLatestProducts = async (req, res) => {
   try {
+    const { currency = 'USD' } = req.query;
+    const exchangeRate = await getExchangeRate(req.dbPool, currency);
+
     const result = await req.dbPool.request()
       .query(`
         SELECT 
@@ -469,12 +504,15 @@ exports.getTopLatestProducts = async (req, res) => {
         OFFSET 0 ROWS FETCH NEXT 4 ROWS ONLY
       `);
 
-    // Group images and categories per product
+    // Group images and categories per product, apply currency conversion
     const groupedProducts = result.recordset.reduce((acc, row) => {
       const productId = row.ProductId;
       if (!acc[productId]) {
         acc[productId] = {
           ...row,
+          Price: parseFloat(row.Price * exchangeRate).toFixed(2),
+          DiscountPrice: row.DiscountPrice ? parseFloat(row.DiscountPrice * exchangeRate).toFixed(2) : null,
+          currency,
           product_images: [],
           categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : []
         };
@@ -485,7 +523,7 @@ exports.getTopLatestProducts = async (req, res) => {
         acc[productId].product_images.push({
           id: row.image_id,
           image_url: row.image_url,
-          is_hero: row.is_hero,
+          is_hero: row.is_hero === 'Y' ? true : false,
         });
       }
       return acc;
@@ -533,6 +571,9 @@ exports.setProductCollection = async (req, res) => {
 
 exports.getUpcomingProducts = async (req, res) => {
   try {
+    const { currency = 'USD' } = req.query;
+    const exchangeRate = await getExchangeRate(req.dbPool, currency);
+
     const result = await req.dbPool.request()
       .query(`
         SELECT 
@@ -549,12 +590,15 @@ exports.getUpcomingProducts = async (req, res) => {
         ORDER BY p.LaunchingDate ASC
       `);
 
-    // Group images and categories per product
+    // Group images and categories per product, apply currency conversion
     const groupedProducts = result.recordset.reduce((acc, row) => {
       const productId = row.ProductId;
       if (!acc[productId]) {
         acc[productId] = {
           ...row,
+          Price: parseFloat(row.Price * exchangeRate).toFixed(2),
+          DiscountPrice: row.DiscountPrice ? parseFloat(row.DiscountPrice * exchangeRate).toFixed(2) : null,
+          currency,
           product_images: [],
           categories: row.category_name ? [{ CategoryId: row.CategoryId, Name: row.category_name }] : []
         };
@@ -565,7 +609,7 @@ exports.getUpcomingProducts = async (req, res) => {
         acc[productId].product_images.push({
           id: row.image_id,
           image_url: row.image_url,
-          is_hero: row.is_hero,
+          is_hero: row.is_hero === 'Y' ? true : false,
         });
       }
       return acc;

@@ -198,6 +198,7 @@ exports.getUserOrders = async (req, res) => {
         o.OrderId, o.OrderNumber, o.CustomerName, o.CustomerEmail,
         o.FulFillmentStatus, o.PlacedAt, o.ShippedAt, o.DeliveredAt,
         o.SubTotal, o.ShippingTotal, o.TaxTotal, o.TrackingNumber, o.Carrier,
+        o.Currency,  -- Added for currency support
         u.UserId, u.FullName, u.Email,
         p.ProductId, p.Name, p.Price,  
         oi.Qty, oi.UnitPrice
@@ -229,6 +230,7 @@ exports.getUserOrders = async (req, res) => {
           tax: row.TaxTotal || 0,
           tracking_number: row.TrackingNumber || null,
           carrier: row.Carrier || null,
+          currency: row.Currency || 'USD',  // Added
           items: []
         });
       }

@@ -1,6 +1,19 @@
-// backend/controllers/cartController.js
 const sql = require('mssql');
 const currentCartOwner = require('../utils/currentCartOwner');
+
+// Helper to get exchange rate from DB
+const getExchangeRate = async (dbPool, currency = 'USD') => {
+  try {
+    const result = await dbPool.request()
+      .input('CurrencyCode', sql.VarChar(3), currency.toUpperCase())
+      .query('SELECT ExchangeRate FROM Currencies WHERE CurrencyCode = @CurrencyCode');
+    
+    return result.recordset[0]?.ExchangeRate || 1.0; // Fallback to USD
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    return 1.0; // Fallback on error
+  }
+};
 
 const now = () => new Date();
 const toInt = (v) => (Number.isInteger(v) ? v : parseInt(v, 10));
@@ -117,6 +130,8 @@ exports.getCartItems = async (req, res) => {
       return res.status(500).json({ error: 'db_not_connected' });
     }
     const owner = currentCartOwner(req);
+    const { currency = 'USD' } = req.query;
+    const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.status(200).json([]);
@@ -157,9 +172,10 @@ exports.getCartItems = async (req, res) => {
       product: {
         id: r.prod_id,
         name: r.prod_name,
-        price: r.prod_price,
-        discountprice: r.prod_discount,
+        price: parseFloat(r.prod_price * exchangeRate).toFixed(2),
+        discountprice: r.prod_discount ? parseFloat(r.prod_discount * exchangeRate).toFixed(2) : null,
         stock: r.prod_stock,
+        currency,
         categories: r.cat_id ? [{ categoryid: r.cat_id, name: r.cat_name }] : [],
         product_images: r.img_id
           ? [{ id: r.img_id, image_url: r.img_url, is_hero: r.img_is_hero }]
