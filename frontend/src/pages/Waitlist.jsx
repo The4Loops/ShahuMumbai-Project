@@ -1,12 +1,11 @@
-// src/pages/Waitlist.jsx
 import React, { useState, useEffect, useRef } from "react";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
+import { apiWithCurrency } from "../supabase/axios";
+import { useCurrency } from "../supabase/CurrencyContext";
+import { toast } from "react-toastify";
 
-// If you use Vite, set VITE_API_BASE (e.g., http://localhost:5001) or leave blank when proxying /api.
-const API_BASE = import.meta?.env?.VITE_API_BASE || "";
-
-// Badge styling stays the same
+// Badge styling
 const getStatusBadgeStyle = (status) => {
   switch (status) {
     case "Available":
@@ -21,23 +20,22 @@ const getStatusBadgeStyle = (status) => {
 };
 
 const Waitlist = () => {
+  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [products, setProducts] = useState([]);
   const [toasts, setToasts] = useState([]);
   const prevRef = useRef([]);
 
-  // Use a saved email so user doesn't retype. You can prefill this elsewhere in your site.
+  // Use a saved email so user doesn't retype
   const email =
     (typeof window !== "undefined" && (localStorage.getItem("waitlistEmail") || "")) || "";
 
   const fetchWaitlist = async () => {
-    if (!email) return; // show capture UI below if not set
+    if (!email || currencyLoading) return;
 
     try {
-      const res = await fetch(
-        `${API_BASE}/api/waitlist?email=${encodeURIComponent(email)}`
-      );
-      if (!res.ok) return;
-      const data = await res.json(); // [{ id, name, status, imageUrl, updated(ISO), availableSince(epochMs|null) }]
+      const api = apiWithCurrency(currency);
+      const res = await api.get(`/api/waitlist?email=${encodeURIComponent(email)}`);
+      const data = res.data;
 
       // Toast on status change since last snapshot
       const prevById = Object.fromEntries(prevRef.current.map((p) => [p.id, p]));
@@ -70,8 +68,8 @@ const Waitlist = () => {
       setProducts(filtered);
       prevRef.current = data; // store raw list (pre-filter) for next diff
     } catch (e) {
-      // optional: show a toast or console
-      console.error("waitlist fetch failed", e);
+      toast.dismiss();
+      toast.error("Failed to load waitlist. Please try again.");
     }
   };
 
@@ -80,11 +78,40 @@ const Waitlist = () => {
     fetchWaitlist();
     const id = setInterval(fetchWaitlist, 300000); // 5 minutes
     return () => clearInterval(id);
-  }, []);
+  }, [email, currency, currencyLoading]);
 
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const canonical = `${origin}/waitlist`;
+
+  const waitlistJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    itemListElement: products.map((product, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "Product",
+        name: product.name,
+        image: product.imageUrl,
+        sku: String(product.id),
+        offers: {
+          "@type": "Offer",
+          availability:
+            product.status === "Available"
+              ? "https://schema.org/InStock"
+              : product.status === "Out of Stock"
+              ? "https://schema.org/OutOfStock"
+              : "https://schema.org/PreOrder",
+          priceCurrency: product.currency || currency,
+        },
+      },
+    })),
+  };
+
+  if (currencyLoading) {
+    return null; // Wait for currency to load
+  }
 
   return (
     <Layout>
@@ -99,6 +126,7 @@ const Waitlist = () => {
         <meta property="og:title" content="Waitlist | Shahu Mumbai" />
         <meta property="og:description" content="Track availability of items you’re watching." />
         <meta property="og:url" content={canonical} />
+        <script type="application/ld+json">{JSON.stringify(waitlistJsonLd)}</script>
       </Helmet>
 
       <div className="max-w-6xl mx-auto p-6 relative">
@@ -162,7 +190,7 @@ const Waitlist = () => {
                 {product.status}
               </span>
 
-              {/* Image Placeholder (or real imageUrl if provided) */}
+              {/* Image Placeholder */}
               <div className="h-40 flex items-center justify-center bg-gray-200">
                 {product.imageUrl ? (
                   <img

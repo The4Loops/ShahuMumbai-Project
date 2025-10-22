@@ -8,11 +8,12 @@ import { FaChevronLeft, FaChevronRight, FaHeart } from "react-icons/fa";
 import { IoMdShareAlt } from "react-icons/io";
 import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import RelatedCard from "../components/RelatedCard";
-import api from "../supabase/axios";
+import { apiWithCurrency } from "../supabase/axios";
 import { jwtDecode } from "jwt-decode";
 import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
+import { useCurrency } from "../supabase/CurrencyContext";
 
 // ---------- helpers ----------
 const asBool = (v) =>
@@ -31,16 +32,17 @@ const normalizeImageUrl = (u) => {
   return `${IMAGE_BASE}/${u}`;
 };
 
-const pickImageUrl = (img) => normalizeImageUrl(
-  img?.image_url ||  // Add this first
-  img?.imageurl || 
-  img?.url || 
-  img?.publicUrl || 
-  img?.publicurl || 
-  img?.Location || 
-  img?.location || 
-  img?.path
-);
+const pickImageUrl = (img) =>
+  normalizeImageUrl(
+    img?.image_url ||
+      img?.imageurl ||
+      img?.url ||
+      img?.publicUrl ||
+      img?.publicurl ||
+      img?.Location ||
+      img?.location ||
+      img?.path
+  );
 
 const categoryName = (p) =>
   p?.categories?.name ||
@@ -48,6 +50,14 @@ const categoryName = (p) =>
   get(p, ["categories", 0, "name"]) ||
   get(p, ["categories", 0, "Name"]) ||
   "Accessories";
+
+// Format price with currency
+const formatPrice = (value, currencyCode) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode || "USD",
+  }).format(value);
+};
 
 // Carousel Arrows
 const NextArrow = ({ onClick }) => (
@@ -109,10 +119,11 @@ const StarRating = ({ value = 0, size = 18 }) => {
 };
 
 const ProductDetails = () => {
+  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const { id } = useParams();
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [qty, setQty] = useState(1);
   const [isInWishlist, setIsInWishlist] = useState(false);
@@ -143,80 +154,85 @@ const ProductDetails = () => {
     ? new Date(product.LaunchingDate) > new Date()
     : false;
 
-    const fetchProduct = async () => {
+  const fetchProduct = async () => {
+    try {
+      setLoading(true);
+      const api = apiWithCurrency(currency);
+      const { data: p } = await api.get(`/api/products/${id}`);
+      setProduct(p);
+
+      const cat = categoryName(p);
+      const { data: rel } = await api.get(
+        `/api/products?category=${encodeURIComponent(cat)}&limit=8`
+      );
+      setRelatedProducts(
+        (rel || []).filter((rp) => String(rp.id) !== String(id))
+      );
+
+      document.title = `${p.Name} - Shahu Mumbai`;
+
       try {
-        setLoading(true);
-        const { data: p } = await api.get(`/api/products/${id}`);
-        setProduct(p);
+        Ecom.viewItem({
+          id: p.ProductId,
+          title: p.Name,
+          category: cat,
+          price: Number(p.Price) - (Number(p.DiscountPrice || 0) || 0),
+          quantity: 1,
+          currency: p.currency || currency,
+        });
+      } catch {}
+    } catch (err) {
+      setError("Failed to fetch product details. Please try again later.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-        const cat = categoryName(p);
-        const { data: rel } = await api.get(
-          `/api/products?category=${encodeURIComponent(cat)}&limit=8`
-        );
-        setRelatedProducts(
-          (rel || []).filter((rp) => String(rp.id) !== String(id))
-        );
+  const fetchReviews = async () => {
+    try {
+      setReviewLoading(true);
+      setReviewError(null);
+      const api = apiWithCurrency(currency);
+      const res = await api.get(`/api/reviews/${id}`);
+      const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
+      setReviews(list);
+      const count = list.length;
+      const avg = count
+        ? list.reduce((s, r) => s + Number(r.Rating || 0), 0) / count
+        : 0;
+      setReviewCount(count);
+      setAvgRating(Number(avg.toFixed(1)));
+    } catch {
+      setReviewError("Failed to load reviews.");
+    } finally {
+      setReviewLoading(false);
+    }
+  };
 
-        document.title = `${p.Name} - Shahu Mumbai`;
-
-        try {
-          Ecom.viewItem({
-            id: p.ProductId,
-            title: p.Name,
-            category: cat,
-            price: Number(p.Price) - (Number(p.DiscountPrice || 0) || 0),
-            quantity: 1
-          });
-        } catch {}
-      } catch (err) {
-        setError("Failed to fetch product details. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    const fetchReviews = async () => {
-      try {
-        setReviewLoading(true);
-        setReviewError(null);
-        const res = await api.get(`/api/reviews/${id}`);
-        const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
-        setReviews(list);
-        const count = list.length;
-        const avg = count
-          ? list.reduce((s, r) => s + Number(r.Rating || 0), 0) / count
-          : 0;
-        setReviewCount(count);
-        setAvgRating(Number(avg.toFixed(1)));
-      } catch {
-        setReviewError("Failed to load reviews.");
-      } finally {
-        setReviewLoading(false);
-      }
-    };
-
-    const checkWishlist = async () => {
-      if (!token || !userid) {
-        setIsInWishlist(false);
-        return;
-      }
-      try {
-        const { data } = await api.get("/api/wishlist");
-        const isWishlisted = (data.data || []).some(
-          (item) => String(item.product_id) === String(id)
-        );
-        setIsInWishlist(isWishlisted);
-      } catch (err) {
-        console.error("Error checking wishlist:", err);
-        toast.error(err.response?.data?.error || "Failed to check wishlist");
-      }
-    };
+  const checkWishlist = async () => {
+    if (!token || !userid) {
+      setIsInWishlist(false);
+      return;
+    }
+    try {
+      const api = apiWithCurrency(currency);
+      const { data } = await api.get("/api/wishlist");
+      const isWishlisted = (data.data || []).some(
+        (item) => String(item.product_id) === String(id)
+      );
+      setIsInWishlist(isWishlisted);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Failed to check wishlist");
+    }
+  };
 
   useEffect(() => {
-    fetchProduct();
-    fetchReviews();
-    checkWishlist();
-  }, [id, token, userid]);
+    if (!currencyLoading) {
+      fetchProduct();
+      fetchReviews();
+      checkWishlist();
+    }
+  }, [id, token, userid, currency, currencyLoading]);
 
   const handleToggleWishlist = async () => {
     if (!token || !userid) {
@@ -227,6 +243,7 @@ const ProductDetails = () => {
 
     try {
       setWishlistSubmitting(true);
+      const api = apiWithCurrency(currency);
       if (isInWishlist) {
         const { data } = await api.get("/api/wishlist");
         const item = (data.data || []).find(
@@ -242,8 +259,8 @@ const ProductDetails = () => {
               title: product.Name,
               category: categoryName(product),
               price:
-                Number(product.Price) -
-                (Number(product.DiscountPrice || 0) || 0),
+                Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
+              currency: product.currency || currency,
             });
           } catch {}
         }
@@ -258,6 +275,7 @@ const ProductDetails = () => {
             category: categoryName(product),
             price:
               Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
+            currency: product.currency || currency,
           });
         } catch {}
       }
@@ -279,6 +297,7 @@ const ProductDetails = () => {
     if (!reviewText.trim()) return;
     try {
       setSubmitting(true);
+      const api = apiWithCurrency(currency);
       const response = await api.post(`/api/reviews`, {
         rating: Number(reviewRating),
         productid: id,
@@ -301,6 +320,7 @@ const ProductDetails = () => {
 
     try {
       setCartSubmitting(true);
+      const api = apiWithCurrency(currency);
       const payload = {
         product_id: product.ProductId,
         quantity: qty,
@@ -312,7 +332,6 @@ const ProductDetails = () => {
         `${product.Name} added to cart!`
       );
 
-      // 🔔 notify navbar (optimistic bump by units)
       window.dispatchEvent(
         new CustomEvent("cart:updated", { detail: { delta: qty } })
       );
@@ -324,7 +343,8 @@ const ProductDetails = () => {
           category: categoryName(product),
           price:
             Number(product.Price) - (Number(product.DiscountPrice || 0) || 0),
-          quantity: qty
+          quantity: qty,
+          currency: product.currency || currency,
         });
       } catch {}
     } catch (e) {
@@ -363,7 +383,7 @@ const ProductDetails = () => {
     );
   }
 
-  if (!product) {
+  if (!product || currencyLoading) {
     return null; // Return nothing while data is loading
   }
 
@@ -420,8 +440,8 @@ const ProductDetails = () => {
   const imgs = Array.isArray(product.product_images) ? product.product_images : [];
 
   const orderedImages = [
-    ...imgs.filter((i) => asBool(i?.ishero)).map(pickImageUrl),
-    ...imgs.filter((i) => !asBool(i?.ishero)).map(pickImageUrl),
+    ...imgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
+    ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
   ].filter(Boolean);
 
   // Remove duplicates
@@ -463,7 +483,7 @@ const ProductDetails = () => {
     offers: {
       "@type": "Offer",
       url: canonical,
-      priceCurrency: "INR",
+      priceCurrency: product.currency || currency,
       price: Number(salePrice).toFixed(2),
       availability:
         Number(product.Stock) > 0
@@ -558,7 +578,7 @@ const ProductDetails = () => {
           content={`${product.Name} — product image`}
         />
         <meta name="product:price:amount" content={String(salePrice)} />
-        <meta name="product:price:currency" content="INR" />
+        <meta name="product:price:currency" content={product.currency || currency} />
         <script type="application/ld+json">
           {JSON.stringify(productJsonLd)}
         </script>
@@ -693,10 +713,10 @@ const ProductDetails = () => {
                   {hasDiscount ? (
                     <div className="flex items-baseline gap-3">
                       <p className="text-3xl font-extrabold text-[#6B4226]">
-                        ${salePrice.toFixed(2)}
+                        {formatPrice(salePrice, product.currency || currency)}
                       </p>
                       <p className="text-base text-gray-500 line-through">
-                        ${mrp.toFixed(2)}
+                        {formatPrice(mrp, product.currency || currency)}
                       </p>
                       <p className="text-base text-[#A3B18A] font-semibold">
                         {discountPercentage}% OFF
@@ -704,7 +724,7 @@ const ProductDetails = () => {
                     </div>
                   ) : (
                     <p className="text-3xl font-extrabold text-[#6B4226]">
-                      ${mrp.toFixed(2)}
+                      {formatPrice(mrp, product.currency || currency)}
                     </p>
                   )}
                 </div>
@@ -753,7 +773,7 @@ const ProductDetails = () => {
                     {/* Wishlist Icon Button */}
                     <button
                       type="button"
-                      className={` flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
+                      className={`flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
                         isInWishlist
                           ? "bg-[#D4A5A5] text-white"
                           : "bg-black hover:bg-slate-600 text-[#D4A5A5]"
@@ -849,70 +869,68 @@ const ProductDetails = () => {
         {/* Reviews */}
         <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8">
-            <div className="lg:col-span-8">
-              <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-3 xs:p-4 sm:p-6">
-                <div className="flex items-center justify-between mb-2 xs:mb-3 sm:mb-4">
-                  <h2 className="text-lg xs:text-xl font-bold text-[#6B4226]">
-                    Customer Reviews
-                  </h2>
-                  <div className="flex items-center gap-1 xs:gap-2">
-                    <StarRating value={avgRating} />
-                    <span className="text-xs xs:text-sm text-[#3E2C23]">
-                      {avgRating}/5 • {reviewCount} review
-                      {reviewCount === 1 ? "" : "s"}
-                    </span>
-                  </div>
+            <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-3 xs:p-4 sm:p-6">
+              <div className="flex items-center justify-between mb-2 xs:mb-3 sm:mb-4">
+                <h2 className="text-lg xs:text-xl font-bold text-[#6B4226]">
+                  Customer Reviews
+                </h2>
+                <div className="flex items-center gap-1 xs:gap-2">
+                  <StarRating value={avgRating} />
+                  <span className="text-xs xs:text-sm text-[#3E2C23]">
+                    {avgRating}/5 • {reviewCount} review
+                    {reviewCount === 1 ? "" : "s"}
+                  </span>
                 </div>
-
-                {reviewLoading ? (
-                  <p className="text-[#6B4226] text-sm xs:text-base">
-                    Loading reviews…
-                  </p>
-                ) : reviewError ? (
-                  <p className="text-red-500 text-sm xs:text-base">
-                    {reviewError}
-                  </p>
-                ) : reviews.length === 0 ? (
-                  <p className="text-[#3E2C23] text-sm xs:text-base">
-                    No reviews yet. Be the first to review!
-                  </p>
-                ) : (
-                  <ul className="space-y-2 xs:space-y-3 sm:space-y-4">
-                    {reviews.map((r) => (
-                      <li
-                        key={
-                          r.ReviewId ||
-                          `${r.userid}-${r.productid}-${
-                            r.CreatedAt || r.created_at || Math.random()
-                          }`
-                        }
-                        className="border border-[#F1E7E5] rounded-lg p-3 xs:p-4"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1 xs:gap-2">
-                            <StarRating
-                              value={Number(r.Rating || r.rating) || 0}
-                            />
-                            <span className="text-xs xs:text-sm text-[#6B4226] font-semibold">
-                              {r.FullName || r?.users?.full_name || "Anonymous"}
-                            </span>
-                          </div>
-                          <time className="text-[10px] xs:text-xs text-[#3E2C23] opacity-70">
-                            {r.CreatedAt || r.created_at
-                              ? new Date(
-                                  r.CreatedAt || r.created_at
-                                ).toLocaleDateString("en-IN")
-                              : ""}
-                          </time>
-                        </div>
-                        <p className="mt-1 xs:mt-2 text-xs xs:text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                          {r.Comment || r.comment}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
               </div>
+
+              {reviewLoading ? (
+                <p className="text-[#6B4226] text-sm xs:text-base">
+                  Loading reviews…
+                </p>
+              ) : reviewError ? (
+                <p className="text-red-500 text-sm xs:text-base">
+                  {reviewError}
+                </p>
+              ) : reviews.length === 0 ? (
+                <p className="text-[#3E2C23] text-sm xs:text-base">
+                  No reviews yet. Be the first to review!
+                </p>
+              ) : (
+                <ul className="space-y-2 xs:space-y-3 sm:space-y-4">
+                  {reviews.map((r) => (
+                    <li
+                      key={
+                        r.ReviewId ||
+                        `${r.userid}-${r.productid}-${
+                          r.CreatedAt || r.created_at || Math.random()
+                        }`
+                      }
+                      className="border border-[#F1E7E5] rounded-lg p-3 xs:p-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1 xs:gap-2">
+                          <StarRating
+                            value={Number(r.Rating || r.rating) || 0}
+                          />
+                          <span className="text-xs xs:text-sm text-[#6B4226] font-semibold">
+                            {r.FullName || r?.users?.full_name || "Anonymous"}
+                          </span>
+                        </div>
+                        <time className="text-[10px] xs:text-xs text-[#3E2C23] opacity-70">
+                          {r.CreatedAt || r.created_at
+                            ? new Date(
+                                r.CreatedAt || r.created_at
+                              ).toLocaleDateString("en-IN")
+                            : ""}
+                        </time>
+                      </div>
+                      <p className="mt-1 xs:mt-2 text-xs xs:text-sm text-[#3E2C23] leading-relaxed whitespace-pre-line">
+                        {r.Comment || r.comment}
+                      </p>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
@@ -997,12 +1015,10 @@ const ProductDetails = () => {
                 : [];
               const relatedOrdered = [
                 ...rImgs
-                  .filter((i) => asBool(i?.is_hero === "Y" ? true : i?.is_hero))
+                  .filter((i) => asBool(i?.is_hero))
                   .map(pickImageUrl),
                 ...rImgs
-                  .filter(
-                    (i) => !asBool(i?.is_hero === "Y" ? true : i?.is_hero)
-                  )
+                  .filter((i) => !asBool(i?.is_hero))
                   .map(pickImageUrl),
               ].filter(Boolean);
               const relatedImage =
@@ -1024,6 +1040,7 @@ const ProductDetails = () => {
                       id: related.id || related.ProductId,
                       name: related.Name || related.name,
                       price: relatedSalePrice,
+                      currency: related.currency || currency,
                       image: relatedImage,
                       category: categoryName(related),
                     }}

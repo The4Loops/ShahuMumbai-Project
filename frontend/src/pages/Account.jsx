@@ -58,16 +58,6 @@ const AuthForm = () => {
   const [resetOtpSent, setResetOtpSent] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    console.log("Environment Variables:", {
-      REACT_APP_GOOGLE_CLIENT_ID: process.env.REACT_APP_GOOGLE_CLIENT_ID,
-      REACT_APP_SERVER_API_BASE_URL: process.env.REACT_APP_SERVER_API_BASE_URL,
-      REACT_APP_API_BASE_URL: process.env.REACT_APP_API_BASE_URL,
-      REACT_APP_SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL,
-      REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY,
-    });
-  }, []);
-
   const resetForm = () => {
     setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
     setErrors({});
@@ -212,14 +202,12 @@ const AuthForm = () => {
 
   const handleGoogleSSO = () => {
     if (!process.env.REACT_APP_GOOGLE_CLIENT_ID) {
-      console.error("Missing REACT_APP_GOOGLE_CLIENT_ID in .env");
       toast.error("Google login is not configured. Please contact support.");
       return;
     }
 
     const redirectUri = `${window.location.origin}/auth/callback`;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.REACT_APP_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=id_token&scope=openid%20profile%20email&nonce=${Math.random().toString(36).substring(2)}`;
-    console.log("Redirecting to Google OAuth:", authUrl);
     window.location.href = authUrl;
   };
 

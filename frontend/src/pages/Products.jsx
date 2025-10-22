@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import api from "../supabase/axios";
+import { apiWithCurrency } from "../supabase/axios";
 import ProductCard from "../components/ProductCard";
 import Layout from "../layout/Layout";
 import { toast } from "react-toastify";
 import { FiFilter, FiChevronDown, FiX, FiSearch } from "react-icons/fi";
 import { Helmet } from "react-helmet-async";
-import { motion, AnimatePresence } from "framer-motion"; // Added for animations
+import { motion, AnimatePresence } from "framer-motion";
+import { useCurrency } from "../supabase/CurrencyContext";
 
 const ITEMS_PER_PAGE = 30;
 const FALLBACK_CATEGORIES = ["Men", "Women", "Accessories"];
@@ -17,7 +18,7 @@ const categoryName = (p) =>
   p?.categories?.name ||
   (p?.category && p.category.name) ||
   (Array.isArray(p?.categories) ? p.categories[0]?.Name : null) ||
-  "Uncategorized";
+  "Accessories";
 
 const IMAGE_BASE =
   process.env.REACT_APP_IMAGE_BASE ||
@@ -53,6 +54,7 @@ const useDebounced = (value, delay = 300) => {
 };
 
 const Products = () => {
+  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [allProducts, setAllProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,7 +63,7 @@ const Products = () => {
   const [selectedCategories, setSelectedCategories] = useState(new Set());
   const [sort, setSort] = useState("relevance");
   const [page, setPage] = useState(1);
-  const [isMobile, setIsMobile] = useState(false); // Added for responsive handling
+  const [isMobile, setIsMobile] = useState(false);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const menuBtnRef = useRef(null);
@@ -72,7 +74,7 @@ const Products = () => {
     const handleResize = () => {
       setIsMobile(window.innerWidth < 640);
     };
-    handleResize(); // Initial check
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -86,6 +88,7 @@ const Products = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      const api = apiWithCurrency(currency);
       const response = await api.get(`/api/products`);
       const products = response.data || [];
 
@@ -101,6 +104,7 @@ const Products = () => {
           name: p.Name,
           description: p.Description || "No description available",
           price: Number(p.Price || 0),
+          currency: p.currency || currency, // Include currency from response
           category: categoryName(p),
           image: ordered[0] || "/assets/images/placeholder.png",
         };
@@ -117,8 +121,10 @@ const Products = () => {
   };
 
   useEffect(() => {
-    fetchProducts();
-  }, []);
+    if (!currencyLoading) {
+      fetchProducts();
+    }
+  }, [currency, currencyLoading]);
 
   const categoryOptions = useMemo(() => {
     const set = new Set(allProducts.map((p) => p.category).filter(Boolean));
@@ -175,7 +181,7 @@ const Products = () => {
 
   useEffect(() => {
     const onDocClick = (e) => {
-      if (!menuOpen || isMobile) return; // Disable outside click close on mobile (since it's inline)
+      if (!menuOpen || isMobile) return;
       const target = e.target;
       if (
         menuRef.current &&
@@ -220,8 +226,21 @@ const Products = () => {
     itemListElement: paged.map((p, idx) => ({
       "@type": "ListItem",
       position: start + idx + 1,
-      url: `${baseUrl}/products/${p.id}`,
-      name: p.name,
+      item: {
+        "@type": "Product",
+        name: p.name,
+        url: `${baseUrl}/products/${p.id}`,
+        image: p.image ? [p.image] : undefined,
+        description: p.description,
+        category: p.category,
+        offers: {
+          "@type": "Offer",
+          url: `${baseUrl}/products/${p.id}`,
+          priceCurrency: p.currency || currency,
+          price: typeof p.price === "number" ? p.price.toFixed(2) : String(p.price),
+          availability: "https://schema.org/InStock"
+        }
+      }
     })),
   };
 
@@ -245,7 +264,7 @@ const Products = () => {
       scale: 1,
       transition: {
         duration: 0.4,
-        ease: [0.22, 1, 0.36, 1], // Smooth ease-out
+        ease: [0.22, 1, 0.36, 1],
       },
     },
   };
@@ -257,10 +276,7 @@ const Products = () => {
       resizeObserver = new ResizeObserver((entries) => {
         for (let entry of entries) {
           if (entry.contentRect) {
-            // Trigger subtle re-render or animation on resize for smoothness
-            window.requestAnimationFrame(() => {
-              // Optional: Force a minor state update if needed for layout shift prevention
-            });
+            window.requestAnimationFrame(() => {});
           }
         }
       });
@@ -279,7 +295,6 @@ const Products = () => {
   return (
     <Layout>
       <Helmet>
-        {/* Core SEO */}
         <title>{pageTitle}</title>
         <meta name="description" content={pageDesc} />
         <meta
@@ -298,13 +313,9 @@ const Products = () => {
             ...Array.from(selectedCategories || [])
           ].filter(Boolean).join(", ")}
         />
-
-        {/* Canonical + hreflang */}
         <link rel="canonical" href={canonical} />
         <link rel="alternate" hrefLang="en-IN" href={canonical} />
         <link rel="alternate" hrefLang="x-default" href={canonical} />
-
-        {/* Open Graph */}
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
@@ -313,16 +324,6 @@ const Products = () => {
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/products.jpg`} />
         <meta property="og:image:alt" content="Shahu Mumbai — product collection" />
-
-        {/* Twitter */}
-        {/* <meta name="twitter:card" content="summary_large_image" /> */}
-        {/* If you have a handle, you can add: */}
-        {/* <meta name="twitter:site" content="@yourhandle" /> */}
-        {/* <meta name="twitter:title" content={pageTitle} />
-        <meta name="twitter:description" content={pageDesc} />
-        <meta name="twitter:image" content={`${baseUrl}/og/products.jpg`} /> */}
-
-        {/* Breadcrumbs */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -333,8 +334,6 @@ const Products = () => {
             ]
           })}
         </script>
-
-        {/* Page type: CollectionPage (browse) or SearchResultsPage (search) */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
@@ -346,46 +345,12 @@ const Products = () => {
             ...(debouncedSearch ? { query: debouncedSearch } : {})
           })}
         </script>
-
-        {/* ItemList: make each entry a Product with an Offer */}
         <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "ItemList",
-            name: "Products",
-            url: `${canonical}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`,
-            numberOfItems: paged.length,
-            itemListElement: paged.map((p, idx) => ({
-              "@type": "ListItem",
-              position: start + idx + 1,
-              item: {
-                "@type": "Product",
-                name: p.name,
-                url: `${baseUrl}/products/${p.id}`,
-                image: p.image ? [p.image] : undefined,
-                description: p.description,
-                category: p.category,
-                offers: {
-                  "@type": "Offer",
-                  url: `${baseUrl}/products/${p.id}`,
-                  priceCurrency: "INR",
-                  price: typeof p.price === "number" ? p.price.toFixed(2) : String(p.price),
-                  availability: "https://schema.org/InStock"
-                }
-              }
-            }))
-          })}
+          {JSON.stringify(itemListJsonLd)}
         </script>
-
-        {/* Optional pagination rels – only if you later add `?page=` in the URL */}
-        {/*
-        <link rel="prev" href={`${canonical}?page=${page-1}`} />
-        <link rel="next" href={`${canonical}?page=${page+1}`} />
-        */}
       </Helmet>
 
       <div className="pt-[10px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
-        {/* Banner */}
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -422,7 +387,6 @@ const Products = () => {
           </div>
         </motion.div>
 
-        {/* Controls */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -439,8 +403,7 @@ const Products = () => {
               of <span className="font-bold">{filtered.length}</span>
             </p>
 
-            {/* Filter Dropdown */}
-            <div className="relative w-full sm:w-auto"> {/* Made full-width on mobile for better flow */}
+            <div className="relative w-full sm:w-auto">
               <button
                 ref={menuBtnRef}
                 onClick={() => setMenuOpen((o) => !o)}
@@ -475,7 +438,6 @@ const Products = () => {
                     } products-filter-dropdown`}
                   >
                     <div className="p-3 xs:p-4 space-y-3">
-                      {/* Search */}
                       <div>
                         <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1">
                           Search
@@ -497,8 +459,6 @@ const Products = () => {
                           />
                         </div>
                       </div>
-
-                      {/* Categories */}
                       <div>
                         <div className="flex items-center justify-between">
                           <label className="block text-xs xs:text-sm font-bold text-[#4a2c17]">
@@ -540,8 +500,6 @@ const Products = () => {
                           })}
                         </div>
                       </div>
-
-                      {/* Sort */}
                       <div>
                         <label className="block text-xs xs:text-sm font-bold text-[#4a2c17] mb-1 xs:mb-2">
                           Sort by
@@ -569,8 +527,6 @@ const Products = () => {
                         </div>
                       </div>
                     </div>
-
-                    {/* Footer */}
                     <div className="flex items-center justify-between gap-2 p-2 xs:p-3 border-t-2 border-black bg-[#fdf6e9] rounded-b-xl">
                       <button
                         onClick={clearFilters}
@@ -594,16 +550,15 @@ const Products = () => {
           </div>
         </motion.div>
 
-        {/* Grid */}
         <motion.div
           className="max-w-7xl mx-auto mt-4 xs:mt-6 products-grid"
           variants={containerVariants}
           initial="hidden"
-          animate={loading ? "hidden" : "visible"}
+          animate={loading || currencyLoading ? "hidden" : "visible"}
           transition={{ duration: isMobile ? 0.6 : 0.4 }}
         >
           <div className="grid gap-4 xs:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-            {loading ? (
+            {loading || currencyLoading ? (
               Array.from({ length: 6 }).map((_, i) => (
                 <motion.div
                   key={i}
@@ -624,7 +579,7 @@ const Products = () => {
                   whileHover={{ y: -5, transition: { duration: 0.2 } }}
                   className="w-full"
                 >
-                  <ProductCard product={product} />
+                  <ProductCard product={product} currency={currency} />
                 </motion.div>
               ))
             ) : (
@@ -638,7 +593,6 @@ const Products = () => {
             )}
           </div>
 
-          {/* Pagination */}
           <AnimatePresence mode="wait">
             {totalPages > 1 && (
               <motion.div

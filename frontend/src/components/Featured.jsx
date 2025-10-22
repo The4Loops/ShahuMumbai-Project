@@ -16,7 +16,6 @@ function Featured() {
   const fetchLatestProducts = async () => {
     try {
       const api = apiWithCurrency(currency);
-      console.log('Fetching products with currency:', currency);
       const response = await api.get("/api/products/getLatestProducts");
       setProducts(response.data || []); // Ensure array even if empty
     } catch (error) {
@@ -89,7 +88,7 @@ function Featured() {
               <div className="w-28 h-28 mx-auto mb-6 flex items-center justify-center rounded-full bg-[#F1E6E1] shadow-inner overflow-hidden">
                 <img
                   src={
-                    product.product_images?.find((img) => img.is_hero === "Y")?.image_url ||
+                    product.product_images?.find((img) => img.is_hero === true)?.image_url ||
                     placeholderImg
                   }
                   alt={product.Name}

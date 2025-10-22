@@ -1,13 +1,13 @@
-// src/pages/Wishlist.jsx
 import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { AiOutlineShoppingCart, AiOutlineDelete } from "react-icons/ai";
 import Layout from "../layout/Layout";
 import { Ecom, UX } from "../analytics";
-import api from "../supabase/axios";
+import { apiWithCurrency } from "../supabase/axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import { Helmet } from "react-helmet-async";
+import { useCurrency } from "../supabase/CurrencyContext";
 
 // Animation variants
 const fadeUpVariant = {
@@ -19,7 +19,16 @@ const fadeUpVariant = {
   }),
 };
 
+// Format price with currency
+const formatPrice = (value, currencyCode) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode || "USD",
+  }).format(value);
+};
+
 const Wishlist = () => {
+  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [wishlistItems, setWishlistItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -40,13 +49,14 @@ const Wishlist = () => {
 
   useEffect(() => {
     const fetchWishlist = async () => {
-      if (!token || !userId) {
+      if (!token || !userId || currencyLoading) {
         setError("Please log in to view your wishlist");
         setLoading(false);
         return;
       }
       try {
         setLoading(true);
+        const api = apiWithCurrency(currency);
         const { data } = await api.get("/api/wishlist");
         setWishlistItems(data.data || []);
       } catch (err) {
@@ -57,12 +67,13 @@ const Wishlist = () => {
       }
     };
     fetchWishlist();
-  }, [token, userId]);
+  }, [token, userId, currency, currencyLoading]);
 
   const handleAddToCart = async (item) => {
     if (item.products.stock <= 0 || cartSubmitting) return;
     try {
       setCartSubmitting(true);
+      const api = apiWithCurrency(currency);
       const payload = {
         user_id: userId,
         product_id: item.product_id,
@@ -75,9 +86,10 @@ const Wishlist = () => {
         Ecom.addToCart({
           id: item.product_id,
           title: item.products.name,
-          category: item.products.categories?.name || "N/A",
+          category: item.products.categories?.[0]?.name || "N/A",
           price: item.products.price - (Number(item.products.discountprice) || 0),
           quantity: 1,
+          currency: item.products.currency || currency,
         });
       } catch {}
     } catch (err) {
@@ -91,6 +103,7 @@ const Wishlist = () => {
     if (removeSubmitting) return;
     try {
       setRemoveSubmitting(true);
+      const api = apiWithCurrency(currency);
       await api.delete(`/api/wishlist/${itemId}`);
       setWishlistItems(wishlistItems.filter((i) => i.id !== itemId));
       toast.success("Removed from wishlist");
@@ -99,8 +112,9 @@ const Wishlist = () => {
           id: item.product_id,
           item_id: item.product_id,
           item_name: item.products.name,
-          category: item.products.categories?.name || "N/A",
+          category: item.products.categories?.[0]?.name || "N/A",
           price: item.products.price - (Number(item.products.discountprice) || 0),
+          currency: item.products.currency || currency,
         });
       } catch {}
     } catch (err) {
@@ -114,6 +128,7 @@ const Wishlist = () => {
     if (clearSubmitting) return;
     try {
       setClearSubmitting(true);
+      const api = apiWithCurrency(currency);
       await api.delete("/api/wishlist");
       const itemsToRemove = [...wishlistItems];
       setWishlistItems([]);
@@ -124,8 +139,9 @@ const Wishlist = () => {
             id: item.product_id,
             item_id: item.product_id,
             item_name: item.products.name,
-            category: item.products.categories?.name || "N/A",
+            category: item.products.categories?.[0]?.name || "N/A",
             price: item.products.price - (Number(item.products.discountprice) || 0),
+            currency: item.products.currency || currency,
           })
         );
       } catch {}
@@ -148,7 +164,29 @@ const Wishlist = () => {
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const canonical = `${origin}/wishlist`;
 
-  if (loading) return <p className="p-6 text-center text-gray-800">Loading...</p>;
+  const wishlistJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Collection",
+    name: "Wishlist",
+    itemListElement: wishlistItems.map((item, index) => ({
+      "@type": "ListItem",
+      position: index + 1,
+      item: {
+        "@type": "Product",
+        name: item.products.name,
+        image: item.products.product_images?.find((img) => img.is_hero)?.image_url || item.products.image_url,
+        sku: String(item.product_id),
+        offers: {
+          "@type": "Offer",
+          price: (item.products.price - (Number(item.products.discountprice) || 0)).toFixed(2),
+          priceCurrency: item.products.currency || currency,
+          availability: item.products.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        },
+      },
+    })),
+  };
+
+  if (currencyLoading || loading) return <p className="p-6 text-center text-gray-800">Loading...</p>;
   if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
 
   return (
@@ -159,12 +197,12 @@ const Wishlist = () => {
           name="description"
           content="View and manage items you’ve saved for later at Shahu Mumbai."
         />
-        {/* Utility/personalized page – keep out of index */}
         <meta name="robots" content="noindex,follow" />
         <link rel="canonical" href={canonical} />
         <meta property="og:title" content="Wishlist | Shahu Mumbai" />
         <meta property="og:description" content="Your saved items in one place." />
         <meta property="og:url" content={canonical} />
+        <script type="application/ld+json">{JSON.stringify(wishlistJsonLd)}</script>
       </Helmet>
 
       <div className="p-6">
@@ -204,7 +242,7 @@ const Wishlist = () => {
           {[
             { label: "Total Items", value: wishlistItems.length },
             { label: "In Stock", value: inStockItems.length },
-            { label: "Total Value", value: `$${totalValue}` },
+            { label: "Total Value", value: formatPrice(totalValue, currency) },
           ].map((stat, index) => (
             <motion.div
               key={stat.label}
@@ -259,15 +297,15 @@ const Wishlist = () => {
                 <div className="p-4">
                   <div className="text-xs text-gray-500 uppercase mb-1">
                     {item.products.categories?.length
-                    ? item.products.categories.map((c) => c.name).join(", ")
-                    : "N/A"}
+                      ? item.products.categories.map((c) => c.name).join(", ")
+                      : "N/A"}
                   </div>
                   <div className="font-semibold text-sm mb-2 line-clamp-2">{item.products.name}</div>
                   <div className="mb-2">
-                    <span className="text-lg font-bold text-gray-800">₹{salePrice.toFixed(2)}</span>
+                    <span className="text-lg font-bold text-gray-800">{formatPrice(salePrice, item.products.currency || currency)}</span>
                     {hasDiscount && (
                       <span className="line-through text-sm text-gray-400 ml-2">
-                        ${item.products.price.toFixed(2)}
+                        {formatPrice(item.products.price, item.products.currency || currency)}
                       </span>
                     )}
                   </div>

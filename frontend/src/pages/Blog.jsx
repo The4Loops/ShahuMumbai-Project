@@ -59,7 +59,6 @@ const Blog = () => {
 
   // Fetch blogs and likes
   useEffect(() => {
-    if (!userId) return;
     const fetchBlogsAndLikes = async () => {
       try {
         const blogsResponse = await api.get("/api/blogs");
