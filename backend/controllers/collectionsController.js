@@ -142,61 +142,73 @@ exports.getCollection = async (req, res) => {
   try {
     const { id } = req.params;
     if (!intRe.test(id)) {
-      return res.status(400).json({ error: 'Invalid collection id format' });
+      return res.status(400).json({ error: "Invalid collection id format" });
     }
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.json({
         id: parseInt(id),
-        title: 'Festive Edit',
-        slug: 'festive-edit',
-        description: 'Handpicked looks',
+        title: "Festive Edit",
+        slug: "festive-edit",
+        description: "Handpicked looks",
         cover_image: null,
-        status: 'PUBLISHED',
+        status: "PUBLISHED",
         is_active: true,
         created_at: now(),
         updated_at: now(),
-        categoryids: [1],
+        categoryids: [
+          {
+            category_id: 1,
+            name: "Scarfs",
+            item_count: 10, // Mock product count for dev
+          },
+        ],
       });
     }
 
     const r = await req.dbPool.request()
-      .input('Id', sql.Int, parseInt(id))
+      .input("Id", sql.Int, parseInt(id))
       .query(`
         SELECT
-         CollectionId          AS id,
-          Title       AS title,
-          Slug        AS slug,
+          CollectionId AS id,
+          Title AS title,
+          Slug AS slug,
           Description AS description,
-          CoverImage  AS cover_image,
-          Status      AS status,
-          IsActive    AS is_active,
-          CreatedAt   AS created_at,
-          UpdatedAt   AS updated_at
+          CoverImage AS cover_image,
+          Status AS status,
+          IsActive AS is_active,
+          CreatedAt AS created_at,
+          UpdatedAt AS updated_at
         FROM dbo.collections
         WHERE CollectionId = @Id
       `);
 
     const data = r.recordset?.[0];
-    if (!data) return res.status(404).json({ error: 'Collection not found' });
+    if (!data) return res.status(404).json({ error: "Collection not found" });
 
     const map = await req.dbPool.request()
-      .input('Id', sql.Int, parseInt(id))
+      .input("Id", sql.Int, parseInt(id))
       .query(`
-        SELECT CategoryId AS category_id
+        SELECT 
+          Categories.CategoryId AS category_id,
+          Categories.Name AS name,
+          COUNT(Products.ProductId) AS item_count
         FROM CollectionCategories
-        WHERE CollectionId = @Id
+        LEFT JOIN Categories ON Categories.CategoryId = CollectionCategories.CategoryId
+        LEFT JOIN Products ON Products.CategoryId = Categories.CategoryId
+        WHERE CollectionCategories.CollectionId = @Id
+        GROUP BY Categories.CategoryId, Categories.Name
       `);
 
-    const categoryids = (map.recordset || []).map(x => x.category_id);
+    const categoryids = map.recordset;
     return res.json({
       ...data,
-      is_active: data.is_active =='Y' ? true : false,
+      is_active: data.is_active === "Y" ? true : false,
       categoryids,
     });
   } catch (e) {
-    console.error('collections.getCollection error', e);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("collections.getCollection error", e);
+    return res.status(500).json({ error: "Internal server error" });
   }
 };
 
