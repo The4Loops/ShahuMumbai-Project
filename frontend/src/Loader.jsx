@@ -1,9 +1,10 @@
-import React, { useState,useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import vintageVideo from "../src/assets/Loader/ShahuLoading.mp4";
 
 const VintageLoader = ({ onFinish }) => {
   const [isLoading, setIsLoading] = useState(true);
+  const videoRef = useRef(null);
 
   const handleVideoEnd = () => {
     setIsLoading(false);
@@ -11,15 +12,15 @@ const VintageLoader = ({ onFinish }) => {
   };
 
   useEffect(() => {
-    if (isLoading) {
-      document.body.style.overflow = 'hidden';
-    } else {
-      document.body.style.overflow = '';
+    // Video speed (1.5x / 2x)
+    if (videoRef.current) {
+      videoRef.current.playbackRate = 2; // adjust speed to complete the loading faster
     }
+  }, []);
 
-    return () => {
-      document.body.style.overflow = '';
-    };
+  useEffect(() => {
+    document.body.style.overflow = isLoading ? "hidden" : "";
+    return () => (document.body.style.overflow = "");
   }, [isLoading]);
 
   return (
@@ -29,11 +30,11 @@ const VintageLoader = ({ onFinish }) => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.75, ease: "easeInOut" }}
+          transition={{ duration: 0.1, ease: "easeInOut" }}
           className="fixed inset-0 z-50 flex items-center justify-center bg-white overflow-hidden"
         >
-          {/* Fullscreen responsive video */}
           <motion.video
+            ref={videoRef}
             src={vintageVideo}
             autoPlay
             muted
@@ -41,14 +42,8 @@ const VintageLoader = ({ onFinish }) => {
             onEnded={handleVideoEnd}
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, ease: "easeOut", delay: 0.1 }}
-            className="
-              w-full h-full max-w-full max-h-full
-              sm:max-w-md sm:max-h-md
-              md:max-w-lg md:max-h-lg
-              lg:max-w-xl lg:max-h-xl
-              object-contain rounded-lg
-            "
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="w-full h-full object-contain rounded-lg"
           />
         </motion.div>
       )}

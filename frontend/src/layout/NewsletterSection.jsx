@@ -138,7 +138,7 @@ export default function NewsletterPopup() {
           <motion.div
             variants={contentVariants}
             onClick={(e) => e.stopPropagation()}
-            className="relative bg-white rounded-2xl shadow-xl p-4 xs:p-6 sm:p-8 w-[90vw] max-w-[350px] xs:max-w-[340px] sm:max-w-md text-center newsletter-popup-content"
+            className="relative bg-[#F1E7E5] rounded-2xl shadow-xl p-4 xs:p-6 sm:p-8 w-[90vw] max-w-[350px] xs:max-w-[340px] sm:max-w-md text-center newsletter-popup-content"
           >
             <motion.button
               onClick={handleClose}
@@ -164,7 +164,7 @@ export default function NewsletterPopup() {
                 whileHover={{ scale: 1.05, rotate: 5 }}
                 className="p-3 xs:p-4 bg-pink-100 rounded-full shadow-md cursor-default"
               >
-                <Mail className="w-6 h-6 xs:w-8 xs:h-8 text-pink-500" />
+                <Mail className="w-6 h-6 xs:w-8 xs:h-8 text-[#A67B5B]" />
               </motion.div>
             </motion.div>
 
@@ -226,7 +226,7 @@ export default function NewsletterPopup() {
                       whileHover={{ scale: 1.05 }}
                       whileTap={{ scale: 0.95 }}
                       type="submit"
-                      className="flex-shrink-0 bg-gradient-to-r from-pink-500 to-purple-500 text-white p-2 xs:py-2 font-semibold rounded-full shadow-md text-xs xs:text-sm"
+                      className="flex-shrink-0 bg-gradient-to-r from-[#A67B5B] to-[#C19A6B] text-white p-2 xs:py-2 font-semibold rounded-full shadow-md text-xs xs:text-sm"
                     >
                       Subscribe
                     </motion.button>
