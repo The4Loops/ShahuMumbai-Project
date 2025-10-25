@@ -13,7 +13,7 @@ const sql = require('mssql');
 async function mergeOrderMetaById(dbPool, orderId, metaPatch = {}, otherFields = {}) {
   try {
     const sel = await dbPool.request()
-      .input('OrderId', sql.Int, orderId)
+      .input('OrderId', sql.BigInt, orderId)
       .query('SELECT Meta FROM orders WHERE OrderId = @OrderId');
 
     if (!sel.recordset[0]) return { error: 'order_not_found' };
@@ -59,7 +59,7 @@ async function mergeOrderMetaById(dbPool, orderId, metaPatch = {}, otherFields =
 /** Return existing open RZP order id for our OrderId if present, else null. */
 async function getExistingRzpOrderId(dbPool, orderId) {
   const r = await dbPool.request()
-    .input('OrderId', sql.Int, orderId)
+    .input('OrderId', sql.BigInt, orderId)
     .query(`
       SELECT JSON_VALUE(Meta, '$.razorpay_order_id') AS rzpOrderId, PaymentStatus
       FROM orders
@@ -125,7 +125,7 @@ exports.createRazorpayOrder = async (req, res) => {
         razorpay_currency: currency,
       };
       const patch = {
-        PaymentStatus: 'pending',
+        PaymentStatus: 'unpaid',
         Status: 'pending',
         UpdatedAt: new Date(),
       };
@@ -173,7 +173,7 @@ exports.verifyPayment = async (req, res) => {
     if (!row) return res.status(404).json({ ok: false, message: 'order_not_found' });
 
     const patch = {
-      PaymentStatus: ok ? 'paid' : 'failed',
+      PaymentStatus: ok ? 'paid' : 'unpaid',
       Status: ok ? 'paid' : 'pending',
       UpdatedAt: new Date(),
       ...(ok && !row.PlacedAt ? { PlacedAt: new Date() } : {}),
@@ -238,7 +238,7 @@ exports.webhook = async (req, res) => {
     if (event.event === 'payment.captured' || event.event === 'order.paid') {
       status = 'paid'; payment_status = 'paid';
     } else if (event.event?.includes('failed')) {
-      status = 'pending'; payment_status = 'failed';
+      status = 'pending'; payment_status = 'unpaid';
     } else if (event.event?.startsWith('refund.')) {
       status = 'paid'; payment_status = 'refunded';
     }

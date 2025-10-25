@@ -55,6 +55,7 @@ function Checkout() {
       name.trim().length > 0 &&
       /\S+@\S+\.\S+/.test(email) &&
       /^\+?\d{10,}$/.test(phone) &&
+      /^\+?\d{10,14}$/.test(phone) &&
       address.trim().length > 5 &&
       paymentMethod
     );
@@ -102,13 +103,13 @@ function Checkout() {
             },
           ],
           currency: "INR",
-          payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
+           payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
           coupon: null,
           shipping_total: 0,
           tax_total: 0,
           discount_total: 0,
           status: "pending",
-          payment_status: "pending",
+          payment_status: "unpaid",
           meta: { transaction_token: newToken },
         }),
       });
@@ -142,7 +143,7 @@ function Checkout() {
 
       const ok = await loadRazorpay();
       if (!ok) {
-        alert("Razorpay failed to load");
+        alert("Razorpay failed to load. Check your network/CSP.");
         return;
       }
 
@@ -185,6 +186,11 @@ function Checkout() {
             window.location.href = `/order/failed?order_id=${orderNumber}`;
           }
         },
+        modal: {
+          ondismiss: function() {
+            console.log("Razorpay modal closed");
+          }
+        }
       };
 
       new window.Razorpay(options).open();
