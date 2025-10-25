@@ -1,4 +1,3 @@
-// src/pages/MyOrders.jsx
 import React, { useState, useEffect } from "react";
 import {
   FaHatCowboy,
@@ -12,7 +11,9 @@ import {
 } from "react-icons/fa";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
-import api from "../supabase/axios"; // ✅ use your axios wrapper
+import { apiWithCurrency } from "../supabase/axios";
+import { useCurrency } from "../supabase/CurrencyContext";
+import { toast } from "react-toastify";
 
 // Icon + color styling per item type
 const getItemIcon = (name) => {
@@ -27,33 +28,45 @@ const getItemIcon = (name) => {
   return { icon: <FaQuestion />, color: "bg-gray-100 text-gray-600" };
 };
 
+// Format price with currency
+const formatPrice = (value, currencyCode) => {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: currencyCode || "USD",
+  }).format(value);
+};
+
 const MyOrders = () => {
+  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedOrderId, setSelectedOrderId] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ✅ Fetch orders dynamically
+  // Fetch orders dynamically
   useEffect(() => {
     const fetchOrders = async () => {
+      if (currencyLoading) return;
       try {
         setLoading(true);
+        const api = apiWithCurrency(currency);
         const response = await api.get("/api/orders/user");
         setOrders(response.data.orders || []);
       } catch (err) {
-        console.error("Failed to fetch orders:", err);
+        toast.dismiss();
+        toast.error("Failed to load orders. Please try again.");
       } finally {
         setLoading(false);
       }
     };
     fetchOrders();
-  }, []);
+  }, [currency, currencyLoading]);
 
   const handleEmailInvoice = (order) => {
     const invoiceText = `
 Invoice for Order ${order.id}
 -----------------------------
-Date: ${order.placed_at}
+Date: ${formatDateTime(order.placed_at)}
 Customer: ${order.customer?.name}
 Email: ${order.customer?.email}
 Address: ${order.customer?.address}
@@ -61,13 +74,13 @@ Payment: ${order.customer?.payment}
 
 Items:
 ${order.items
-  ?.map((item) => `• ${item.quantity}x ${item.product_name} - $${(item.unit_price * item.quantity).toFixed(2)}`)
+  ?.map((item) => `• ${item.quantity}x ${item.product_name} - ${formatPrice(item.unit_price * item.quantity, item.currency || currency)}`)
   .join("\n")}
 
-Subtotal: $${order.subtotal?.toFixed(2)}
-Shipping: ${order.shipping > 0 ? `$${order.shipping}` : "Free"}
-Tax: $${order.tax?.toFixed(2)}
-Total: $${(order.subtotal + order.shipping + order.tax).toFixed(2)}
+Subtotal: ${formatPrice(order.subtotal, order.currency || currency)}
+Shipping: ${order.shipping > 0 ? formatPrice(order.shipping, order.currency || currency) : "Free"}
+Tax: ${formatPrice(order.tax, order.currency || currency)}
+Total: ${formatPrice(order.subtotal + order.shipping + order.tax, order.currency || currency)}
 
 Tracking:
 ${order.tracking?.carrier} - ${order.tracking?.trackingNumber}
@@ -90,7 +103,7 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
     });
   };
 
-  const sortedOrders = [...orders].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sortedOrders = [...orders].sort((a, b) => new Date(b.placed_at) - new Date(a.placed_at));
   const filteredOrders = sortedOrders.filter((order) =>
     order.id?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -98,6 +111,36 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const canonical = `${baseUrl}/myorder`;
+
+  const ordersJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Order",
+    orderStatus: "https://schema.org/OrderProcessing",
+    merchant: {
+      "@type": "Organization",
+      name: "Shahu Mumbai",
+    },
+    orderItem: filteredOrders.flatMap((order) =>
+      order.items.map((item) => ({
+        "@type": "OrderItem",
+        orderedItem: {
+          "@type": "Product",
+          name: item.product_name,
+          sku: String(item.product_id),
+          offers: {
+            "@type": "Offer",
+            price: item.unit_price.toFixed(2),
+            priceCurrency: item.currency || currency,
+          },
+        },
+        quantity: item.quantity,
+      }))
+    ),
+  };
+
+  if (currencyLoading) {
+    return null; // Wait for currency to load
+  }
 
   return (
     <Layout>
@@ -111,6 +154,7 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
         <meta property="og:description" content="Private order history page for customers." />
         <meta property="og:url" content={canonical} />
         <meta name="twitter:card" content="summary" />
+        <script type="application/ld+json">{JSON.stringify(ordersJsonLd)}</script>
       </Helmet>
 
       <div className="p-4 md:p-6 bg-[#F1E7E5] min-h-screen">
@@ -174,24 +218,24 @@ Expected Delivery: ${order.tracking?.expectedDelivery}
                           {icon}
                         </div>
                         <div className="flex-1">
-                          <p className="font-medium text-[#1C1C1C]">{item.name}</p>
+                          <p className="font-medium text-[#1C1C1C]">{item.product_name}</p>
                           <p className="text-sm text-[#666666]">
-                            Qty: {item.quantity} • ${item.unit_price?.toFixed(2)}
+                            Qty: {item.quantity} • {formatPrice(item.unit_price, item.currency || currency)}
                           </p>
                         </div>
                         <div className="font-semibold text-nowrap text-[#1C1C1C]">
-                          ${(item.unit_price * item.quantity).toFixed(2)}
+                          {formatPrice(item.unit_price * item.quantity, item.currency || currency)}
                         </div>
                       </div>
                     );
                   })}
 
                   <div className="text-right space-y-1 text-[#1C1C1C]">
-                    <p>Subtotal: ${order.subtotal?.toFixed(2)}</p>
-                    <p>Shipping: {order.shipping > 0 ? `$${order.shipping}` : "Free"}</p>
-                    <p>Tax: ${order.tax?.toFixed(2)}</p>
+                    <p>Subtotal: {formatPrice(order.subtotal, order.currency || currency)}</p>
+                    <p>Shipping: {order.shipping > 0 ? formatPrice(order.shipping, order.currency || currency) : "Free"}</p>
+                    <p>Tax: {formatPrice(order.tax, order.currency || currency)}</p>
                     <p className="font-bold">
-                      Total: ${(order.subtotal + order.shipping + order.tax).toFixed(2)}
+                      Total: {formatPrice(order.subtotal + order.shipping + order.tax, order.currency || currency)}
                     </p>
                   </div>
 

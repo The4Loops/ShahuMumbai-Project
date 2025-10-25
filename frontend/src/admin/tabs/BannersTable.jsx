@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useContext } from "react";
-import { Search, Edit, } from "lucide-react";
+import { Search, Edit } from "lucide-react";
 import api from "../../supabase/axios";
 import { AdminActionsContext } from "../AdminActionsContext";
 
@@ -31,10 +31,18 @@ const BannerCards = () => {
         const { data } = await api.get("/api/banners");
         if (!alive) return;
         const bannerList = Array.isArray(data) ? data : data?.banners || [];
-        setBanners(bannerList);
+        setBanners(
+          bannerList.map((banner) => ({
+            id: banner.BannerId,
+            title: banner.Title,
+            description: banner.Description,
+            image_url: banner.ImageUrl,
+            status: banner.IsActive === "Y" ? "Active" : "Inactive",
+          }))
+        );
       } catch (e) {
         if (!alive) return;
-        setError(e?.response?.data?.error || "Failed to load banners");
+        setError(e?.response?.data?.message || e?.message || "Failed to load banners");
       } finally {
         if (alive) setLoading(false);
       }
@@ -80,6 +88,9 @@ const BannerCards = () => {
                 src={banner.image_url}
                 alt={banner.title}
                 className="w-full h-40 object-cover rounded-lg"
+                onError={(e) => {
+                  e.target.src = "https://via.placeholder.com/300x160?text=Image+Not+Found";
+                }}
               />
               <div className="mt-3 flex-1">
                 <h3 className="text-lg font-semibold">{banner.title}</h3>

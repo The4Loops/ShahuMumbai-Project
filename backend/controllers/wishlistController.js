@@ -1,6 +1,20 @@
 const jwt = require('jsonwebtoken');
 const sql = require('mssql');
 
+// Helper to get exchange rate from DB
+const getExchangeRate = async (dbPool, currency = 'USD') => {
+  try {
+    const result = await dbPool.request()
+      .input('CurrencyCode', sql.VarChar(3), currency.toUpperCase())
+      .query('SELECT ExchangeRate FROM Currencies WHERE CurrencyCode = @CurrencyCode');
+    
+    return result.recordset[0]?.ExchangeRate || 1.0; // Fallback to USD
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    return 1.0; // Fallback on error
+  }
+};
+
 // Verify User
 const verifyUser = (req) => {
   const token = req.headers.authorization?.split(' ')[1];
@@ -66,6 +80,9 @@ exports.getWishlist = async (req, res) => {
   if (error) return res.status(401).json({ error });
 
   try {
+    const { currency = 'USD' } = req.query;
+    const exchangeRate = await getExchangeRate(req.dbPool, currency);
+
     const result = await req.dbPool.request()
       .input('UserId', sql.Int, decoded.id)
       .query(`
@@ -112,10 +129,11 @@ exports.getWishlist = async (req, res) => {
           products: {
             id: item.product_id,
             name: item.name,
-            price: item.price,
-            discountprice: item.discountprice,
+            price: parseFloat((Number(item.price) * exchangeRate).toFixed(2)),
+            discountprice: item.discountprice ? parseFloat((Number(item.discountprice) * exchangeRate).toFixed(2)) : null,
             stock: item.stock,
             image_url: item.image_url || null,
+            currency,
             categories: item.categoryid
               ? [
                   {
@@ -130,13 +148,12 @@ exports.getWishlist = async (req, res) => {
       return acc;
     }, []);
 
-    res.status(200).json({ message: 'Wishlist retrieved', data: processedData });
+    res.status(200).json({ message: 'Wishlist retrieved', data: processedData, currency });
   } catch (err) {
     console.error('Error in getWishlist:', err);
     res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
-
 
 // Remove item from wishlist
 exports.removeFromWishlist = async (req, res) => {
@@ -187,5 +204,3 @@ exports.clearWishlist = async (req, res) => {
     res.status(500).json({ error: err.message || 'Internal server error' });
   }
 };
-
-module.exports = exports;

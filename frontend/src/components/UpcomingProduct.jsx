@@ -3,8 +3,9 @@ import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import "slick-carousel/slick/slick-theme.css";
 import { toast } from "react-toastify";
-import api from "../supabase/axios";
+import { apiWithCurrency } from "../supabase/axios";
 import placeholder from "../assets/products/coat.jpg";
+import { useCurrency } from "../supabase/CurrencyContext";
 
 const formatDateTime = (dateStr) => {
   const date = new Date(dateStr);
@@ -19,6 +20,7 @@ const formatDateTime = (dateStr) => {
 };
 
 function UpcomingCarousel() {
+  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [products, setProducts] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +34,7 @@ function UpcomingCarousel() {
     const fetchUpcomingProducts = async () => {
       try {
         setLoading(true);
+        const api = apiWithCurrency(currency);
         const { data } = await api.get("/api/products/upcomingProducts");
         setProducts(data.products || []);
       } catch (err) {
@@ -44,8 +47,10 @@ function UpcomingCarousel() {
       }
     };
 
-    fetchUpcomingProducts();
-  }, []);
+    if (!currencyLoading) {
+      fetchUpcomingProducts();
+    }
+  }, [currency, currencyLoading]);
 
   // Open modal instead of directly joining
   const handleWaitlistClick = (product) => {
@@ -59,9 +64,10 @@ function UpcomingCarousel() {
 
     try {
       // Create order from backend
-      const { data } = await api.post("/api/payment/create-order", {
-        amount: (selectedProduct.price / 2) * 100, // 50% in cents (for USD)
-        currency: "USD", // Changed to USD
+      const amountInCents = Math.round((selectedProduct.Price / 2) * 100); // 50% in cents
+      const { data } = await apiWithCurrency(currency).post("/api/payment/create-order", {
+        amount: amountInCents,
+        currency: selectedProduct.currency || currency, // Use product currency
       });
 
       const options = {
@@ -69,20 +75,20 @@ function UpcomingCarousel() {
         amount: data.amount,
         currency: data.currency,
         name: "Vintage Store",
-        description: `50% Payment for ${selectedProduct.name}`,
+        description: `50% Payment for ${selectedProduct.Name}`,
         order_id: data.id,
         handler: function (response) {
           toast.success("Payment Successful ✅");
-          setWaitlist((prev) => [...prev, selectedProduct.id]);
+          setWaitlist((prev) => [...prev, selectedProduct.ProductId]);
           setShowModal(false);
           setSelectedProduct(null);
 
           // Save payment to backend (verification)
-          api.post("/api/payment/verify", {
+          apiWithCurrency(currency).post("/api/payment/verify", {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_order_id: response.razorpay_order_id,
             razorpay_signature: response.razorpay_signature,
-            productId: selectedProduct.id,
+            productId: selectedProduct.ProductId,
           });
         },
         prefill: {
@@ -98,14 +104,20 @@ function UpcomingCarousel() {
       const rzp = new window.Razorpay(options);
       rzp.open();
     } catch (err) {
-      console.error(err);
       toast.error("Payment failed, try again");
     }
   };
 
   const getHeroImage = (product) => {
-    const heroImage = product.product_images?.find((img) => img.is_hero ==='Y' ? true : false);
+    const heroImage = product.product_images?.find((img) => img.is_hero);
     return heroImage?.image_url || product.product_images?.[0]?.image_url || placeholder;
+  };
+
+  const formatPrice = (value, currencyCode) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode || "USD",
+    }).format(value);
   };
 
   const settings = {
@@ -141,7 +153,7 @@ function UpcomingCarousel() {
         Upcoming Products
       </h2>
 
-      {(loading || products.length === 0) && !error ? (
+      {(loading || currencyLoading || products.length === 0) && !error ? (
         <Slider {...settings} className="max-w-7xl mx-auto">
           {Array.from({ length: 4 }).map((_, i) => (
             <SkeletonSlide key={i} />
@@ -150,7 +162,7 @@ function UpcomingCarousel() {
       ) : (
         <Slider {...settings} className="max-w-7xl mx-auto">
           {products.map((product) => (
-            <div key={product.id} className="px-3">
+            <div key={product.ProductId} className="px-3">
               <div className="relative bg-white rounded-xl shadow-md overflow-hidden group">
                 <img
                   src={getHeroImage(product)}
@@ -159,7 +171,7 @@ function UpcomingCarousel() {
                 />
 
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
-                  <h3 className="text-lg font-semibold mb-2">{product.name}</h3>
+                  <h3 className="text-lg font-semibold mb-2">{product.Name}</h3>
                   <p className="mb-3 text-sm">
                     Launching on: {formatDateTime(product.LaunchingDate)}
                   </p>
@@ -204,10 +216,12 @@ function UpcomingCarousel() {
               </p>
               <p className="mb-2 text-[#4B2C20]">
                 Price:{" "}
-                <span className="font-semibold">₹{selectedProduct.Price}</span>
+                <span className="font-semibold">
+                  {formatPrice(selectedProduct.Price, selectedProduct.currency || currency)}
+                </span>
               </p>
               <p className="text-green-800 font-bold text-lg">
-                Pay 50% Now: ${selectedProduct.Price / 2}
+                Pay 50% Now: {formatPrice(selectedProduct.Price / 2, selectedProduct.currency || currency)}
               </p>
             </div>
 

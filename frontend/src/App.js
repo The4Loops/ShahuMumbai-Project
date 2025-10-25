@@ -1,6 +1,7 @@
 import { Routes, Route, Suspense } from "react-router-dom";
-import React, { useState, lazy, Suspense as ReactSuspense } from "react"; // Updated imports
+import React, { useState, lazy, Suspense as ReactSuspense } from "react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
+import { CurrencyProvider } from "./supabase/CurrencyContext";
 import "./App.css";
 
 import HomePage from "./pages/HomePage";
@@ -31,11 +32,12 @@ import PageTracker from "./PageTracker";
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
-import VintageLoader from "./Loader"; // Import the loader
+import VintageLoader from "./Loader";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
-import ShippingPolicy from './pages/ShippingPolicy';
+import ShippingPolicy from "./pages/ShippingPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
+import AddBlogPost from "./admin/AddBlogPost";
 
 const PageSkeleton = () => (
   <div className="min-h-screen bg-[#EDE1DF] flex items-center justify-center p-4">
@@ -54,7 +56,7 @@ const PageSkeleton = () => (
 
 function App() {
   useAutoLogout();
-  const [isLoading, setIsLoading] = useState(true); // Track loading state
+  const [isLoading, setIsLoading] = useState(true);
 
   const siteUrl =
     typeof window !== "undefined"
@@ -67,78 +69,91 @@ function App() {
 
   return (
     <HelmetProvider>
-      <Helmet>
-        <html lang="en" />
-        <meta charSet="utf-8" />
-        <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <meta name="robots" content="index,follow" />
-        <meta name="theme-color" content="#ffffff" />
-        <meta property="og:site_name" content="Shahu Mumbai" />
-        <link rel="canonical" href={siteUrl} />
-        <script type="application/ld+json">
-          {JSON.stringify({
-            "@context": "https://schema.org",
-            "@type": "Organization",
-            name: "Shahu Mumbai",
-            url: siteUrl,
-            logo: `${siteUrl}/ShahuLogo.png`,
-            sameAs: [
-              "https://www.instagram.com/shahumumbai",
-              "https://www.linkedin.com/company/shahumumbai",
-            ],
-          })}
-        </script>
-      </Helmet>
+      <CurrencyProvider>
+        <Helmet>
+          <html lang="en" />
+          <meta charSet="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <meta name="robots" content="index,follow" />
+          <meta name="theme-color" content="#ffffff" />
+          <meta property="og:site_name" content="Shahu Mumbai" />
+          <link rel="canonical" href={siteUrl} />
+          <script type="application/ld+json">
+            {JSON.stringify({
+              "@context": "https://schema.org",
+              "@type": "Organization",
+              name: "Shahu Mumbai",
+              url: siteUrl,
+              logo: `${siteUrl}/ShahuLogo.png`,
+              sameAs: [
+                "https://www.instagram.com/shahumumbai",
+                "https://www.linkedin.com/company/shahumumbai",
+              ],
+            })}
+          </script>
+        </Helmet>
 
-      {isLoading && <VintageLoader onFinish={handleLoadingComplete} />}
+        {isLoading && <VintageLoader onFinish={handleLoadingComplete} />}
 
-      <PageTracker />
+        <PageTracker />
 
-      <ToastContainer
-        position="top-right"
-        autoClose={4000}
-        hideProgressBar={false}
-        newestOnTop
-        closeOnClick
-        pauseOnFocusLoss
-        draggable
-        pauseOnHover
-      />
+        <ToastContainer
+          position="top-right"
+          autoClose={4000}
+          hideProgressBar={false}
+          newestOnTop
+          closeOnClick
+          pauseOnFocusLoss
+          draggable
+          pauseOnHover
+        />
 
-      <ReactSuspense fallback={<PageSkeleton />}>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/home" element={<HomePage />} />
-          <Route path="/account" element={<Account />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/cart" element={<Cart />} />
-          <Route path="/Services" element={<ServicePage />} />
-          <Route path="/contactus" element={<ContactUs />} />
-          <Route path="/ourphilosophy" element={<OurPhilosophy />} />
-          <Route path="/heritagetimeline" element={<HeritageTimeline />} />
-          <Route path="/ourstudios" element={<OurStudios />} />
-          <Route path="/contemporaryartisans" element={<ContemporaryArtisans />} />
-          <Route path="/auth/callback" element={<Callback />} />
-          <Route path="/about" element={<About />} />
-          <Route path="/products/:id" element={<ProductDetails />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          <Route path="/myorder" element={<MyOrder />} />
-          <Route path="/wishlist" element={<Wishlist />} />
-          <Route path="/profile" element={<Profile />} />
-          <Route path="/checkout" element={<Checkout />} />
-          <Route path="/blog" element={<Blog />} />
-          <Route path="/blogs/:id" element={<BlogsView />} />
-          <Route path="/returns" element={<Returns />} />
-          <Route path="/waitlist" element={<WaitlistProductCard />} />
-          <Route path="/collections/:id" element={<CollectionsPage />} />
-          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
-          <Route path="/shipping-policy" element={<ShippingPolicy />} />
-          <Route path="/cancellation-refund-policy" element={<CancellationRefundPolicy />} />
-        </Routes>
-      </ReactSuspense>
+        <ReactSuspense fallback={<PageSkeleton />}>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/home" element={<HomePage />} />
+            <Route path="/account" element={<Account />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/Services" element={<ServicePage />} />
+            <Route path="/contactus" element={<ContactUs />} />
+            <Route path="/ourphilosophy" element={<OurPhilosophy />} />
+            <Route path="/heritagetimeline" element={<HeritageTimeline />} />
+            <Route path="/ourstudios" element={<OurStudios />} />
+            <Route
+              path="/contemporaryartisans"
+              element={<ContemporaryArtisans />}
+            />
+            <Route path="/auth/callback" element={<Callback />} />
+            <Route path="/about" element={<About />} />
+            <Route path="/products/:id" element={<ProductDetails />} />
+            <Route path="/admin" element={<AdminPanel />} />
+            <Route path="/admin/addblogpost" element={<AddBlogPost />} />
+            <Route path="/admin/addblogpost/:id" element={<AddBlogPost />} />
+            <Route path="/myorder" element={<MyOrder />} />
+            <Route path="/wishlist" element={<Wishlist />} />
+            <Route path="/profile" element={<Profile />} />
+            <Route path="/checkout" element={<Checkout />} />
+            <Route path="/blog" element={<Blog />} />
+            <Route path="/blogs/:id" element={<BlogsView />} />
+            <Route path="/returns" element={<Returns />} />
+            <Route path="/waitlist" element={<WaitlistProductCard />} />
+            <Route path="/collections/:id" element={<CollectionsPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+            <Route
+              path="/terms-and-conditions"
+              element={<TermsAndConditions />}
+            />
+            <Route path="/shipping-policy" element={<ShippingPolicy />} />
+            <Route
+              path="/cancellation-refund-policy"
+              element={<CancellationRefundPolicy />}
+            />
+          </Routes>
+        </ReactSuspense>
 
-      {!isLoading && <NewsletterPopup />}
+        {!isLoading && <NewsletterPopup />}
+      </CurrencyProvider>
     </HelmetProvider>
   );
 }

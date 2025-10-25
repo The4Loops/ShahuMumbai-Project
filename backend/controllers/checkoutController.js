@@ -1,5 +1,19 @@
 const sql = require('mssql');
 
+// Helper to get exchange rate from DB
+const getExchangeRate = async (dbPool, currency = 'USD') => {
+  try {
+    const result = await dbPool.request()
+      .input('CurrencyCode', sql.VarChar(3), currency.toUpperCase())
+      .query('SELECT ExchangeRate FROM Currencies WHERE CurrencyCode = @CurrencyCode');
+    
+    return result.recordset[0]?.ExchangeRate || 1.0; // Fallback to USD
+  } catch (error) {
+    console.error('Error fetching exchange rate:', error);
+    return 1.0; // Fallback on error
+  }
+};
+
 function dbReady(req) {
   return req.dbPool && req.dbPool.connected;
 }
@@ -10,7 +24,7 @@ function devFakeAllowed() {
 exports.createOrder = async (req, res) => {
   const {
     customer,
-    currency = 'INR',
+    currency = 'USD', // Changed default to USD for consistency
     items = [],
     discount_total = 0,
     tax_total = 0,
@@ -18,6 +32,7 @@ exports.createOrder = async (req, res) => {
     payment_method,
     meta: extraMeta = {},
   } = req.body || {};
+  const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
   try {
     if (!customer?.name || !customer?.email) {
@@ -79,13 +94,14 @@ exports.createOrder = async (req, res) => {
         return res.status(409).json({ error: 'insufficient_stock', product_id: p.id });
       }
 
-      const unit_price = Number(p.discountprice ?? p.price);
-      if (!Number.isFinite(unit_price) || unit_price < 0) {
+      const baseUnitPrice = Number(p.discountprice ?? p.price);
+      if (!Number.isFinite(baseUnitPrice) || baseUnitPrice < 0) {
         return res.status(400).json({ error: 'invalid_price', product_id: p.id });
       }
 
-      const line_total = unit_price * qty;
-      subtotal += line_total;
+      const unit_price = parseFloat(baseUnitPrice * exchangeRate).toFixed(2);
+      const line_total = parseFloat(unit_price * qty).toFixed(2);
+      subtotal += Number(line_total);
 
       normalizedItems.push({
         product_id: p.id,
@@ -111,7 +127,7 @@ exports.createOrder = async (req, res) => {
         .input('CustEmail', sql.NVarChar(255), String(customer.email))
         .input('Status', sql.NVarChar(20), 'pending')
         .input('PayStatus', sql.NVarChar(20), 'pending')
-        .input('Currency', sql.NVarChar(8), currency)
+        .input('Currency', sql.NVarChar(8), currency.toUpperCase())
         .input('Subtotal', sql.Decimal(18, 2), subtotal)
         .input('Discount', sql.Decimal(18, 2), discount_total || 0)
         .input('Tax', sql.Decimal(18, 2), tax_total || 0)
@@ -181,6 +197,7 @@ exports.createOrder = async (req, res) => {
         order_id: orderId,
         order_number: orderRow.order_number || null,
         total,
+        currency,
       });
     } catch (inner) {
       try { await tx.rollback(); } catch (_) {}

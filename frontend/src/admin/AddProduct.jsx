@@ -10,13 +10,6 @@ const PRODUCT_GET_URL = (id) => `/api/products/${id}`;
 const PRODUCT_CREATE_URL = `/api/products`;
 const PRODUCT_UPDATE_URL = (id) => `/api/products/${id}`;
 
-// --- tiny color helpers ---
-const isHex = (s) => /^#([0-9A-F]{3}|[0-9A-F]{6})$/i.test(s.trim());
-const isCssNamed = (s) => /^[a-z][a-z0-9\s-]*$/i.test(s.trim());
-const normalizeColor = (s) => s.trim();
-
-// --- extract URLs from many backend shapes ---
-const asArray = (v) => (Array.isArray(v) ? v : v == null ? [] : [v]);
 const extractUrlsFromUnknown = (payload) => {
   if (Array.isArray(payload) && payload.every((x) => typeof x === "string"))
     return payload;
@@ -155,18 +148,18 @@ const AddProduct = ({ editId = null, onSaved }) => {
         const p = data || {};
 
         reset({
-          name: p.name ?? "",
-          description: p.description ?? "",
-          shortdescription: p.shortdescription ?? "",
+          name: p.Name ?? "",
+          description: p.Description ?? "",
+          shortdescription: p.ShortDescription ?? "",
           categoryid: p.categoryid ?? "",
-          branddesigner: p.branddesigner ?? "",
-          price: p.price ?? "",
-          discountprice: p.discountprice ?? "",
-          stock: p.stock ?? 0,
-          isactive: !!p.isactive,
-          isfeatured: !!p.isfeatured,
-          collection_id: p.collectionid ?? null,
-          uploadeddate: p.uploadeddate ? new Date(p.uploadeddate) : new Date(),
+          branddesigner: p.BrandDesigner ?? "",
+          price: p.Price ?? "",
+          discountprice: p.DiscountPrice ?? "",
+          stock: p.Stock ?? 0,
+          isactive: !!p.IsActive,
+          isfeatured: !!p.IsFeatured,
+          collection_id: p.CollectionId ?? null,
+          uploadeddate: p.UploadedDate ? new Date(p.UploadedDate) : new Date(),
         });
 
         const imgs = (p.product_images || []).map((img) => ({

@@ -97,8 +97,8 @@ exports.listCollections = async (req, res) => {
       FROM dbo.collections c
       OUTER APPLY (
         SELECT COUNT(*) AS ProductsCount
-        FROM Products p
-        WHERE p.CollectionId = c.CollectionId
+        FROM CollectionCategories cc
+        WHERE cc.CollectionId = c.CollectionId
       ) pc
       ${whereSql}
       ORDER BY c.CreatedAt DESC

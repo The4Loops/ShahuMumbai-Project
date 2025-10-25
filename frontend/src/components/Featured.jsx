@@ -1,18 +1,21 @@
 import { motion } from "framer-motion";
-import React,{useEffect,useState} from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import api from "../supabase/axios";
+import { apiWithCurrency } from "../supabase/axios"; // Import apiWithCurrency
 import { toast } from "react-toastify";
 import placeholderImg from "../assets/products/coat.jpg";
+import { useCurrency } from "../supabase/CurrencyContext"; // Import CurrencyContext
 
 function Featured() {
   const navigate = useNavigate();
+  const { currency, loading: currencyLoading } = useCurrency(); // Get currency and loading state
   const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // Start as true to show skeletons immediately on mount
+  const [isLoading, setIsLoading] = useState(true); // For product fetch
 
-  // Fetch top 4 latest products
+  // Fetch top 4 latest products with currency
   const fetchLatestProducts = async () => {
     try {
+      const api = apiWithCurrency(currency);
       const response = await api.get("/api/products/getLatestProducts");
       setProducts(response.data || []); // Ensure array even if empty
     } catch (error) {
@@ -25,8 +28,9 @@ function Featured() {
   };
 
   useEffect(() => {
+    if (currencyLoading) return; // Wait for currency detection
     fetchLatestProducts();
-  }, []);
+  }, [currency, currencyLoading]);
 
   const SkeletonCard = () => (
     <div className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md border border-[#E4D5C9] p-6 animate-pulse">
@@ -37,7 +41,15 @@ function Featured() {
     </div>
   );
 
-  const showSkeletons = isLoading || products.length === 0;
+  const showSkeletons = isLoading || currencyLoading || products.length === 0;
+
+  // Price formatting helper
+  const formatPrice = (value, currency) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency,
+    }).format(value);
+  };
 
   return (
     <section className="py-20 px-6 bg-[#F1E7E5] text-center relative overflow-hidden">
@@ -55,9 +67,7 @@ function Featured() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 max-w-7xl mx-auto">
         {showSkeletons ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <SkeletonCard key={i} />
-          ))
+          Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
           products.map((product, i) => (
             <motion.div
@@ -66,8 +76,8 @@ function Featured() {
               whileInView={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.2, duration: 0.6 }}
               whileHover={{ y: -8, scale: 1.02 }}
-              className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer "
-              onClick={()=>navigate(`/products/${product.ProductId}`)}
+              className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer"
+              onClick={() => navigate(`/products/${product.ProductId}`)}
             >
               {product.is_new && (
                 <span className="absolute top-4 left-4 text-xs bg-[#E3BDB4] text-[#4B2C20] px-3 py-1 rounded-full shadow">
@@ -78,7 +88,7 @@ function Featured() {
               <div className="w-28 h-28 mx-auto mb-6 flex items-center justify-center rounded-full bg-[#F1E6E1] shadow-inner overflow-hidden">
                 <img
                   src={
-                    product.product_images?.find(img => img.is_hero === 'Y' ? true : false)?.image_url ||
+                    product.product_images?.find((img) => img.is_hero === true)?.image_url ||
                     placeholderImg
                   }
                   alt={product.Name}
@@ -86,15 +96,13 @@ function Featured() {
                 />
               </div>
 
-              <h3 className="text-lg font-semibold text-[#4B2C20] mb-2">
-                {product.Name}
-              </h3>
+              <h3 className="text-lg font-semibold text-[#4B2C20] mb-2">{product.Name}</h3>
 
               <p className="text-[#4B2C20] font-semibold text-base">
-                {product.Price}{" "}
+                {formatPrice(product.Price, product.currency || currency)}
                 {product.old_price && (
                   <span className="text-sm text-[#4B2C20]/50 line-through ml-1">
-                    ${product.old_price}
+                    {formatPrice(product.old_price, product.currency || currency)}
                   </span>
                 )}
               </p>

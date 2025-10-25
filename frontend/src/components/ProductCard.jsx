@@ -1,8 +1,15 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-const ProductCard = ({ product }) => {
-  const { id, name, description, price, category, image } = product;
+const ProductCard = ({ product, currency }) => {
+  const { id, name, description, price, category, image, currency: productCurrency } = product;
+
+  const formatPrice = (value, currencyCode) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: currencyCode || "USD",
+    }).format(value);
+  };
 
   return (
     <div className="bg-[#F9F5F0] border border-[#D4A5A5] rounded-xl shadow-[0_4px_10px_rgba(139,115,105,0.15)] p-5 relative overflow-hidden group transition-transform duration-300 hover:-translate-y-1">
@@ -22,7 +29,9 @@ const ProductCard = ({ product }) => {
           <h3 className="text-2xl font-bold text-[#6B4226] tracking-wide">{name}</h3>
           <p className="text-sm italic text-[#A3B18A]">{category}</p>
           <p className="text-[1rem] text-[#3E2C23] leading-relaxed">{description}</p>
-          <p className="text-lg font-semibold text-[#6B4226] mt-1">₹{price}</p>
+          <p className="text-lg font-semibold text-[#6B4226] mt-1">
+            {formatPrice(price, productCurrency || currency)}
+          </p>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#DDB892] group-hover:bg-[#B77E65] transition-colors duration-300" />
       </Link>

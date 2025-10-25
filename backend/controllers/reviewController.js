@@ -241,3 +241,37 @@ exports.deleteReview = async (req, res) => {
     return res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
+
+// Get All Reviews
+exports.getAllReviews = async (req, res) => {
+  try {
+    const result = await req.dbPool.request()
+      .query(`
+        SELECT 
+          r.ReviewId,
+          r.UserId,
+          r.ProductId,
+          r.Rating,
+          r.Comment,
+          r.CreatedAt,
+          r.UpdatedAt,
+          r.IsActive,
+          u.FullName,
+          p.Name AS ProductName
+        FROM reviews r
+        INNER JOIN users u ON r.UserId = u.UserId
+        INNER JOIN products p ON r.ProductId = p.ProductId
+        WHERE r.IsActive = 'Y'
+      `);
+
+    const data = result.recordset;
+    if (!data || data.length === 0) {
+      return res.status(200).json({ message: 'No reviews found' });
+    }
+
+    return res.status(200).json(data);
+  } catch (error) {
+    console.error('getAllReviews:', error);
+    return res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};

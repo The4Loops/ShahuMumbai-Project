@@ -291,26 +291,3 @@ exports.getSalesReport = async (req, res) => {
     return res.status(500).json({ error: 'internal_error', details: e.message });
   }
 };
-
-
-
-// CREATE TABLE dbo.analytics_events (
-//   id           BIGINT IDENTITY(1,1) PRIMARY KEY,
-//   occurred_at  DATETIME2(3) NOT NULL DEFAULT SYSUTCDATETIME(),
-//   name         NVARCHAR(100) NOT NULL,
-//   anon_id      NVARCHAR(64)  NULL,
-//   user_id      INT           NULL,
-//   url          NVARCHAR(MAX) NULL,
-//   referrer     NVARCHAR(MAX) NULL,
-//   utm          NVARCHAR(MAX) NULL, -- JSON string
-//   props        NVARCHAR(MAX) NULL, -- JSON string
-//   user_agent   NVARCHAR(512) NULL,
-//   ip           NVARCHAR(64)  NULL
-// );
-
-// CREATE INDEX IX_ae_occurred_at ON dbo.analytics_events(occurred_at DESC);
-// CREATE INDEX IX_ae_name_date   ON dbo.analytics_events(name, occurred_at DESC);
-// CREATE INDEX IX_ae_anon        ON dbo.analytics_events(anon_id);
-// CREATE INDEX IX_ae_user        ON dbo.analytics_events(user_id);
-
-// -- orders / order_items are assumed to already exist
