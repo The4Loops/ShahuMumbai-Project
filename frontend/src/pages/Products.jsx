@@ -69,6 +69,20 @@ const Products = () => {
   const menuBtnRef = useRef(null);
   const menuRef = useRef(null);
 
+  // Initialize category filter from URL query parameter 'name'
+  useEffect(() => {
+    const category = searchParams.get("name");
+    if (category) {
+      setSelectedCategories(new Set([category]));
+    }
+  }, [searchParams]);
+
+  // Initialize search from URL query
+  useEffect(() => {
+    const query = searchParams.get("search") || "";
+    setSearch(query);
+  }, [searchParams]);
+
   // Detect mobile for layout adjustments (breakpoint at sm: 640px)
   useEffect(() => {
     const handleResize = () => {
@@ -79,17 +93,15 @@ const Products = () => {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
-  // Initialize search from URL query
-  useEffect(() => {
-    const query = searchParams.get("search") || "";
-    setSearch(query);
-  }, [searchParams]);
-
   const fetchProducts = async () => {
     try {
       setLoading(true);
       const api = apiWithCurrency(currency);
-      const response = await api.get(`/api/products`);
+      // Pass category name as query param if selectedCategories is not empty
+      const category = searchParams.get("name") || Array.from(selectedCategories)[0] || "";
+      const response = await api.get(`/api/products`, {
+        params: { category: category || undefined, search: debouncedSearch || undefined },
+      });
       const products = response.data || [];
 
       const mapped = products.map((p) => {
@@ -104,7 +116,7 @@ const Products = () => {
           name: p.Name,
           description: p.Description || "No description available",
           price: Number(p.Price || 0),
-          currency: p.currency || currency, // Include currency from response
+          currency: p.currency || currency,
           category: categoryName(p),
           image: ordered[0] || "/assets/images/placeholder.png",
         };
@@ -124,7 +136,7 @@ const Products = () => {
     if (!currencyLoading) {
       fetchProducts();
     }
-  }, [currency, currencyLoading]);
+  }, [currency, currencyLoading, debouncedSearch, selectedCategories]);
 
   const categoryOptions = useMemo(() => {
     const set = new Set(allProducts.map((p) => p.category).filter(Boolean));
@@ -168,6 +180,12 @@ const Products = () => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat);
       else next.add(cat);
+      // Update URL query params to reflect category selection
+      if (next.size > 0) {
+        setSearchParams({ name: Array.from(next)[0], search: debouncedSearch || "" });
+      } else {
+        setSearchParams(debouncedSearch ? { search: debouncedSearch } : {});
+      }
       return next;
     });
   };
@@ -212,15 +230,17 @@ const Products = () => {
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const canonical = `${baseUrl}/products`;
-  const pageTitle = "Discover Handpicked Styles — Shahu Mumbai";
-  const pageDesc =
-    "Explore curated fashion in earthy tones and timeless silhouettes. Filter by category, search, and sort to find your perfect piece at Shahu Mumbai.";
+  const pageTitle = selectedCategories.size > 0
+    ? `${Array.from(selectedCategories)[0]} Products — Shahu Mumbai`
+    : "Discover Handpicked Styles — Shahu Mumbai";
+  const pageDesc = selectedCategories.size > 0
+    ? `Explore ${Array.from(selectedCategories)[0]} products at Shahu Mumbai. Filter, search, and sort to find your perfect piece.`
+    : "Explore curated fashion in earthy tones and timeless silhouettes. Filter by category, search, and sort to find your perfect piece at Shahu Mumbai.";
 
-  // Build ItemList JSON-LD for the current page slice
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: "Products",
+    name: selectedCategories.size > 0 ? `${Array.from(selectedCategories)[0]} Products` : "Products",
     url: `${canonical}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`,
     numberOfItems: paged.length,
     itemListElement: paged.map((p, idx) => ({
@@ -238,9 +258,9 @@ const Products = () => {
           url: `${baseUrl}/products/${p.id}`,
           priceCurrency: p.currency || currency,
           price: typeof p.price === "number" ? p.price.toFixed(2) : String(p.price),
-          availability: "https://schema.org/InStock"
-        }
-      }
+          availability: "https://schema.org/InStock",
+        },
+      },
     })),
   };
 
@@ -272,7 +292,7 @@ const Products = () => {
   // Smooth resize observer for mobile responsiveness
   useEffect(() => {
     let resizeObserver;
-    if (typeof ResizeObserver !== 'undefined') {
+    if (typeof ResizeObserver !== "undefined") {
       resizeObserver = new ResizeObserver((entries) => {
         for (let entry of entries) {
           if (entry.contentRect) {
@@ -280,7 +300,7 @@ const Products = () => {
           }
         }
       });
-      const grid = document.querySelector('.products-grid');
+      const grid = document.querySelector(".products-grid");
       if (grid) {
         resizeObserver.observe(grid);
       }
@@ -310,7 +330,7 @@ const Products = () => {
             "sustainable luxury",
             "Indian fashion",
             "designer sarees",
-            ...Array.from(selectedCategories || [])
+            ...Array.from(selectedCategories || []),
           ].filter(Boolean).join(", ")}
         />
         <link rel="canonical" href={canonical} />
@@ -330,8 +350,8 @@ const Products = () => {
             "@type": "BreadcrumbList",
             itemListElement: [
               { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
-              { "@type": "ListItem", position: 2, name: "Products", item: canonical }
-            ]
+              { "@type": "ListItem", position: 2, name: "Products", item: canonical },
+            ],
           })}
         </script>
         <script type="application/ld+json">
@@ -342,12 +362,10 @@ const Products = () => {
             url: canonical,
             description: pageDesc,
             isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
-            ...(debouncedSearch ? { query: debouncedSearch } : {})
+            ...(debouncedSearch ? { query: debouncedSearch } : {}),
           })}
         </script>
-        <script type="application/ld+json">
-          {JSON.stringify(itemListJsonLd)}
-        </script>
+        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
       </Helmet>
 
       <div className="pt-[10px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
@@ -378,10 +396,12 @@ const Products = () => {
                 Freshly Curated
               </span>
               <h1 className="mt-2 text-2xl xs:text-3xl font-extrabold text-[#4a2c17]">
-                Discover Handpicked Styles
+                {selectedCategories.size > 0
+                  ? `Explore ${Array.from(selectedCategories)[0]}`
+                  : "Discover Handpicked Styles"}
               </h1>
               <p className="mt-2 text-sm xs:text-base text-[#4a2c17]/80 max-w-[90%] mx-auto">
-                Earthy tones, timeless silhouettes. Use filters to find your perfect piece.
+                {pageDesc}
               </p>
             </div>
           </div>
@@ -411,7 +431,9 @@ const Products = () => {
               >
                 <FiFilter size={16} />
                 <span className="text-sm font-semibold">Filter & Sort</span>
-                <FiChevronDown className={`transition-transform duration-300 ${menuOpen ? "rotate-180" : ""}`} />
+                <FiChevronDown
+                  className={`transition-transform duration-300 ${menuOpen ? "rotate-180" : ""}`}
+                />
                 {activeCount > 0 && (
                   <motion.span
                     initial={{ scale: 0 }}
@@ -449,8 +471,11 @@ const Products = () => {
                             onChange={(e) => {
                               setSearch(e.target.value);
                               setSearchParams(
-                                e.target.value.trim()
-                                  ? { search: e.target.value.trim() }
+                                e.target.value.trim() || selectedCategories.size > 0
+                                  ? {
+                                      name: Array.from(selectedCategories)[0] || "",
+                                      search: e.target.value.trim(),
+                                    }
                                   : {}
                               );
                             }}
@@ -583,7 +608,7 @@ const Products = () => {
                 </motion.div>
               ))
             ) : (
-              <motion.p 
+              <motion.p
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className="text-center col-span-full text-[#6B4226] text-base xs:text-lg"
@@ -622,7 +647,7 @@ const Products = () => {
                       className={`px-2 xs:px-3 py-1.5 xs:py-2 rounded border-2 text-xs xs:text-sm cursor-pointer transition-all duration-200 ${
                         isActive
                           ? "bg-black text-white border-black"
-                          : "border-black hover:bg-[#fdf6e9]"
+                          : "border-black hover:bg-[#eadfce]"
                       }`}
                     >
                       {n}
