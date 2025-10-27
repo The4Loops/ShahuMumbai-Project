@@ -1,8 +1,10 @@
 // routes/checkoutRoutes.js
 const express = require('express');
 const router = express.Router();
-const checkoutController = require('../controllers/checkoutController');
+const checkout = require('../controllers/checkoutController');
 
-router.post('/checkout/order', checkoutController.createOrder);
+// create order (both paths supported)
+router.post('/checkout', checkout.createOrder);
+router.post('/checkout/order', checkout.createOrder); // <- add this line
 
 module.exports = router;

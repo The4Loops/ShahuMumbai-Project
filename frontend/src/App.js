@@ -1,5 +1,5 @@
-import { Routes, Route, useLocation } from "react-router-dom";
-import React, { useEffect, useState, Suspense as ReactSuspense } from "react";
+import { Routes, Route } from "react-router-dom";
+import React from "react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import { CurrencyProvider } from "./supabase/CurrencyContext";
 import "./App.css";
@@ -32,51 +32,19 @@ import PageTracker from "./PageTracker";
 import BlogsView from "./layout/BlogsView";
 import WaitlistProductCard from "./pages/Waitlist";
 import CollectionsPage from "./pages/CollectionsPage";
-import VintageLoader from "./Loader";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TermsAndConditions from "./pages/TermsAndConditions";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 import AddBlogPost from "./admin/AddBlogPost";
 
-const PageSkeleton = () => (
-  <div className="min-h-screen bg-[#EDE1DF] flex items-center justify-center p-4">
-    <div className="w-full max-w-4xl space-y-8 animate-pulse">
-      <div className="h-16 bg-[#fdf6e9]/50 rounded-lg"></div>
-      <div className="h-64 bg-[#fdf6e9]/50 rounded-2xl"></div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {Array.from({ length: 6 }).map((_, i) => (
-          <div key={i} className="h-64 bg-[#fdf6e9]/50 rounded-xl"></div>
-        ))}
-      </div>
-      <div className="h-20 bg-[#fdf6e9]/50 rounded-lg"></div>
-    </div>
-  </div>
-);
-
 function App() {
   useAutoLogout();
-  const location = useLocation();
-  const [isLoading, setIsLoading] = useState(true);
 
   const siteUrl =
     typeof window !== "undefined"
       ? window.location.origin
       : "https://www.shahumumbai.com";
-
-  // 1) Show loader on every route change
-  useEffect(() => {
-    setIsLoading(true);
-  }, [location.pathname, location.search]);
-
-  // 2) Callback that pages call once ALL their data is ready
-  const handlePageLoaded = () => {
-    setIsLoading(false);
-  };
-
-  const PageWrapper = ({ Component, onPageLoaded }) => (
-    <Component onPageLoaded={onPageLoaded} />
-  );
 
   return (
     <HelmetProvider>
@@ -104,8 +72,6 @@ function App() {
           </script>
         </Helmet>
 
-        {isLoading && <VintageLoader />}
-
         <PageTracker />
 
         <ToastContainer
@@ -119,42 +85,40 @@ function App() {
           pauseOnHover
         />
 
-        <ReactSuspense fallback={<PageSkeleton />}>
-          <Routes>
-            <Route path="/" element={<PageWrapper Component={HomePage} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/home" element={<PageWrapper Component={HomePage} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/account" element={<PageWrapper Component={Account} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/products" element={<PageWrapper Component={Products} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/cart" element={<PageWrapper Component={Cart} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/Services" element={<PageWrapper Component={ServicePage} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/contactus" element={<PageWrapper Component={ContactUs} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/ourphilosophy" element={<PageWrapper Component={OurPhilosophy} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/heritagetimeline" element={<PageWrapper Component={HeritageTimeline} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/ourstudios" element={<PageWrapper Component={OurStudios} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/contemporaryartisans" element={<PageWrapper Component={ContemporaryArtisans} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/auth/callback" element={<PageWrapper Component={Callback} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/about" element={<PageWrapper Component={About} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/products/:id" element={<PageWrapper Component={ProductDetails} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/admin" element={<PageWrapper Component={AdminPanel} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/admin/addblogpost" element={<PageWrapper Component={AddBlogPost} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/admin/addblogpost/:id" element={<PageWrapper Component={AddBlogPost} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/myorder" element={<PageWrapper Component={MyOrder} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/wishlist" element={<PageWrapper Component={Wishlist} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/profile" element={<PageWrapper Component={Profile} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/checkout" element={<PageWrapper Component={Checkout} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/blog" element={<PageWrapper Component={Blog} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/blogs/:id" element={<PageWrapper Component={BlogsView} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/returns" element={<PageWrapper Component={Returns} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/waitlist" element={<PageWrapper Component={WaitlistProductCard} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/collections/:id" element={<PageWrapper Component={CollectionsPage} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/privacy-policy" element={<PageWrapper Component={PrivacyPolicy} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/terms-and-conditions" element={<PageWrapper Component={TermsAndConditions} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/shipping-policy" element={<PageWrapper Component={ShippingPolicy} onPageLoaded={handlePageLoaded} />} />
-            <Route path="/cancellation-refund-policy" element={<PageWrapper Component={CancellationRefundPolicy} onPageLoaded={handlePageLoaded} />} />
-          </Routes>
-        </ReactSuspense>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/home" element={<HomePage />} />
+          <Route path="/account" element={<Account />} />
+          <Route path="/products" element={<Products />} />
+          <Route path="/products/:id" element={<ProductDetails />} />
+          <Route path="/cart" element={<Cart />} />
+          <Route path="/Services" element={<ServicePage />} />
+          <Route path="/contactus" element={<ContactUs />} />
+          <Route path="/ourphilosophy" element={<OurPhilosophy />} />
+          <Route path="/heritagetimeline" element={<HeritageTimeline />} />
+          <Route path="/ourstudios" element={<OurStudios />} />
+          <Route path="/contemporaryartisans" element={<ContemporaryArtisans />} />
+          <Route path="/auth/callback" element={<Callback />} />
+          <Route path="/about" element={<About />} />
+          <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/admin/addblogpost" element={<AddBlogPost />} />
+          <Route path="/admin/addblogpost/:id" element={<AddBlogPost />} />
+          <Route path="/myorder" element={<MyOrder />} />
+          <Route path="/wishlist" element={<Wishlist />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/checkout" element={<Checkout />} />
+          <Route path="/blog" element={<Blog />} />
+          <Route path="/blogs/:id" element={<BlogsView />} />
+          <Route path="/returns" element={<Returns />} />
+          <Route path="/waitlist" element={<WaitlistProductCard />} />
+          <Route path="/collections/:id" element={<CollectionsPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+          <Route path="/terms-and-conditions" element={<TermsAndConditions />} />
+          <Route path="/shipping-policy" element={<ShippingPolicy />} />
+          <Route path="/cancellation-refund-policy" element={<CancellationRefundPolicy />} />
+        </Routes>
 
-        {!isLoading && <NewsletterPopup />}
+        <NewsletterPopup />
       </CurrencyProvider>
     </HelmetProvider>
   );

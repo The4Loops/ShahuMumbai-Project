@@ -148,6 +148,7 @@ exports.getCartItems = async (req, res) => {
           p.Price           AS prod_price,
           p.DiscountPrice   AS prod_discount,
           p.Stock           AS prod_stock,
+          p.IsActive        AS prod_active,
           pi.ProductImageId AS img_id,
           pi.ImageUrl       AS img_url,
           pi.IsHero         AS img_is_hero, -- expects 'Y'/'N'
@@ -175,6 +176,7 @@ exports.getCartItems = async (req, res) => {
         price: parseFloat(r.prod_price * exchangeRate).toFixed(2),
         discountprice: r.prod_discount ? parseFloat(r.prod_discount * exchangeRate).toFixed(2) : null,
         stock: r.prod_stock,
+        is_active: r.prod_active,
         currency,
         categories: r.cat_id ? [{ categoryid: r.cat_id, name: r.cat_name }] : [],
         product_images: r.img_id

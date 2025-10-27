@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import Logo from "../../assets/ShahuLogo.png";
 import api from "../../supabase/axios"; // your axios instance (withCredentials enabled)
 import { toast } from "react-toastify";
-import Loader from "../../Loader";
+// import Loader from "../../Loader";
 
 // Reusable Dropdown section
 export const DropdownSection = ({ title, links, onLinkClick }) => {
@@ -209,7 +209,7 @@ export default function Navbar() {
 
   return (
     <div>
-      <Loader isLoading={isLoading} />
+      {/* <Loader isLoading={isLoading} /> */}
       <nav className="fixed top-0 w-full z-40 bg-transparent backdrop-blur-lg shadow-md font-serif">
         {/* Top Bar */}
         <div className="flex items-center justify-between lg:justify-center px-4 sm:px-6 lg:px-8 h-20 w-full relative">
