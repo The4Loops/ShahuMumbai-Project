@@ -137,7 +137,7 @@ function ContactPage() {
             <div>
               <h2 className="text-2xl font-serif mb-2">Contact Details</h2>
               <p className="text-[#555]">Email — bhumi.founder@shahumumbai.com</p>
-              <p className="text-[#555]">Phone — +1 (929) 715-5118</p>
+              <p className="text-[#555]">Phone — +91 9920678152</p>
             </div>
 
             <div>

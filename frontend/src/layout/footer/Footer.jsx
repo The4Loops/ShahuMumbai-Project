@@ -103,7 +103,7 @@ const Footer = () => {
                 {t("footer.followUs.title")}
               </h4>
               <div className="flex gap-3 xs:gap-4 mt-1 xs:mt-2 justify-center xs:justify-start social-icons">
-                <a
+                {/* <a
                   href="https://www.facebook.com/yourpage"
                   aria-label={t("footer.followUs.facebook")}
                   target="_blank"
@@ -111,7 +111,7 @@ const Footer = () => {
                   className="text-lg xs:text-xl text-[#000] hover:text-[#1877F2] transition-colors"
                 >
                   <FaFacebookF />
-                </a>
+                </a> */}
                 <a
                   href="https://www.instagram.com/shahumumbai?igsh=ZDl1YnN6cTFybmtx"
                   aria-label={t("footer.followUs.instagram")}
