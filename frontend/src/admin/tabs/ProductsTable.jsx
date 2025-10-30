@@ -10,12 +10,14 @@ function ProductsTab() {
   const [products, setProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [productsError, setProductsError] = useState(null);
+
   const { openProductEditor } = useAdminActions();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [modalProduct, setModalProduct] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [deleteProduct, setDeleteProduct] = useState(null);
+
   const [collections, setCollections] = useState([]);
   const [loadingCollections, setLoadingCollections] = useState(true);
   const [collectionsError, setCollectionsError] = useState(null);
@@ -35,12 +37,12 @@ function ProductsTab() {
   };
 
   const handleOpenEdit = (product) => {
-    // Removed UUID check since ProductId is a number
+    // ProductId is mapped to product.id already
     openProductEditor(product.id);
   };
 
   const handleSave = async () => {
-    if (!modalProduct.name) return alert("Product name is required!");
+    if (!modalProduct?.name) return alert("Product name is required!");
 
     try {
       if (isEditing) {
@@ -79,6 +81,14 @@ function ProductsTab() {
   useEffect(() => {
     let alive = true;
 
+    const toNumber = (val, fallback = 0) =>
+      typeof val === "number" ? val : Number.parseFloat(val ?? fallback);
+
+    const fmtCurrency = (num, currency = "INR") =>
+      new Intl.NumberFormat("en-IN", { style: "currency", currency }).format(
+        Number.isFinite(num) ? num : 0
+      );
+
     const fetchProductsAndCollections = async () => {
       try {
         setLoadingProducts(true);
@@ -86,28 +96,35 @@ function ProductsTab() {
         setLoadingCollections(true);
         setCollectionsError(null);
 
-        // Fetch products
+        // --- PRODUCTS ---
         const { data: productData } = await api.get("/api/products");
         if (!alive) return;
 
         const productList = Array.isArray(productData)
           ? productData
           : productData?.items || [];
-        setProducts(
-          productList.map((p) => ({
+
+        const mapped = productList.map((p) => {
+          const priceNum = toNumber(p.Price, 0);
+          const stockNum = toNumber(p.Stock, 0);
+          const currency = p.currency || "INR"; // your payload has "USD"; change if needed
+
+          return {
             id: p.ProductId,
-            name: p.Name,
-            category: p.categories?.length > 0 ? p.categories[0].Name : "Uncategorized",
-            price: `₹${p.Price.toFixed(2)}`,
-            stock: p.Stock ?? 0,
-            images: p.product_images || [], // Include images for view modal
+            name: p.Name?.trim() || "Untitled",
+            category: p.categories?.[0]?.Name || "Uncategorized",
+            price: fmtCurrency(priceNum, currency),
+            stock: stockNum,
+            images: Array.isArray(p.product_images) ? p.product_images : [],
             description: p.Description || "",
             shortDescription: p.ShortDescription || "",
             brand: p.BrandDesigner || "",
-          }))
-        );
+          };
+        });
 
-        // Fetch collections
+        setProducts(mapped);
+
+        // --- COLLECTIONS ---
         const { data: collectionData } = await api.get("/api/collections");
         if (!alive) return;
 
@@ -117,18 +134,23 @@ function ProductsTab() {
         setCollections(collectionList);
       } catch (e) {
         if (!alive) return;
+
+        // Log full details for debugging
         console.error("Load failed:", {
-          url: (api.defaults?.baseURL || "") + e.response?.config?.url,
-          status: e.response?.status,
-          payload: e.response?.data,
-          message: e.message,
+          url: e?.response?.config?.url,
+          status: e?.response?.status,
+          payload: e?.response?.data,
+          message: e?.message,
         });
-        if (e.response?.config?.url.includes("/api/products")) {
-          setProductsError(e.response?.data?.message || "Failed to load products");
-        } else if (e.response?.config?.url.includes("/api/collections")) {
-          setCollectionsError(
-            e.response?.data?.message || "Failed to load collections"
-          );
+
+        const url = e?.response?.config?.url || "";
+        if (url.includes("/api/products")) {
+          setProductsError(e?.response?.data?.message || e?.message || "Failed to load products");
+        } else if (url.includes("/api/collections")) {
+          setCollectionsError(e?.response?.data?.message || e?.message || "Failed to load collections");
+        } else {
+          // Generic surface so silent mapping/runtime errors show up
+          setProductsError(e?.message || "Failed to load products");
         }
       } finally {
         if (alive) {
@@ -139,7 +161,6 @@ function ProductsTab() {
     };
 
     fetchProductsAndCollections();
-
     return () => {
       alive = false;
     };
@@ -256,10 +277,7 @@ function ProductsTab() {
                 })
               ) : (
                 <tr>
-                  <td
-                    colSpan={6}
-                    className="border p-4 text-center text-gray-500"
-                  >
+                  <td colSpan={6} className="border p-4 text-center text-gray-500">
                     No products found
                   </td>
                 </tr>
@@ -280,12 +298,8 @@ function ProductsTab() {
                 className="bg-white rounded-lg shadow p-4 space-y-2 border border-gray-200"
               >
                 <div className="flex items-center justify-between">
-                  <h3 className="font-semibold text-gray-800">
-                    {product.name}
-                  </h3>
-                  <span
-                    className={`${status.color} text-xs px-2 py-1 rounded-full`}
-                  >
+                  <h3 className="font-semibold text-gray-800">{product.name}</h3>
+                  <span className={`${status.color} text-xs px-2 py-1 rounded-full`}>
                     {status.label}
                   </span>
                 </div>
@@ -365,15 +379,13 @@ function ProductsTab() {
                   <strong>Stock:</strong> {selectedProduct.stock}
                 </p>
                 <p>
-                  <strong>Status:</strong>{" "}
-                  {getStatus(selectedProduct.stock).label}
+                  <strong>Status:</strong> {getStatus(selectedProduct.stock).label}
                 </p>
                 <p>
                   <strong>Description:</strong> {selectedProduct.description}
                 </p>
                 <p>
-                  <strong>Short Description:</strong>{" "}
-                  {selectedProduct.shortDescription}
+                  <strong>Short Description:</strong> {selectedProduct.shortDescription}
                 </p>
                 {selectedProduct.images?.length > 0 && (
                   <div>
@@ -423,31 +435,31 @@ function ProductsTab() {
                 {isEditing ? "Edit Product" : "Add Product"}
               </h2>
               <div className="space-y-4">
-                {["name", "brand", "category", "price", "stock", "description", "shortDescription"].map((field) => (
-                  <div key={field} className="flex flex-col">
-                    <label className="text-gray-600 font-medium capitalize mb-1">
-                      {field}
-                    </label>
-                    <input
-                      type={field === "stock" || field === "price" ? "number" : "text"}
-                      value={modalProduct[field] ?? ""}
-                      onChange={(e) =>
-                        setModalProduct({
-                          ...modalProduct,
-                          [field]:
-                            field === "stock" || field === "price"
-                              ? parseFloat(e.target.value || "0")
-                              : e.target.value,
-                        })
-                      }
-                      className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                    />
-                  </div>
-                ))}
+                {["name", "brand", "category", "price", "stock", "description", "shortDescription"].map(
+                  (field) => (
+                    <div key={field} className="flex flex-col">
+                      <label className="text-gray-600 font-medium capitalize mb-1">
+                        {field}
+                      </label>
+                      <input
+                        type={field === "stock" || field === "price" ? "number" : "text"}
+                        value={modalProduct[field] ?? ""}
+                        onChange={(e) =>
+                          setModalProduct({
+                            ...modalProduct,
+                            [field]:
+                              field === "stock" || field === "price"
+                                ? parseFloat(e.target.value || "0")
+                                : e.target.value,
+                          })
+                        }
+                        className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                    </div>
+                  )
+                )}
                 <div className="flex flex-col">
-                  <label className="text-gray-600 font-medium mb-1">
-                    Collection
-                  </label>
+                  <label className="text-gray-600 font-medium mb-1">Collection</label>
                   <select
                     value={modalProduct.collection_id || ""}
                     onChange={(e) =>
@@ -472,9 +484,7 @@ function ProductsTab() {
                     </span>
                   )}
                   {collectionsError && (
-                    <span className="text-xs text-red-600 mt-1">
-                      {collectionsError}
-                    </span>
+                    <span className="text-xs text-red-600 mt-1">{collectionsError}</span>
                   )}
                 </div>
                 <div className="flex justify-end gap-2 mt-4">
@@ -514,8 +524,7 @@ function ProductsTab() {
             >
               <h2 className="text-lg font-semibold mb-4">Delete Product</h2>
               <p className="text-gray-700 mb-6">
-                Are you sure you want to delete{" "}
-                <strong>{deleteProduct.name}</strong>?
+                Are you sure you want to delete <strong>{deleteProduct.name}</strong>?
               </p>
               <div className="flex justify-end gap-2">
                 <button

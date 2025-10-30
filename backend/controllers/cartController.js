@@ -1,19 +1,6 @@
+// controllers/cartController.js
 const sql = require('mssql');
 const currentCartOwner = require('../utils/currentCartOwner');
-
-// Helper to get exchange rate from DB
-const getExchangeRate = async (dbPool, currency = 'USD') => {
-  try {
-    const result = await dbPool.request()
-      .input('CurrencyCode', sql.VarChar(3), currency.toUpperCase())
-      .query('SELECT ExchangeRate FROM Currencies WHERE CurrencyCode = @CurrencyCode');
-    
-    return result.recordset[0]?.ExchangeRate || 1.0; // Fallback to USD
-  } catch (error) {
-    console.error('Error fetching exchange rate:', error);
-    return 1.0; // Fallback on error
-  }
-};
 
 const now = () => new Date();
 const toInt = (v) => (Number.isInteger(v) ? v : parseInt(v, 10));
@@ -23,6 +10,14 @@ function dbReady(req) {
 }
 function devFakeAllowed() {
   return process.env.ALLOW_FAKE === '1';
+}
+
+// ---- Price helpers (INR only, never convert) ----
+function effectiveUnitINR(price, discountPrice) {
+  const mrp = Number(price || 0);
+  const disc = discountPrice != null ? Number(discountPrice) : 0;
+  const eff = disc > 0 && mrp - disc > 0 ? mrp - disc : mrp;
+  return Number(eff.toFixed(2));
 }
 
 // POST /api/cart    body: { product_id, quantity=1, mode='add' | 'set' }
@@ -65,17 +60,17 @@ exports.addToCart = async (req, res) => {
       const newQty = mode === 'set' ? qty : (Number(existing.Quantity) + qty);
 
       const upd = await req.dbPool.request()
-        .input('Id', sql.NVarChar(50), String(existing.Id))               // <— use the alias we selected
+        .input('Id', sql.NVarChar(50), String(existing.Id))               // using alias we selected
         .input('UserId', sql.NVarChar(128), String(owner))
         .input('Qty', sql.Int, newQty)
         .input('UpdatedAt', sql.DateTime2, new Date())
         .query(`
           UPDATE dbo.carts
           SET Quantity = @Qty, UpdatedAt = @UpdatedAt
-          OUTPUT INSERTED.CartId   AS Id,
-                 INSERTED.UserId   AS UserId,
+          OUTPUT INSERTED.CartId    AS Id,
+                 INSERTED.UserId    AS UserId,
                  INSERTED.ProductId AS ProductId,
-                 INSERTED.Quantity AS Quantity,
+                 INSERTED.Quantity  AS Quantity,
                  INSERTED.CreatedAt AS CreatedAt,
                  INSERTED.UpdatedAt AS UpdatedAt
           WHERE CartId = @Id AND UserId = @UserId
@@ -98,10 +93,10 @@ exports.addToCart = async (req, res) => {
       .input('UpdatedAt', sql.DateTime2, new Date())
       .query(`
         INSERT INTO dbo.carts (UserId, ProductId, Quantity, CreatedAt, UpdatedAt)
-        OUTPUT INSERTED.CartId   AS Id,
-               INSERTED.UserId   AS UserId,
+        OUTPUT INSERTED.CartId    AS Id,
+               INSERTED.UserId    AS UserId,
                INSERTED.ProductId AS ProductId,
-               INSERTED.Quantity AS Quantity,
+               INSERTED.Quantity  AS Quantity,
                INSERTED.CreatedAt AS CreatedAt,
                INSERTED.UpdatedAt AS UpdatedAt
         VALUES (@UserId, @ProductId, @Qty, @CreatedAt, @UpdatedAt)
@@ -130,8 +125,6 @@ exports.getCartItems = async (req, res) => {
       return res.status(500).json({ error: 'db_not_connected' });
     }
     const owner = currentCartOwner(req);
-    const { currency = 'USD' } = req.query;
-    const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
     if (!dbReady(req) && devFakeAllowed()) {
       return res.status(200).json([]);
@@ -141,49 +134,64 @@ exports.getCartItems = async (req, res) => {
       .input('UserId', sql.NVarChar(128), String(owner))
       .query(`
         SELECT
-          c.CartId AS id, c.UserId AS user_id, c.ProductId AS product_id, c.Quantity AS quantity,
-          c.CreatedAt AS created_at, c.UpdatedAt AS updated_at,
+          c.CartId          AS id,
+          c.UserId          AS user_id,
+          c.ProductId       AS product_id,
+          c.Quantity        AS quantity,
+          c.CreatedAt       AS created_at,
+          c.UpdatedAt       AS updated_at,
+
           p.ProductId       AS prod_id,
           p.Name            AS prod_name,
           p.Price           AS prod_price,
           p.DiscountPrice   AS prod_discount,
           p.Stock           AS prod_stock,
           p.IsActive        AS prod_active,
+
           pi.ProductImageId AS img_id,
           pi.ImageUrl       AS img_url,
-          pi.IsHero         AS img_is_hero, -- expects 'Y'/'N'
+          pi.IsHero         AS img_is_hero, -- 'Y'/'N'
+
           cat.CategoryId    AS cat_id,
           cat.Name          AS cat_name
         FROM dbo.carts c
         INNER JOIN dbo.products p ON p.ProductId = c.ProductId
         LEFT JOIN dbo.ProductImages pi ON pi.ProductId = p.ProductId AND pi.IsHero = 'Y'
-        LEFT JOIN dbo.Categories cat ON cat.CategoryId = p.CategoryId
+        LEFT JOIN dbo.Categories    cat ON cat.CategoryId = p.CategoryId
         WHERE c.UserId = @UserId
         ORDER BY c.CreatedAt DESC
       `);
 
     const rows = q.recordset || [];
-    const shaped = rows.map(r => ({
-      id: r.id,
-      user_id: r.user_id,
-      product_id: r.product_id,
-      quantity: r.quantity,
-      created_at: r.created_at,
-      updated_at: r.updated_at,
-      product: {
-        id: r.prod_id,
-        name: r.prod_name,
-        price: parseFloat(r.prod_price * exchangeRate).toFixed(2),
-        discountprice: r.prod_discount ? parseFloat(r.prod_discount * exchangeRate).toFixed(2) : null,
-        stock: r.prod_stock,
-        is_active: r.prod_active,
-        currency,
-        categories: r.cat_id ? [{ categoryid: r.cat_id, name: r.cat_name }] : [],
-        product_images: r.img_id
-          ? [{ id: r.img_id, image_url: r.img_url, is_hero: r.img_is_hero }]
-          : [],
-      },
-    }));
+    const shaped = rows.map(r => {
+      const unit_inr = effectiveUnitINR(r.prod_price, r.prod_discount);
+      const line_total_inr = Number((unit_inr * Number(r.quantity || 1)).toFixed(2));
+
+      return {
+        id: r.id,
+        user_id: r.user_id,
+        product_id: r.product_id,
+        quantity: r.quantity,
+        created_at: r.created_at,
+        updated_at: r.updated_at,
+        product: {
+          id: r.prod_id,
+          name: r.prod_name,
+          price: Number(r.prod_price),                         // raw INR MRP from DB
+          discountprice: r.prod_discount != null ? Number(r.prod_discount) : null, // raw INR discount from DB
+          effective_unit_inr: unit_inr,                        // computed effective INR unit price
+          stock: r.prod_stock,
+          is_active: r.prod_active,
+          currency: 'INR',
+          categories: r.cat_id ? [{ categoryid: r.cat_id, name: r.cat_name }] : [],
+          product_images: r.img_id
+            ? [{ id: r.img_id, image_url: r.img_url, is_hero: r.img_is_hero === 'Y' }]
+            : [],
+        },
+        line_total_inr,                                        // quantity * effective_unit_inr
+        currency: 'INR',
+      };
+    });
 
     res.status(200).json(shaped);
   } catch (err) {

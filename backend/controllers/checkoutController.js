@@ -1,7 +1,6 @@
 // controllers/checkoutController.js
 require('dotenv').config();
 const sql = require('mssql');
-const crypto = require('crypto');
 
 function dbReady(req) {
   return req.dbPool && req.dbPool.connected;
@@ -10,28 +9,18 @@ function devFakeAllowed() {
   return process.env.ALLOW_FAKE === '1';
 }
 
-const getExchangeRate = async (dbPool, currency = 'USD') => {
-  try {
-    const result = await dbPool
-      .request()
-      .input('CurrencyCode', sql.VarChar(3), String(currency || 'USD').toUpperCase())
-      .query('SELECT ExchangeRate FROM Currencies WHERE CurrencyCode = @CurrencyCode');
-
-    return result.recordset[0]?.ExchangeRate || 1.0;
-  } catch (err) {
-    console.error('Exchange rate lookup failed:', err);
-    return 1.0;
-  }
-};
+// Always INR now; keep function in case you re-enable FX later.
+const getExchangeRate = async (_dbPool, _currency = 'INR') => 1;
 
 /**
  * POST /api/checkout/order
- * Creates an internal order record with PaymentStatus='unpaid'
+ * Creates an internal order record with PaymentStatus='unpaid' in INR
+ * Body: { customer, items: [{product_id, product_title?, unit_price?, qty}], discount_total?, tax_total?, shipping_total?, payment_method?, meta? }
  */
 exports.createOrder = async (req, res) => {
   const {
     customer,
-    currency = 'USD',
+    currency = 'INR',
     items = [],
     discount_total = 0,
     tax_total = 0,
@@ -41,7 +30,7 @@ exports.createOrder = async (req, res) => {
   } = req.body || {};
 
   try {
-    if (!customer?.name || !customer?.email) {
+    if (!customer?.name) {
       return res.status(400).json({ ok: false, error: 'missing_customer' });
     }
     if (!Array.isArray(items) || items.length === 0) {
@@ -57,7 +46,7 @@ exports.createOrder = async (req, res) => {
       const total = Number(
         (subtotal - Number(discount_total || 0) + Number(tax_total || 0) + Number(shipping_total || 0)).toFixed(2)
       );
-      return res.json({ ok: true, order_id: 1, order_number: 'SM-000001', total, currency });
+      return res.json({ ok: true, order_id: 1, order_number: 'SM-000001', total, currency: 'INR' });
     }
 
     const exchangeRate = await getExchangeRate(req.dbPool, currency);
@@ -107,6 +96,7 @@ exports.createOrder = async (req, res) => {
         return res.status(400).json({ ok: false, error: 'invalid_price', product_id: p.Id });
       }
 
+      // Always INR
       const unit_price = Number((baseUnitPrice * exchangeRate).toFixed(2));
       const line_total = Number((unit_price * qty).toFixed(2));
       subtotal += line_total;
@@ -134,12 +124,10 @@ exports.createOrder = async (req, res) => {
       orderReq
         .input('UserId', sql.Int, null)
         .input('CustName', sql.NVarChar(255), String(customer.name))
-        .input('CustEmail', sql.NVarChar(255), String(customer.email))
-        // Keep your Orders.Status as 'pending' (no CHECK shown on this)
-        .input('Status', sql.NVarChar(20), 'pending')
-        // ✅ PaymentStatus must satisfy your CHECK: unpaid|paid|partial|refunded
-        .input('PayStatus', sql.NVarChar(20), 'unpaid')
-        .input('Currency', sql.NVarChar(8), String(currency || 'USD').toUpperCase())
+        .input('CustEmail', sql.NVarChar(255), String(customer.email || ''))
+        .input('Status', sql.NVarChar(20), 'pending')            // allowed by your CHECK
+        .input('PayStatus', sql.NVarChar(20), 'unpaid')          // unpaid → will flip to paid on verify
+        .input('Currency', sql.NVarChar(8), 'INR')               // 🔒 INR
         .input('Subtotal', sql.Decimal(18, 2), subtotal)
         .input('Discount', sql.Decimal(18, 2), discount_total || 0)
         .input('Tax', sql.Decimal(18, 2), tax_total || 0)
@@ -149,13 +137,13 @@ exports.createOrder = async (req, res) => {
           'Meta',
           sql.NVarChar(sql.MAX),
           JSON.stringify({
-            phone: customer.phone,
-            address: customer.address,
+            phone: customer.phone || '',
+            address: customer.address || '',
             payment_method,
             cart: items,
             ...extraMeta,
           })
-        ) // <-- fixed: removed the extra ')'
+        )
         .input('PlacedAt', sql.DateTime2, new Date());
 
       const orderIns = await orderReq.query(`
@@ -198,7 +186,7 @@ exports.createOrder = async (req, res) => {
         order_id: orderId,
         order_number: orderNumber,
         total,
-        currency: String(currency || 'USD').toUpperCase(),
+        currency: 'INR',
       });
     } catch (inner) {
       try { await tx.rollback(); } catch {}
@@ -211,46 +199,5 @@ exports.createOrder = async (req, res) => {
   } catch (e) {
     console.error('checkout.createOrder error', e);
     return res.status(500).json({ ok: false, error: 'internal_error', detail: e?.message });
-  }
-};
-
-/**
- * POST /api/checkout/verify
- * Called after Razorpay Checkout returns success;
- * verifies signature and marks order as 'paid'.
- * Expect body: { order_id, razorpay_order_id, razorpay_payment_id, razorpay_signature }
- */
-exports.verifyPayment = async (req, res) => {
-  const { order_id, razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body || {};
-  try {
-    if (!order_id || !razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-      return res.status(400).json({ ok: false, error: 'missing_fields' });
-    }
-
-    const expected = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest('hex');
-
-    if (expected !== razorpay_signature) {
-      return res.status(400).json({ ok: false, error: 'invalid_signature' });
-    }
-
-    // ✅ Update to 'paid'
-    await req.dbPool.request()
-      .input('OrderId', sql.Int, parseInt(order_id, 10))
-      .input('PaymentId', sql.NVarChar(64), razorpay_payment_id)
-      .query(`
-        UPDATE dbo.Orders
-        SET PaymentStatus = 'paid',
-            RazorpayPaymentId = @PaymentId,
-            PaidAt = GETUTCDATE()
-        WHERE OrderId = @OrderId
-      `);
-
-    return res.json({ ok: true, status: 'paid' });
-  } catch (err) {
-    console.error('verifyPayment error:', err);
-    return res.status(500).json({ ok: false, error: 'internal_error', detail: err.message });
   }
 };

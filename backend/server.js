@@ -7,10 +7,6 @@ const cookieParser = require('cookie-parser');
 const sql = require('mssql');
 const sqlConfig = require('./config/db');
 
-// Cron jobs (leave these as-is)
-require('./cron/autounlock')();
-require('./cron/reminderMailOfCartItem')();
-
 // Middlewares
 const guestSession = require('./middleware/guestSession');
 const { optional } = require('./middleware/auth');
@@ -41,21 +37,28 @@ const subscriberRoutes = require('./routes/subscriberRoutes');
 const wishlistRoutes = require('./routes/wishlistRoutes');
 const paymentsRoutes = require('./routes/paymentsRoutes');
 const heritageRoutes = require('./routes/heritageRoutes');
-const standaloneRoutes = require('./routes/standaloneRoutes'); // <-- public subscribe route
+const standaloneRoutes = require('./routes/standaloneRoutes');
 const waitlistRoutes = require('./routes/waitlistRoutes');
 
-// Import controller directly to mount the webhook with raw parser
+// Payment controller for webhook
 const paymentsController = require('./controllers/paymentsController');
 
 const app = express();
 app.set('trust proxy', 1);
 
-// Initialize MSSQL connection pool
+// ✅ Create pool here & keep it global inside this file
 let pool;
+
+// ✅ Initialize DB Pool
 async function initDatabasePool() {
   try {
     pool = await sql.connect(sqlConfig);
     console.log('✅ Connected to MSSQL database');
+
+    // ✅ Start cron jobs AFTER DB is ready
+    require('./cron/autounlock')();
+    require('./cron/reminderMailOfCartItem')();
+
   } catch (err) {
     console.error('❌ Database connection failed:', err);
     process.exit(1);
@@ -63,103 +66,58 @@ async function initDatabasePool() {
 }
 initDatabasePool();
 
-// Expose the pool to routes
+// ✅ Attach pool to every request
 app.use((req, _res, next) => {
   req.dbPool = pool;
   next();
 });
 
-// Security headers (Helmet defaults)
+// Security headers
 app.use(helmet());
 
-// --- CORS (allow multiple frontends) ---
+// --- CORS ---
 const rawAllowed = process.env.ALLOWED_ORIGINS || process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
-const allowed = rawAllowed
-  .split(',')
-  .map(s => s.trim().replace(/\/$/, ''))
-  .filter(Boolean);
-
-console.log('CORS allowed origins:', allowed);
-
+const allowed = rawAllowed.split(',').map(s => s.trim().replace(/\/$/, '')).filter(Boolean);
 const isDev = process.env.NODE_ENV !== 'production';
+console.log('CORS Allowed Origins:', allowed);
 
 app.use(cors({
   origin: (origin, cb) => {
     if (!origin || isDev) return cb(null, true);
-
     const normalized = origin.replace(/\/$/, '');
     const ok =
       allowed.includes(normalized) ||
       /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(normalized);
-
-    if (ok) return cb(null, true);
-
-    console.warn('Blocked by CORS:', origin);
-    return cb(null, false);
+    return ok ? cb(null, true) : cb(null, false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// ✅ Handle all OPTIONS requests quickly
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    res.sendStatus(204);
-  } else {
-    next();
-  }
-});
+// Fast OPTIONS
+app.use((req, res, next) => (req.method === 'OPTIONS' ? res.sendStatus(204) : next()));
 
-// Cookies (before guestSession)
 app.use(cookieParser(process.env.COOKIE_SECRET));
 
-/** 
- * IMPORTANT: Mount the Razorpay webhook BEFORE the global JSON parser,
- * so req.rawBody is available for HMAC verification.
+/**
+ * ✅ Webhook BEFORE JSON parser (raw body required)
  */
 app.post('/api/payments/webhook', express.raw({ type: '*/*' }), paymentsController.webhook);
 
-// Global JSON parser for everything else
+// ✅ Now global JSON parsing for everything else
 app.use(express.json());
 
-// Content Security Policy
-const connectSrc = [
-  "'self'",
-  ...allowed,
-  process.env.API_ORIGIN || "http://localhost:5000",
-  "https://api.razorpay.com",
-  "https://*.razorpay.com",
-];
-
-app.use(
-  helmet.contentSecurityPolicy({
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", "https://cdnjs.cloudflare.com", "https://checkout.razorpay.com"],
-      styleSrc: ["'self'", "https://fonts.googleapis.com"],
-      fontSrc: ["https://fonts.gstatic.com"],
-      imgSrc: ["'self'", "data:", "https://*.razorpay.com"],
-      connectSrc,
-      frameSrc: ["'self'", "https://*.razorpay.com"],
-      objectSrc: ["'none'"],
-    },
-  })
-);
-
-app.disable('x-powered-by');
-
-// Rate limiting
 app.use(rateLimit({ windowMs: 30 * 60 * 1000, max: 1000 }));
 
-// Guest session + optional auth
+// Sessions / auth
 app.use(guestSession);
 app.use(optional);
 
-// Health check
+// Health
 app.get('/health', (_req, res) => res.json({ ok: true }));
 
-// Mount routes
+// Mounted Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', productRoutes);
 app.use('/api', categoryRoutes);
@@ -183,26 +141,20 @@ app.use('/api', teamMembersRoutes);
 app.use('/api', collectionsRoutes);
 app.use('/api', subscriberRoutes);
 app.use('/api', wishlistRoutes);
-
-// Note: paymentsRoutes defines only /create-order and /verify (not /webhook)
-app.use('/api/payments', paymentsRoutes);
-
+app.use('/api/payments', paymentsRoutes); 
 app.use('/api', heritageRoutes);
-app.use('/api', standaloneRoutes); // <-- public subscribe endpoint
+app.use('/api', standaloneRoutes);
 app.use('/api', waitlistRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on http://localhost:${PORT}`);
+  console.log(`✅ Server running at http://localhost:${PORT}`);
 });
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('Shutting down server...');
-  if (pool) {
-    await pool.close();
-    console.log('Database pool closed');
-  }
+  console.log('Shutting down...');
+  if (pool) await pool.close();
   process.exit(0);
 });

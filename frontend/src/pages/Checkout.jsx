@@ -1,3 +1,4 @@
+// src/pages/Checkout.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import { FaLock, FaCreditCard, FaUniversity, FaMobileAlt } from "react-icons/fa";
 import { MdEmail, MdPhone, MdPerson, MdHome } from "react-icons/md";
@@ -6,6 +7,18 @@ import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
+
+// ---- helpers ----
+const fmtINR = (n) =>
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(n || 0));
+
+const finalUnitPrice = (p) => {
+  // support different casings from your API
+  const rawPrice = p?.Price ?? p?.price ?? 0;
+  const rawDiscount = p?.DiscountPrice ?? p?.discountprice;
+  // If DiscountPrice exists, it's the FINAL price. Otherwise use Price.
+  return Number((rawDiscount != null && rawDiscount !== "" ? rawDiscount : rawPrice) || 0);
+};
 
 async function loadRazorpay() {
   if (typeof window !== "undefined" && window.Razorpay) return true;
@@ -25,34 +38,35 @@ async function loadRazorpay() {
 function Checkout() {
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", address: "" });
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false); // (kept) original success modal (unused now)
   const [token, setToken] = useState("");
   const [cart, setCart] = useState([]);
   const [loadingCart, setLoadingCart] = useState(true);
   const [errBanner, setErrBanner] = useState("");
   const [currency, setCurrency] = useState("INR");
 
-  const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  // 🎉 Thank-you modal
+  const [thankOpen, setThankOpen] = useState(false);
+  const [thankOrderNo, setThankOrderNo] = useState("");
+  const [emailNoted, setEmailNoted] = useState(false);
+
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const pageUrl = `${baseUrl}/checkout`;
 
-  // Derived totals from cart (UI only; backend is authoritative)
+  // ---- totals using DiscountPrice as final price when present ----
   const totals = useMemo(() => {
     const lines = cart || [];
     const subtotal = lines.reduce((sum, l) => {
-      const price = Number(l?.product?.price) || 0;
-      const disc = l?.product?.discountprice ? Number(l.product.discountprice) : 0;
-      const effective = Math.max(0, price - disc);
-      return sum + effective * Number(l?.quantity || 1);
+      const unit = finalUnitPrice(l?.product);
+      const qty = Number(l?.quantity || 1);
+      return sum + unit * qty;
     }, 0);
     return { subtotal, tax: 0, shipping: 0, total: subtotal };
   }, [cart]);
 
   useEffect(() => {
     (async () => {
-      if (!API) {
-        setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
-      }
+      if (!API) setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
       try {
         setLoadingCart(true);
         const r = await fetch(`${API}/api/cartById`, { credentials: "include" });
@@ -69,9 +83,7 @@ function Checkout() {
     })();
   }, []);
 
-  const generateToken = () =>
-    `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-
+  const generateToken = () => `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
   const handleChange = (e) => setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const isValid = () => {
@@ -88,18 +100,17 @@ function Checkout() {
 
   const handleSubmit = async () => {
     if (!isValid()) return;
+    setErrBanner("");
 
-    // Analytics: intent
+    // Analytics: intent (use finalUnitPrice)
     try {
       const gaItems = (cart || []).map((l) => ({
         id: l?.product?.id,
         title: l?.product?.name,
         category: l?.product?.categories?.[0]?.name || l?.product?.categories?.name || "Checkout",
-        price:
-          (Number(l?.product?.price) || 0) -
-          (l?.product?.discountprice ? Number(l.product.discountprice) : 0),
+        price: finalUnitPrice(l?.product),
         quantity: l?.quantity || 1,
-        currency: l?.product?.currency || currency,
+        currency: "INR",
       }));
       Ecom.addShippingInfo(gaItems, "Standard");
       const pm = (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_");
@@ -114,7 +125,7 @@ function Checkout() {
       return;
     }
 
-    // 0) Reload cart (authoritative) to get latest ids/qty/availability
+    // 0) Reload cart (authoritative)
     let serverCart = [];
     try {
       const r = await fetch(`${API}/api/cartById`, { credentials: "include" });
@@ -126,20 +137,15 @@ function Checkout() {
       return;
     }
 
-    // Pre-validate: filter out inactive / out-of-stock if server exposes flags
+    // Filter invalid
     const invalid = [];
     const validLines = serverCart.filter((ci) => {
       const p = ci?.product;
-      const active =
-        p?.is_active === 1 || p?.is_active === "Y" || p?.is_active === true || p?.is_active === undefined; // pass if flag not provided
+      const active = p?.is_active === 1 || p?.is_active === "Y" || p?.is_active === true || p?.is_active === undefined;
       const qty = Number(ci?.quantity || 1);
       const okStock = p?.stock == null ? true : Number(p.stock) >= qty;
       if (!active || !okStock) {
-        invalid.push({
-          id: p?.id,
-          name: p?.name,
-          reason: !active ? "inactive" : "insufficient stock",
-        });
+        invalid.push({ id: p?.id, name: p?.name, reason: !active ? "inactive" : "insufficient stock" });
         return false;
       }
       return true;
@@ -148,24 +154,20 @@ function Checkout() {
     if (!validLines.length) {
       alert(
         invalid.length
-          ? `Your cart has items that cannot be purchased:\n${invalid
-              .map((i) => `• ${i.name} (${i.reason})`)
-              .join("\n")}`
+          ? `Your cart has items that cannot be purchased:\n${invalid.map((i) => `• ${i.name} (${i.reason})`).join("\n")}`
           : "Your cart is empty."
       );
       return;
     }
 
-    // Build order items from cart (product_id is KEY)
+    // Build items (use finalUnitPrice)
     const items = validLines
       .map((ci) => {
-        const unit =
-          (Number(ci?.product?.price) || 0) -
-          (ci?.product?.discountprice ? Number(ci.product.discountprice) : 0);
+        const unit = finalUnitPrice(ci?.product);
         return {
-          product_id: ci?.product?.id ?? ci?.product?.ProductId, // support both shapes
+          product_id: ci?.product?.id ?? ci?.product?.ProductId,
           product_title: ci?.product?.name,
-          unit_price: Number(unit.toFixed(2)), // client hint only; server recalculates
+          unit_price: Number(unit.toFixed(2)), // hint; server still recalculates
           qty: Number(ci?.quantity || 1),
         };
       })
@@ -176,7 +178,7 @@ function Checkout() {
       return;
     }
 
-    // 1) Create order
+    // 1) Create order (INR)
     let orderNumber;
     try {
       const resp = await fetch(`${API}/api/checkout/order`, {
@@ -192,7 +194,7 @@ function Checkout() {
             anon_id: "web|guest",
           },
           items,
-          currency: serverCart?.[0]?.product?.currency || currency || "INR",
+          currency: "INR", // 🔒 force INR
           payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
           shipping_total: 0,
           tax_total: 0,
@@ -204,22 +206,19 @@ function Checkout() {
       });
 
       const text = await resp.text();
-      let j;
-      try {
-        j = JSON.parse(text);
-      } catch {
-        j = { ok: false, error: "non_json_response", raw: text };
-      }
+      const j = (() => {
+        try {
+          return JSON.parse(text);
+        } catch {
+          return null;
+        }
+      })();
 
       if (!resp.ok || !j?.ok) {
-        console.error("Checkout failed", j);
-        if (j?.missing?.length) {
-          alert(`Order create failed: missing product IDs ${j.missing.join(", ")}`);
-        } else if (j?.error === "product_inactive") {
-          alert("One of your cart items is inactive. Please remove it and try again.");
-        } else {
-          alert("Something went wrong creating your order. Please try again.");
-        }
+        console.error("Checkout failed", j || text);
+        if (j?.missing?.length) alert(`Order create failed: missing product IDs ${j.missing.join(", ")}`);
+        else if (j?.error === "product_inactive") alert("One of your cart items is inactive. Please remove it and try again.");
+        else alert("Something went wrong creating your order. Please try again.");
         return;
       }
       orderNumber = j.order_number;
@@ -239,27 +238,24 @@ function Checkout() {
       });
 
       const rText = await r.text();
-      let rz;
-      try {
-        rz = JSON.parse(rText);
-      } catch {
-        rz = { error: "non_json_response", raw: rText };
-      }
+      const rz = (() => {
+        try {
+          return JSON.parse(rText);
+        } catch {
+          return null;
+        }
+      })();
 
-      // Accept either `{ ok: true, rzp: {...} }` or just `{ rzp: {...} }`
       if (!r.ok || !rz?.rzp?.order_id) {
-        console.error("Razorpay order creation failed", rz);
+        console.error("Razorpay order creation failed", rz || rText);
         alert(`Unable to start payment: ${rz?.message || rz?.error || r.status}`);
         return;
       }
 
       const loaded = await loadRazorpay();
-      if (!loaded) {
-        alert("Razorpay failed to load. Check your network/CSP.");
-        return;
-      }
+      if (!loaded) return alert("Razorpay failed to load. Check your network/CSP.");
 
-      // 3) Open Razorpay checkout
+      // 3) Open Razorpay in modal (no redirects)
       const options = {
         key: rz.key,
         order_id: rz.rzp.order_id,
@@ -267,12 +263,9 @@ function Checkout() {
         currency: rz.rzp.currency,
         name: "Shahu",
         description: `Payment for ${orderNumber}`,
-        prefill: {
-          name: formData.name,
-          email: formData.email,
-          contact: formData.phone,
-        },
+        prefill: { name: formData.name, email: formData.email, contact: formData.phone },
         theme: { color: "#173F5F" },
+        redirect: false, // 👈 keep modal, handle result here
         handler: async (response) => {
           try {
             const v = await fetch(`${API}/api/payments/verify`, {
@@ -282,44 +275,45 @@ function Checkout() {
               body: JSON.stringify(response),
             });
             const vText = await v.text();
-            let vr;
-            try {
-              vr = JSON.parse(vText);
-            } catch {
-              vr = { ok: false, error: "non_json_response", raw: vText };
-            }
+            const vr = (() => {
+              try {
+                return JSON.parse(vText);
+              } catch {
+                return null;
+              }
+            })();
 
-            if (v.ok && vr.ok) {
-              // GA purchase
+            if (v.ok && vr?.ok) {
+              // GA purchase (use finalUnitPrice)
               try {
                 const gaItems = validLines.map((ci) => ({
                   id: ci?.product?.id,
                   title: ci?.product?.name,
-                  category:
-                    ci?.product?.categories?.[0]?.name ||
-                    ci?.product?.categories?.name ||
-                    "Checkout",
-                  price:
-                    (Number(ci?.product?.price) || 0) -
-                    (ci?.product?.discountprice ? Number(ci.product.discountprice) : 0),
+                  category: ci?.product?.categories?.[0]?.name || ci?.product?.categories?.name || "Checkout",
+                  price: finalUnitPrice(ci?.product),
                   quantity: ci?.quantity || 1,
-                  currency: ci?.product?.currency || currency,
+                  currency: "INR",
                 }));
                 Ecom.purchase({
-                  transactionId: orderNumber || newToken,
+                  transactionId: vr.order_number || orderNumber || newToken,
                   items: gaItems,
                   value: gaItems.reduce((s, i) => s + i.price * i.quantity, 0),
                   tax: 0,
                   shipping: 0,
                 });
               } catch {}
-              setIsModalOpen(true);
+
+              // 🎉 Thank-you (no redirect)
+              setThankOrderNo(vr.order_number || orderNumber);
+              setEmailNoted(!!vr.email_sent);
+              setThankOpen(true);
             } else {
-              window.location.href = `/order/failed?order_id=${orderNumber}`;
+              // Show inline banner on failure (no redirect to /order/failed)
+              setErrBanner(vr?.message || "Payment verification failed. Your card was not charged.");
             }
           } catch (e) {
             console.error("Verify error:", e);
-            window.location.href = `/order/failed?order_id=${orderNumber}`;
+            setErrBanner("Payment verification failed due to a network error. Please try again.");
           }
         },
         modal: { ondismiss: () => console.log("Razorpay modal closed") },
@@ -347,18 +341,10 @@ function Checkout() {
         <meta name="description" content="Complete your purchase securely on Shahu Mumbai." />
         <link rel="canonical" href={pageUrl} />
         <meta name="robots" content="noindex,nofollow,noarchive" />
-        <meta property="og:type" content="website" />
-        <meta property="og:title" content="Checkout — Shahu Mumbai" />
-        <meta property="og:description" content="Secure checkout powered by Razorpay." />
-        <meta property="og:url" content={pageUrl} />
-        <meta property="og:image" content={`${baseUrl}/og/checkout.jpg`} />
-        <meta name="twitter:card" content="summary" />
       </Helmet>
 
       {errBanner && (
-        <div className="max-w-3xl mx-auto mt-4 p-3 text-sm rounded bg-yellow-100 text-yellow-800">
-          {errBanner}
-        </div>
+        <div className="max-w-3xl mx-auto mt-4 p-3 text-sm rounded bg-yellow-100 text-yellow-800">{errBanner}</div>
       )}
 
       <div className="max-w-3xl mx-auto p-6 space-y-6">
@@ -433,10 +419,7 @@ function Checkout() {
           <div className="mt-4 bg-gray-50 p-4 rounded text-sm space-y-2">
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>
-                {currency === "INR" ? "₹" : currency === "USD" ? "$" : ""}
-                {totals.total.toFixed(2)}
-              </span>
+              <span>{currency === "INR" ? fmtINR(totals.total) : totals.total.toFixed(2)}</span>
             </div>
             <div className="text-green-600 text-sm mt-2">
               Your payment is secured by Razorpay with 256-bit SSL encryption
@@ -445,21 +428,15 @@ function Checkout() {
               onClick={handleSubmit}
               disabled={!isValid() || loadingCart}
               className={`w-full mt-4 text-white py-2 rounded transition ${
-                !isValid() || loadingCart
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-black hover:bg-gray-900"
+                !isValid() || loadingCart ? "bg-gray-400 cursor-not-allowed" : "bg-black hover:bg-gray-900"
               }`}
             >
-              {loadingCart
-                ? "Loading your cart..."
-                : `💳 Pay ${currency === "INR" ? "₹" : currency === "USD" ? "$" : ""}${totals.total.toFixed(
-                    2
-                  )} Securely`}
+              {loadingCart ? "Loading your cart..." : `💳 Pay ${fmtINR(totals.total)} Securely`}
             </button>
           </div>
         </div>
 
-        {/* Success Modal */}
+        {/* (legacy) success modal */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">
@@ -468,12 +445,33 @@ function Checkout() {
               <p className="text-sm font-mono text-gray-600">
                 🧾 Transaction Token: <strong>{token}</strong>
               </p>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="mt-4 bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
-              >
+              <button onClick={() => setIsModalOpen(false)} className="mt-4 bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
                 Close
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* 🎉 Thank-you modal after verify */}
+        {thankOpen && (
+          <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">
+              <h2 className="text-xl font-semibold text-green-600">Payment Successful</h2>
+              <p className="text-gray-700">Your order has been placed.</p>
+              <p className="text-sm font-mono text-gray-600">
+                🧾 Order Number: <strong>{thankOrderNo}</strong>
+              </p>
+              <p className="text-xs text-gray-600">
+                {emailNoted ? "A confirmation email has been sent." : "We’ll email your receipt shortly."}
+              </p>
+              <div className="flex gap-3 justify-center">
+                <a href="/myorder" className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
+                  View Orders
+                </a>
+                <button onClick={() => setThankOpen(false)} className="px-4 py-2 rounded border">
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -3,11 +3,48 @@ require('dotenv').config();
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const sql = require('mssql');
+const nodemailer = require('nodemailer');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID,
   key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
+
+/** best-effort mailer; if SMTP envs are missing it silently no-ops */
+async function sendOrderEmail({ to, orderNumber, total, currency = 'INR', name }) {
+  try {
+    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      return { sent: false, reason: 'smtp_not_configured' };
+    }
+    const transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      secure: false,
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+    });
+
+    const html = `
+      <div style="font-family:Arial,sans-serif;line-height:1.5">
+        <h2>Thanks for your purchase${name ? `, ${name}` : ''}!</h2>
+        <p>Your order has been placed successfully.</p>
+        <p><strong>Order Number:</strong> ${orderNumber}</p>
+        <p><strong>Total Paid:</strong> ${currency} ${Number(total).toFixed(2)}</p>
+        <p>We’ll notify you when your order ships.</p>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      to,
+      subject: `Order Confirmation — ${orderNumber}`,
+      html,
+    });
+    return { sent: true };
+  } catch (e) {
+    console.warn('sendOrderEmail failed:', e.message);
+    return { sent: false, reason: e.message };
+  }
+}
 
 /** Merge JSON Meta and optionally update other fields on dbo.Orders */
 async function mergeOrderMetaById(dbPool, orderId, metaPatch = {}, otherFields = {}) {
@@ -29,17 +66,14 @@ async function mergeOrderMetaById(dbPool, orderId, metaPatch = {}, otherFields =
       .input('Meta', sql.NVarChar(sql.MAX), JSON.stringify(nextMeta))
       .input('UpdatedAt', sql.DateTime2, otherFields.UpdatedAt || new Date());
 
-    if (otherFields.PlacedAt) {
-      setParts.push('PlacedAt = @PlacedAt');
-      req.input('PlacedAt', sql.DateTime2, otherFields.PlacedAt);
-    }
-    if (otherFields.Status) {
-      setParts.push('Status = @Status');
-      req.input('Status', sql.NVarChar(20), otherFields.Status);
-    }
+    // ⚠️ Do NOT set Status here unless you are 100% sure it's allowed by orders_status_check
     if (otherFields.PaymentStatus) {
       setParts.push('PaymentStatus = @PaymentStatus');
       req.input('PaymentStatus', sql.NVarChar(20), otherFields.PaymentStatus);
+    }
+    if (otherFields.PlacedAt) {
+      setParts.push('PlacedAt = @PlacedAt');
+      req.input('PlacedAt', sql.DateTime2, otherFields.PlacedAt);
     }
 
     const updateSql = `
@@ -122,13 +156,13 @@ exports.createRazorpayOrder = async (req, res) => {
         razorpay_amount: amountPaise,
         razorpay_currency: currency,
       };
-      const patch = {
-        PaymentStatus: 'unpaid',
-        Status: 'pending',
-        UpdatedAt: new Date(),
-      };
 
-      const { error: updErr } = await mergeOrderMetaById(req.dbPool, order.OrderId, metaPatch, patch);
+      const { error: updErr } = await mergeOrderMetaById(
+        req.dbPool,
+        order.OrderId,
+        metaPatch,
+        { PaymentStatus: 'unpaid', UpdatedAt: new Date() }
+      );
       if (updErr) return res.status(500).json({ message: 'failed_to_save_razorpay_order' });
     }
 
@@ -158,13 +192,13 @@ exports.verifyPayment = async (req, res) => {
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex');
 
-    const ok = expected === razorpay_signature;
+    const sigOk = expected === razorpay_signature;
 
     // Find our order by RZP order id in Meta
     const ordersRes = await req.dbPool.request()
       .input('rzpOrderId', sql.NVarChar(100), razorpay_order_id)
       .query(`
-        SELECT OrderId, OrderNumber, PlacedAt, PaymentStatus
+        SELECT OrderId, OrderNumber, PlacedAt, PaymentStatus, CustomerEmail, CustomerName, Total, Currency, UserId
         FROM dbo.Orders
         WHERE JSON_VALUE(Meta, '$.razorpay_order_id') = @rzpOrderId
       `);
@@ -172,13 +206,11 @@ exports.verifyPayment = async (req, res) => {
     const ord = ordersRes.recordset[0];
     if (!ord) return res.status(404).json({ ok: false, message: 'order_not_found' });
 
-    if (!ok) {
-      // Record failed verify and keep pending
+    if (!sigOk) {
       await mergeOrderMetaById(req.dbPool, ord.OrderId, {
         razorpay_payment_id, razorpay_signature, verify_ok: false,
       }, {
         PaymentStatus: 'unpaid',
-        Status: 'pending',
         UpdatedAt: new Date(),
       });
       return res.status(400).json({ ok: false, message: 'signature_mismatch' });
@@ -186,10 +218,10 @@ exports.verifyPayment = async (req, res) => {
 
     // If already paid, just return ok (idempotent)
     if (String(ord.PaymentStatus || '').toLowerCase() === 'paid') {
-      return res.json({ ok: true, order_number: ord.OrderNumber });
+      return res.json({ ok: true, order_number: ord.OrderNumber, email_sent: false });
     }
 
-    // Transaction: decrement stock then mark paid/confirmed
+    // Transaction: decrement stock then mark paid (do NOT change Status)
     const tx = new sql.Transaction(req.dbPool);
     await tx.begin();
 
@@ -218,14 +250,13 @@ exports.verifyPayment = async (req, res) => {
         }
       }
 
-      // Update order -> paid/confirmed; store payment id in meta
+      // Mark order as paid; do NOT modify Status (avoids CHECK constraint)
       await new sql.Request(tx)
         .input('OrderId', sql.Int, ord.OrderId)
         .input('RzpPaymentId', sql.NVarChar(100), razorpay_payment_id)
         .query(`
           UPDATE dbo.Orders
           SET PaymentStatus = 'paid',
-              Status = 'confirmed',
               PlacedAt = ISNULL(PlacedAt, SYSUTCDATETIME()),
               UpdatedAt = SYSUTCDATETIME(),
               Meta = CASE
@@ -238,12 +269,40 @@ exports.verifyPayment = async (req, res) => {
 
       await tx.commit();
 
-      // Also merge outside tx to keep extra fields if you want
+      // Merge extra meta (non-critical)
       await mergeOrderMetaById(req.dbPool, ord.OrderId, {
         razorpay_order_id, razorpay_payment_id, razorpay_signature, verify_ok: true,
       }, {});
 
-      return res.json({ ok: true, order_number: ord.OrderNumber });
+      // Clear the cart best-effort
+      try {
+        if (ord.UserId != null) {
+          await req.dbPool.request()
+            .input('UserId', sql.NVarChar(128), String(ord.UserId))
+            .query(`DELETE FROM dbo.carts WHERE UserId = @UserId`);
+        }
+      } catch (e) {
+        console.warn('verify: clear cart failed (non-fatal):', e.message);
+      }
+
+      // Send confirmation email (best-effort)
+      let emailSent = false;
+      try {
+        if (ord.CustomerEmail) {
+          const r = await sendOrderEmail({
+            to: ord.CustomerEmail,
+            orderNumber: ord.OrderNumber,
+            total: ord.Total,
+            currency: ord.Currency || 'INR',
+            name: ord.CustomerName,
+          });
+          emailSent = !!r.sent;
+        }
+      } catch (e) {
+        console.warn('verify: email send failed (non-fatal):', e.message);
+      }
+
+      return res.json({ ok: true, order_number: ord.OrderNumber, email_sent: emailSent });
     } catch (errTx) {
       try { await tx.rollback(); } catch {}
       if (errTx?.message === 'insufficient_stock') {
@@ -273,7 +332,7 @@ exports.webhook = async (req, res) => {
     }
 
     const event = JSON.parse(req.rawBody.toString());
-    // You can upsert webhook info to Meta similarly if you like
+    // Optionally persist webhook details in Meta
     res.json({ received: true });
   } catch (e) {
     console.error('payments.webhook error:', e);
