@@ -11,33 +11,50 @@ const razorpay = new Razorpay({
 });
 
 /** best-effort mailer; if SMTP envs are missing it silently no-ops */
-async function sendOrderEmail({ to, orderNumber, total, currency = 'INR', name }) {
+async function sendOrderEmail({ req,to, orderNumber, total, currency = '₹', name,productname,phoneno,address }) {
   try {
-    if (!process.env.SMTP_HOST || !process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      return { sent: false, reason: 'smtp_not_configured' };
+
+    const moduleResult = await req.dbPool.request()
+      .input('mailtype', sql.NVarChar, 'OrderConfirmation')
+      .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
+    const module = moduleResult.recordset[0];
+
+    if (!module) {
+      throw new Error('Order confirmation email template not found');
     }
-    const transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST,
-      port: Number(process.env.SMTP_PORT || 587),
-      secure: false,
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+
+    let mailContent = module.maildescription;
+  
+    mailContent = mailContent.replace(/#name/g, name || '');
+    mailContent = mailContent.replace(/#email/g, to);
+    mailContent = mailContent.replace(/#phoneno/g, phoneno || '');
+    mailContent = mailContent.replace(/#address/g, address || '');
+    mailContent = mailContent.replace(/#productname/g, productname || '');
+    mailContent = mailContent.replace(/#orderNumber/g, orderNumber || '');
+    mailContent = mailContent.replace(/#total/g, Number(total).toFixed(2) || 0.00);
+    mailContent = mailContent.replace(/#currency/g, currency || 'INR');
+
+    const plainTextContent = mailContent
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+      let mailSubject = module.mailsubject.replace(/#orderNumber/g, orderNumber);
+
+   const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
     });
 
-    const html = `
-      <div style="font-family:Arial,sans-serif;line-height:1.5">
-        <h2>Thanks for your purchase${name ? `, ${name}` : ''}!</h2>
-        <p>Your order has been placed successfully.</p>
-        <p><strong>Order Number:</strong> ${orderNumber}</p>
-        <p><strong>Total Paid:</strong> ${currency} ${Number(total).toFixed(2)}</p>
-        <p>We’ll notify you when your order ships.</p>
-      </div>
-    `;
-
     await transporter.sendMail({
-      from: process.env.SMTP_FROM || process.env.SMTP_USER,
+      from: process.env.EMAIL_USER,
       to,
-      subject: `Order Confirmation — ${orderNumber}`,
-      html,
+      subject: mailSubject,
+      html: mailContent,
+      text: plainTextContent,
     });
     return { sent: true };
   } catch (e) {
@@ -198,9 +215,26 @@ exports.verifyPayment = async (req, res) => {
     const ordersRes = await req.dbPool.request()
       .input('rzpOrderId', sql.NVarChar(100), razorpay_order_id)
       .query(`
-        SELECT OrderId, OrderNumber, PlacedAt, PaymentStatus, CustomerEmail, CustomerName, Total, Currency, UserId
-        FROM dbo.Orders
-        WHERE JSON_VALUE(Meta, '$.razorpay_order_id') = @rzpOrderId
+        SELECT 
+          o.OrderId, 
+          o.OrderNumber, 
+          o.PlacedAt, 
+          o.PaymentStatus, 
+          o.CustomerEmail, 
+          o.CustomerName, 
+          o.CustomerPhoneNo, 
+          o.CustomerAddress, 
+          o.Total, 
+          o.Currency, 
+          o.UserId,
+          (
+            SELECT STRING_AGG(p.Name, ', ') 
+            FROM dbo.OrderItems oi 
+            LEFT JOIN dbo.Products p ON oi.ProductId = p.ProductId 
+            WHERE oi.OrderId = o.OrderId
+          ) AS ProductNames
+        FROM dbo.Orders o
+        WHERE JSON_VALUE(o.Meta, '$.razorpay_order_id') = @rzpOrderId
       `);
 
     const ord = ordersRes.recordset[0];
@@ -288,14 +322,20 @@ exports.verifyPayment = async (req, res) => {
       // Send confirmation email (best-effort)
       let emailSent = false;
       try {
+        console.log(ord.CustomerEmail);
         if (ord.CustomerEmail) {
           const r = await sendOrderEmail({
+            req:req,
             to: ord.CustomerEmail,
             orderNumber: ord.OrderNumber,
             total: ord.Total,
             currency: ord.Currency || 'INR',
             name: ord.CustomerName,
+            productname:ord.ProductNames,
+            phoneno:ord.CustomerPhoneNo,
+            address:ord.CustomerAddress,
           });
+          console.log(r);
           emailSent = !!r.sent;
         }
       } catch (e) {

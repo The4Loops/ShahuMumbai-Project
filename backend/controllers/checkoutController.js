@@ -125,6 +125,8 @@ exports.createOrder = async (req, res) => {
         .input('UserId', sql.Int, null)
         .input('CustName', sql.NVarChar(255), String(customer.name))
         .input('CustEmail', sql.NVarChar(255), String(customer.email || ''))
+        .input('CustPhoneNo', sql.NVarChar(255), String(customer.phone || ''))
+        .input('CustAddress', sql.NVarChar(255), String(customer.address || ''))
         .input('Status', sql.NVarChar(20), 'pending')            // allowed by your CHECK
         .input('PayStatus', sql.NVarChar(20), 'unpaid')          // unpaid → will flip to paid on verify
         .input('Currency', sql.NVarChar(8), 'INR')               // 🔒 INR
@@ -148,11 +150,11 @@ exports.createOrder = async (req, res) => {
 
       const orderIns = await orderReq.query(`
         INSERT INTO dbo.Orders
-          (UserId, CustomerName, CustomerEmail, Status, PaymentStatus, Currency,
+          (UserId, CustomerName, CustomerEmail,CustomerPhoneNo,CustomerAddress, Status, PaymentStatus, Currency,
            Subtotal, DiscountTotal, TaxTotal, ShippingTotal, Total, Meta, PlacedAt)
         OUTPUT INSERTED.OrderId, INSERTED.OrderNumber
         VALUES
-          (@UserId, @CustName, @CustEmail, @Status, @PayStatus, @Currency,
+          (@UserId, @CustName, @CustEmail,@CustPhoneNo,@CustAddress, @Status, @PayStatus, @Currency,
            @Subtotal, @Discount, @Tax, @Shipping, @Total, @Meta, @PlacedAt)
       `);
 
