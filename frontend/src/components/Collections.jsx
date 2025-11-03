@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from "react";
-import api from "../supabase/axios"; // Adjust path as needed
+import api from "../supabase/axios"; 
 
-// ✅ Import images properly (for fallback)
 import img1 from "../assets/images/product_images/DummyHandbag1.jpeg";
 import img2 from "../assets/images/product_images/DummyHandbag2.jpeg";
 import img3 from "../assets/images/product_images/DummyHandbag3.jpeg";
 
 function Collections() {
-  const [filter, setFilter] = useState("All");
   const [currentPage, setCurrentPage] = useState(1);
   const [collections, setCollections] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -15,44 +13,70 @@ function Collections() {
 
   const itemsPerPage = 3;
 
+  // Detect if Published
+  const isPublishedFlag = (v) => {
+    if (typeof v === "boolean") return v;
+    if (typeof v === "number") return v === 1;
+    if (typeof v === "string") {
+      const s = v.trim().toLowerCase();
+      return s === "y" || s === "yes" || s === "true" || s === "published";
+    }
+    return false;
+  };
+
+  const getFallbackImage = () => {
+    const arr = [img1, img2, img3];
+    return arr[Math.floor(Math.random() * arr.length)];
+  };
+
   useEffect(() => {
     const fetchCollections = async () => {
       try {
         setLoading(true);
         setError(null);
+
         const response = await api.get("/api/collections");
         const data = response.data;
 
-        const processedCollections = Array.isArray(data)
-          ? data.map((collection) => ({
-              id: collection.id || collection.collection_id,
-              title:
-                collection.title || collection.name || "Untitled Collection",
-              desc: collection.description || "No description available",
-              count: collection.product_count || collection.count || "0+",
-              img: collection.cover_image || getFallbackImage(),
-              status:
-                collection.status || collection.is_published
-                  ? "Published"
-                  : "Draft",
-            }))
-          : (data.collections || []).map((collection) => ({
-              id: collection.id || collection.collection_id,
-              title:
-                collection.title || collection.name || "Untitled Collection",
-              desc: collection.description || "No description available",
-              count: collection.product_count || collection.count || "0+",
-              img: collection.cover_image || getFallbackImage(),
-              status:
-                collection.status || collection.is_published
-                  ? "Published"
-                  : "Draft",
-            }));
+        const list = Array.isArray(data)
+          ? data
+          : data?.collections || [];
 
-        setCollections(processedCollections);
+        const processed = list.map((c) => {
+          const publishedRaw =
+            c.published ??
+            c.Published ??
+            c.is_published ??
+            c.IsPublished ??
+            c.status ??
+            c.Status;
+
+          return {
+            id: c.id || c.collection_id || c.Id,
+            title: c.title || c.name || c.Title || c.Name || "Untitled Collection",
+            desc: c.description || c.Description || "",
+            count:
+              c.product_count ||
+              c.count ||
+              c.ProductCount ||
+              "0+",
+            img:
+              c.cover_image ||
+              c.CoverImage ||
+              getFallbackImage(),
+            status: isPublishedFlag(publishedRaw) ? "Published" : "Draft",
+            slug:
+              c.slug ||
+              c.Slug ||
+              c.seo_slug ||
+              c.SeoSlug ||
+              c.id,
+          };
+        });
+
+        setCollections(processed);
       } catch (err) {
-        console.error("Failed to fetch collections:", err);
-        setError(err?.response?.data?.message || "Failed to load collections");
+        setError("Failed to load collections");
         setCollections([]);
       } finally {
         setLoading(false);
@@ -62,67 +86,27 @@ function Collections() {
     fetchCollections();
   }, []);
 
-  const getFallbackImage = () => {
-    const images = [img1, img2, img3];
-    return images[Math.floor(Math.random() * images.length)];
-  };
-
-  const SkeletonSlide = () => (
-    <div className="px-3">
-      <div className="relative bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
-        <div className="w-full h-52 bg-[#F1E7E5]/50 rounded-t-xl"></div>
-        <div className="p-4">
-          <div className="h-6 bg-[#F1E7E5]/50 rounded mb-2 w-3/4"></div>
-          <div className="h-4 bg-[#F1E7E5]/50 rounded w-1/2"></div>
-        </div>
-      </div>
-    </div>
-  );
-
   if (loading) {
     return (
-      <section className="relative bg-[#F1E7E5] py-16 px-6">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonSlide key={i} />
-            ))}
-          </div>
-        </div>
+      <section className="relative bg-[#F1E7E5] py-16 px-6 text-center">
+        <p className="text-[#4A2C2A] text-lg">Loading collections...</p>
       </section>
     );
   }
 
   if (error && collections.length === 0) {
     return (
-      <section className="relative bg-[#F1E7E5] py-16 px-6">
-        <div className="max-w-7xl mx-auto text-center">
-          <div className="text-red-600 mb-4">
-            <p className="text-lg font-semibold">Error loading collections</p>
-            <p className="text-sm">{error}</p>
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2 bg-[#4A2C2A] text-white rounded-full hover:bg-opacity-90 transition"
-          >
-            Retry
-          </button>
-        </div>
+      <section className="relative bg-[#F1E7E5] py-16 px-6 text-center">
+        <p className="text-red-600 text-lg font-medium">{error}</p>
       </section>
     );
   }
 
-  const filteredData =
-    filter === "All"
-      ? collections
-      : collections.filter((item) => item.status === filter);
+  const publishedData = collections.filter((c) => c.status === "Published");
 
-  const totalPages = Math.ceil(filteredData.length / itemsPerPage);
+  const totalPages = Math.ceil(publishedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedData = filteredData.slice(
-    startIndex,
-    startIndex + itemsPerPage
-  );
+  const paginated = publishedData.slice(startIndex, startIndex + itemsPerPage);
 
   return (
     <section className="relative bg-[#F1E7E5] py-16 px-6">
@@ -131,59 +115,36 @@ function Collections() {
           Our Collections
         </h2>
 
-        <p className="text-[#4A2C2A]/70 text-lg max-w-2xl mx-auto mb-8">
-          Explore our carefully curated collections, each telling a unique story
-          of style and heritage.
+        <p className="text-[#4A2C2A]/70 text-lg max-w-2xl mx-auto mb-10">
+          Explore our carefully curated collections, each telling a unique story of style and heritage.
         </p>
 
-        {/* Filter Buttons */}
-        <div className="flex justify-center gap-4 mb-10">
-          {["All", "Published", "Draft"].map((status) => (
-            <button
-              key={status}
-              onClick={() => {
-                setFilter(status);
-                setCurrentPage(1);
-              }}
-              className={`px-5 py-2 rounded-full border transition ${
-                filter === status
-                  ? "bg-[#4A2C2A] text-white border-[#4A2C2A]"
-                  : "bg-white text-[#4A2C2A] border-gray-300 hover:bg-gray-100"
-              }`}
-            >
-              {status}
-            </button>
-          ))}
-        </div>
-
-        {/* Collection Cards */}
-        {paginatedData.length > 0 ? (
+        {paginated.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {paginatedData.map((col, i) => (
+            {paginated.map((col) => (
               <div
-                key={col.id || i}
+                key={col.id}
                 className="relative group rounded-2xl overflow-hidden shadow-lg transform transition duration-500 hover:scale-[1.03]"
               >
                 <img
                   src={col.img}
-                  alt={`Collection - ${col.title}`}
+                  alt={col.title}
                   loading="lazy"
-                  onError={(e) => {
-                    e.target.src = getFallbackImage();
-                  }}
+                  onError={(e) => (e.currentTarget.src = getFallbackImage())}
                   className="w-full h-72 object-cover transition-transform duration-500 group-hover:scale-110"
                 />
 
                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent group-hover:from-black/60 transition-all"></div>
 
                 <div className="absolute bottom-6 left-6 text-left text-white">
-                  <span className="block text-sm tracking-wide opacity-80 mb-1">
-                    {col.count} ITEMS • {col.status}
+                  <span className="block text-sm opacity-80 mb-1">
+                    {col.count} ITEMS
                   </span>
                   <h3 className="text-2xl font-semibold mb-2">{col.title}</h3>
                   <p className="text-sm opacity-90 mb-4 max-w-xs">{col.desc}</p>
+
                   <a
-                    href={`/collections/${col.id || ""}`}
+                    href={`/collections/${encodeURIComponent(col.slug)}`}
                     className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm px-4 py-2 text-sm font-medium hover:bg-white/30 transition"
                   >
                     Explore →
@@ -193,15 +154,17 @@ function Collections() {
             ))}
           </div>
         ) : (
-          // 👇 Show 4 skeleton cards instead of 1
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-3 gap-8">
-            {Array.from({ length: 3 }).map((_, i) => (
-              <SkeletonSlide key={i} />
-            ))}
+          // ✅ No Collections Message
+          <div className="py-12 text-center">
+            <h3 className="text-2xl font-semibold text-[#4A2C2A]">
+              No Collections Available
+            </h3>
+            <p className="mt-2 text-[#4A2C2A]/70 text-lg">
+              More beautiful collections are on the way. Stay tuned ✨
+            </p>
           </div>
         )}
 
-        {/* Pagination Controls */}
         {totalPages > 1 && (
           <div className="flex justify-center gap-2 mt-10">
             <button
@@ -211,6 +174,7 @@ function Collections() {
             >
               Prev
             </button>
+
             {[...Array(totalPages)].map((_, idx) => (
               <button
                 key={idx}
@@ -224,6 +188,7 @@ function Collections() {
                 {idx + 1}
               </button>
             ))}
+
             <button
               onClick={() => setCurrentPage((p) => Math.min(p + 1, totalPages))}
               disabled={currentPage === totalPages}
