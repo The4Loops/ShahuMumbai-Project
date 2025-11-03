@@ -114,14 +114,28 @@ export default function Navbar() {
 
       let sorted = res.data.menus.sort((a, b) => a.OrderIndex - b.OrderIndex);
 
-      sorted = sorted.map((menu) => ({
-        ...menu,
-        DropdownItems: userRole
-          ? menu.DropdownItems.filter(
-              (item) => item.Roles.length === 0 || item.Roles.split(",").includes(userRole)
-            )
-          : menu.DropdownItems,
-      }));
+      sorted = sorted.map((menu) => {
+        const filtered = {
+          ...menu,
+          DropdownItems: userRole
+            ? menu.DropdownItems.filter(
+                (item) => item.Roles.length === 0 || item.Roles.split(",").includes(userRole)
+              )
+            : menu.DropdownItems,
+        };
+
+        // >>> PRODUCTS: disable dropdown and link directly to /products
+        if (String(filtered.Label || "").toLowerCase() === "products") {
+          // Commented out: keep incoming categories but don't use them
+          // filtered.DropdownItems = filtered.DropdownItems;
+          // Instead, force no dropdown by clearing them:
+          // filtered.DropdownItems = []; // (Commented: alternative approach)
+          filtered.Href = "/products";
+        }
+        // <<< PRODUCTS
+
+        return filtered;
+      });
 
       if (userRole !== "Admin") {
         sorted = sorted.filter(
@@ -144,7 +158,7 @@ export default function Navbar() {
   const fetchCartItemCount = useCallback(async () => {
     try {
       const response = await api.get("/api/cartById");
-      setCartItemCount(Array.isArray(response.data) ? response.data.length : 0);
+    setCartItemCount(Array.isArray(response.data) ? response.data.length : 0);
     } catch (_err) {
       // stay quiet to avoid spamming the user with toasts from the navbar
       setCartItemCount(0);
@@ -242,7 +256,20 @@ export default function Navbar() {
           {/* Menus */}
           <ul className="flex items-center justify-center gap-8 flex-[1]">
             {menus.map((menu) => {
+              const isProducts = String(menu.Label || "").toLowerCase() === "products";
               const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
+
+              // >>> PRODUCTS (DESKTOP): Force simple link, remove dropdown
+              if (isProducts) {
+                return (
+                  <li key={menu.Id}>
+                    <Link to={"/products"} className="hover:text-[#D4A5A5] text-[#6B4226] font-normal">
+                      {menu.Label}
+                    </Link>
+                  </li>
+                );
+              }
+              // <<< PRODUCTS
 
               if (hasDropdown) {
                 const sortedItems = [...menu.DropdownItems].sort((a, b) => a.OrderIndex - b.OrderIndex);
@@ -362,7 +389,24 @@ export default function Navbar() {
 
               {/* Mobile Menus */}
               {menus.map((menu) => {
+                const isProducts = String(menu.Label || "").toLowerCase() === "products";
                 const hasDropdown = menu.DropdownItems && menu.DropdownItems.length > 0;
+
+                // >>> PRODUCTS (MOBILE): Force simple link, remove dropdown
+                if (isProducts) {
+                  return (
+                    <Link
+                      key={menu.Id}
+                      to={"/products"}
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="block py-2 border-b border-[#d4c4b6]"
+                    >
+                      {menu.Label}
+                    </Link>
+                  );
+                }
+                // <<< PRODUCTS
+
                 if (hasDropdown) {
                   const sortedItems = [...menu.DropdownItems].sort((a, b) => a.OrderIndex - b.OrderIndex);
                   return (
@@ -383,6 +427,7 @@ export default function Navbar() {
                             transition={{ duration: 0.25 }}
                             className="pl-4 pt-1 space-y-2 overflow-hidden"
                           >
+                            {/* Commented out since Products dropdown is removed; other menus still work */}
                             {sortedItems.map(({ Label, Href }) => (
                               <Link
                                 key={Label}
