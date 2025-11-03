@@ -10,7 +10,7 @@ exports.sendOtp = async (req, res) => {
     const { Email, FullName, Password } = req.body;
 
     // Check if already exists in users table
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT UserId FROM users WHERE Email = @Email');
     if (userResult.recordset[0]) {
@@ -23,7 +23,7 @@ exports.sendOtp = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('email', sql.NVarChar, Email)
       .input('otp', sql.NVarChar, otp)
       .query('INSERT INTO shortmessage (Email, Otp, CreatedAt) VALUES (@email, @otp, GETDATE())');
@@ -56,7 +56,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
   try {
     const { FullName, Email, Password, otp, SSOLogin = 'N' } = req.body;
 
-    const otpResult = await req.dbPool.request()
+    const otpResult = await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .query(`
         SELECT TOP 1 Email, Otp
@@ -71,7 +71,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     }
 
     // Fetch the default 'Users' role ID
-    const roleResult = await req.dbPool.request()
+    const roleResult = await req.db.request()
       .input('Label', sql.NVarChar, 'Users')
       .query('SELECT RoleId FROM roles WHERE Label = @Label');
     if (!roleResult.recordset[0]) {
@@ -82,7 +82,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     const hashedPassword = Password ? await bcrypt.hash(Password, 10) : null;
 
     // Check if email exists in subscriptions
-    const subscriptionResult = await req.dbPool.request()
+    const subscriptionResult = await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT SubscriptionId FROM subscriptions WHERE Email = @Email');
     const subscription = subscriptionResult.recordset[0];
@@ -91,7 +91,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     let insertResult;
     if (subscription) {
       // Update existing subscription to users table
-      insertResult = await req.dbPool.request()
+      insertResult = await req.db.request()
         .input('FullName', sql.NVarChar, FullName)
         .input('Email', sql.NVarChar, Email)
         .input('Password', sql.NVarChar, hashedPassword)
@@ -107,12 +107,12 @@ exports.verifyOtpAndRegister = async (req, res) => {
         `);
 
       // Delete the subscription record
-      await req.dbPool.request()
+      await req.db.request()
         .input('SubscriptionId', sql.Int, subscription.SubscriptionId)
         .query('DELETE FROM subscriptions WHERE SubscriptionId = @SubscriptionId');
     } else {
       // New user without prior subscription
-      insertResult = await req.dbPool.request()
+      insertResult = await req.db.request()
         .input('FullName', sql.NVarChar, FullName)
         .input('Email', sql.NVarChar, Email)
         .input('Password', sql.NVarChar, hashedPassword)
@@ -131,7 +131,7 @@ exports.verifyOtpAndRegister = async (req, res) => {
     const userId = insertResult.recordset[0].UserId;
 
     // Clean up OTP
-    await req.dbPool.request()
+    await req.db.request()
       .input('email', sql.NVarChar, Email)
       .query('DELETE FROM shortmessage WHERE email = @email');
 
@@ -148,7 +148,7 @@ exports.login = async (req, res) => {
     const { Email, Password } = req.body;
 
     // Step 1: Fetch user by email with role information
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .query(`
         SELECT 
@@ -193,7 +193,7 @@ exports.login = async (req, res) => {
         updates.LockedDate = new Date();
       }
 
-      await req.dbPool.request()
+      await req.db.request()
         .input('UserId', sql.Int, user.UserId)
         .input('InvalidAttempt', sql.Int, updates.InvalidAttempt)
         .input('UserLocked', sql.Char(1), updates.UserLocked || user.UserLocked)
@@ -215,7 +215,7 @@ exports.login = async (req, res) => {
     }
 
     // Step 4: Reset invalid attempts and update LastLogin
-    await req.dbPool.request()
+    await req.db.request()
       .input('UserId', sql.Int, user.UserId)
       .input('InvalidAttempt', sql.Int, 0)
       .input('LastLogin', sql.DateTime, new Date())
@@ -285,7 +285,7 @@ exports.ssoLogin = async (req, res) => {
     };
 
     // Fetch the default 'Users' role
-    const roleResult = await req.dbPool.request()
+    const roleResult = await req.db.request()
       .input('Label', sql.NVarChar, 'Users')
       .query('SELECT RoleId, Label FROM roles WHERE Label = @Label');
     if (!roleResult.recordset[0]) {
@@ -295,7 +295,7 @@ exports.ssoLogin = async (req, res) => {
     const { RoleId, Label: userRoleLabel } = roleResult.recordset[0];
 
     // Check if user exists in DB
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('Email', sql.NVarChar, user.email)
       .query(`
         SELECT 
@@ -316,13 +316,13 @@ exports.ssoLogin = async (req, res) => {
 
     if (!existingUser) {
       // Check if email exists in subscriptions
-      const subscriptionResult = await req.dbPool.request()
+      const subscriptionResult = await req.db.request()
         .input('Email', sql.NVarChar, user.email)
         .query('SELECT SubscriptionId FROM subscriptions WHERE Email = @Email');
       const subscription = subscriptionResult.recordset[0];
 
       // New User -> Create with SSOLogin = 'Y'
-      const insertResult = await req.dbPool.request()
+      const insertResult = await req.db.request()
         .input('FullName', sql.NVarChar, user.user_metadata.full_name || user.email)
         .input('Email', sql.NVarChar, user.email)
         .input('Password', sql.NVarChar, '')
@@ -341,7 +341,7 @@ exports.ssoLogin = async (req, res) => {
 
       // Delete the subscription record if it existed
       if (subscription) {
-        await req.dbPool.request()
+        await req.db.request()
           .input('SubscriptionId', sql.Int, subscription.SubscriptionId)
           .query('DELETE FROM subscriptions WHERE SubscriptionId = @SubscriptionId');
       }
@@ -354,7 +354,7 @@ exports.ssoLogin = async (req, res) => {
       roleLabel = existingUser.Label;
 
       // Update LastLogin and ensure NewsLetterSubscription is preserved
-      await req.dbPool.request()
+      await req.db.request()
         .input('UserId', sql.Int, userId)
         .input('LastLogin', sql.DateTime, new Date())
         .query(`
@@ -387,7 +387,7 @@ exports.sendResetPasswordOtp = async (req, res) => {
       return res.status(400).json({ error: 'Email is required' });
     }
 
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT UserId FROM users WHERE Email = @Email');
     if (!userResult.recordset[0]) {
@@ -400,7 +400,7 @@ exports.sendResetPasswordOtp = async (req, res) => {
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('email', sql.NVarChar, Email)
       .input('otp', sql.NVarChar, otp)
       .query('INSERT INTO shortmessage (email, otp, CreatedAt) VALUES (@email, @otp, GETDATE())');
@@ -440,14 +440,14 @@ exports.verifyResetPasswordOtp = async (req, res) => {
       return res.status(400).json({ error: 'New password must be at least 6 characters' });
     }
 
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .query('SELECT UserId FROM users WHERE Email = @Email');
     if (!userResult.recordset[0]) {
       return res.status(400).json({ error: 'Email not found' });
     }
 
-    const otpResult = await req.dbPool.request()
+    const otpResult = await req.db.request()
       .input('email', sql.NVarChar, Email)
       .input('otp', sql.NVarChar, otp)
       .query(`
@@ -462,7 +462,7 @@ exports.verifyResetPasswordOtp = async (req, res) => {
 
     const hashedPassword = await bcrypt.hash(NewPassword, 10);
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('Email', sql.NVarChar, Email)
       .input('Password', sql.NVarChar, hashedPassword)
       .query(`
@@ -471,7 +471,7 @@ exports.verifyResetPasswordOtp = async (req, res) => {
         WHERE Email = @Email
       `);
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('email', sql.NVarChar, Email)
       .input('otp', sql.NVarChar, otp)
       .query('DELETE FROM shortmessage WHERE email = @email AND otp = @otp');

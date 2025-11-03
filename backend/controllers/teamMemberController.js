@@ -40,7 +40,7 @@ exports.listTeamMembers = async (req, res) => {
     query += whereClause;
     query += ' ORDER BY Name ASC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(param => request.input(param.name, param.type, param.value));
     request.input('offset', sql.Int, offset);
     request.input('limit', sql.Int, limit);
@@ -51,7 +51,7 @@ exports.listTeamMembers = async (req, res) => {
     let countQuery = 'SELECT COUNT(*) AS total FROM TeamMembers';
     if (whereClause.includes('WHERE')) {
       countQuery += whereClause.replace(' WHERE', ' WHERE');
-      const countRequest = req.dbPool.request();
+      const countRequest = req.db.request();
       parameters.forEach(param => countRequest.input(param.name, param.type, param.value));
       const countResult = await countRequest.query(countQuery);
       const total = countResult.recordset[0].total;
@@ -95,7 +95,7 @@ exports.createTeamMember = async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('Name', sql.NVarChar, name)
       .input('Role', sql.NVarChar, role)
       .input('Description', sql.NVarChar, description || null)
@@ -124,7 +124,7 @@ exports.getTeamMember = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('TeamMemberId', sql.Int, id)
       .query(`
         SELECT 
@@ -180,7 +180,7 @@ exports.updateTeamMember = async (req, res) => {
     }
 
     let query = 'UPDATE TeamMembers SET ';
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('TeamMemberId', sql.Int, id);
     const values = [];
 
@@ -230,7 +230,7 @@ exports.deleteTeamMember = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('TeamMemberId', sql.Int, id)
       .query(`
         DELETE FROM TeamMembers

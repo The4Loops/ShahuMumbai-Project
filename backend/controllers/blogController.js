@@ -2,7 +2,7 @@ const sql = require('mssql');
 const crypto = require('crypto');
 
 function dbReady(req) {
-  return req.dbPool && req.dbPool.connected;
+  return req.db && req.db.connected;  // ← FIXED
 }
 
 const now = () => new Date();
@@ -81,7 +81,7 @@ exports.createOrUpdateBlog = async (req, res) => {
 
     if (hasId) {
       
-      const r = await req.dbPool.request()
+      const r = await req.db.request()
         .input('Id', sql.NVarChar(36), req.params.id)
         .input('Title', sql.NVarChar(255), blogData.title)
         .input('Slug', sql.NVarChar(255), blogData.slug)
@@ -110,7 +110,7 @@ exports.createOrUpdateBlog = async (req, res) => {
       return res.status(200).json(data);
     } else {
       // INSERT
-      const r = await req.dbPool.request()
+      const r = await req.db.request()
         .input('Title', sql.NVarChar(255), blogData.title)
         .input('Slug', sql.NVarChar(255), blogData.slug)
         .input('CoverImage', sql.NVarChar(1024), blogData.cover_image)
@@ -154,7 +154,7 @@ exports.resetBlog = async (req, res) => {
       return res.status(200).json({ message: 'Draft reset successfully' });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('Id', sql.NVarChar(36), id)
       .input('UpdatedAt', sql.DateTime2, now())
       .query(`
@@ -179,8 +179,7 @@ exports.getBlogById = async (req, res) => {
     if (!id) return res.status(400).json({ error: "Blog ID is required" });
 
     // ✅ Fetch blog by ID
-    const blogQuery = await req.dbPool
-      .request()
+    const blogQuery = await req.db.request()
       .input("Id", sql.Int, id)
       .query(`SELECT * FROM dbo.blogs WHERE BlogId=@Id AND IsActive='Y'`);
 
@@ -198,8 +197,7 @@ exports.getBlogById = async (req, res) => {
     }
 
     // ✅ Fetch reviews
-    const reviewsQuery = await req.dbPool
-      .request()
+    const reviewsQuery = await req.db.request()
       .input("BlogId", sql.Int, id)
       .query(
         `SELECT * FROM dbo.BlogReviews WHERE BlogId=@BlogId ORDER BY CreatedAt ASC`
@@ -262,7 +260,7 @@ exports.getUserDrafts = async (_req, res) => {
       }]);
     }
 
-    const r = await _req.dbPool.request().query(`
+    const r = await _req.db.request().query(`
       SELECT * FROM dbo.blogs
       WHERE Status='DRAFT' AND IsActive='Y'
       ORDER BY UpdatedAt DESC
@@ -300,7 +298,7 @@ exports.getAllBlogs = async (req, res) => {
   try {
 
     // ✅ Fetch blogs
-    const blogsRes = await req.dbPool.request().query(`
+    const blogsRes = await req.db.request().query(`
       SELECT * FROM dbo.blogs
       WHERE Status = 'PUBLISHED' AND IsActive = 'Y'
       ORDER BY PublishAt DESC
@@ -312,7 +310,7 @@ exports.getAllBlogs = async (req, res) => {
     // ✅ Get blog IDs
     const blogIds = blogs.map((b) => b.BlogId);
     const inList = blogIds.map((_, i) => `@B${i}`).join(",");
-    const rReq = req.dbPool.request();
+    const rReq = req.db.request();
     blogIds.forEach((id, i) => rReq.input(`B${i}`, sql.Int, id));
 
     // ✅ Fetch reviews
@@ -371,7 +369,7 @@ exports.getUserLikes = async (req, res) => {
       return res.status(200).json({ likedBlogIds: [] });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('UserId', sql.NVarChar(128), String(user_id))
       .query(`
         SELECT BlogId AS blog_id
@@ -408,7 +406,7 @@ exports.addReview = async (req, res) => {
       return res.status(200).json(created);
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('BlogId', sql.NVarChar(36), id)
       .input('ParentId', sql.NVarChar(36), null)
       .input('UserId', sql.NVarChar(128), String(user_id))
@@ -454,7 +452,7 @@ exports.addReply = async (req, res) => {
       return res.status(200).json(data);
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('BlogId', sql.NVarChar(36), id)
       .input('ParentId', sql.NVarChar(36), reviewId)
       .input('UserId', sql.NVarChar(128), String(user_id))
@@ -488,7 +486,7 @@ exports.incrementLikes = async (req, res) => {
       return res.status(200).json({ likes: 1 });
     }
 
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('BlogId', sql.NVarChar(36), id)
       .input('UserId', sql.Int, Number(user_id))
       .input('Action', sql.NVarChar(16), 'LIKE')
@@ -502,7 +500,7 @@ exports.incrementLikes = async (req, res) => {
       return res.status(400).json({ message: 'User has already liked this blog' });
     }
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('BlogId', sql.Int, Number(id))
       .input('UserId', sql.Int, Number(user_id))
       .input('Action', sql.NVarChar(16), 'LIKE')
@@ -512,14 +510,14 @@ exports.incrementLikes = async (req, res) => {
         VALUES (@BlogId, @UserId, @Action, @CreatedAt)
       `);
 
-      await req.dbPool.request()
+      await req.db.request()
       .input('BlogId', sql.Int, Number(id))
       .query(`
         Update Blogs set Likes=Likes+1
         WHERE BlogId=@BlogId
       `);
 
-    const countRes = await req.dbPool.request()
+    const countRes = await req.db.request()
       .input('BlogId', sql.Int, Number(id))
       .query(`SELECT COUNT(*) AS Likes FROM dbo.UserInteractions WHERE BlogId = @BlogId and ActionType='LIKE'`);
 
@@ -541,7 +539,7 @@ exports.incrementViews = async (req, res) => {
       return res.status(200).json({ views: 1 });
     }
 
-    const ex = await req.dbPool.request()
+    const ex = await req.db.request()
       .input('BlogId', sql.Int, id)
       .input('UserId', sql.Int, Number(user_id))
       .query(`
@@ -550,7 +548,7 @@ exports.incrementViews = async (req, res) => {
       `);
 
     if (!ex.recordset?.[0]) {
-      await req.dbPool.request()
+      await req.db.request()
         .input('BlogId', sql.Int, id)
         .input('UserId', sql.Int, Number(user_id))
         .input('Action', sql.NVarChar(16), 'VIEW')
@@ -560,7 +558,7 @@ exports.incrementViews = async (req, res) => {
           VALUES (@BlogId, @UserId, @Action, @CreatedAt)
         `);
       
-      await req.dbPool.request()
+      await req.db.request()
       .input('BlogId', sql.Int, Number(id))
       .query(`
         Update Blogs set Views=Views+1
@@ -568,7 +566,7 @@ exports.incrementViews = async (req, res) => {
       `);  
     }
 
-    const countRes = await req.dbPool.request()
+    const countRes = await req.db.request()
       .input('BlogId', sql.NVarChar(36), id)
       .query(`SELECT COUNT(*) AS views FROM dbo.UserInteractions WHERE BlogId=@BlogId AND ActionType='VIEW'`);
 
@@ -590,11 +588,11 @@ exports.deleteBlog = async (req, res) => {
       return res.status(200).json({ message: 'Blog and associated reviews deleted successfully' });
     }
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('BlogId', sql.NVarChar(36), id)
       .query(`DELETE FROM dbo.blogreviews WHERE blog_id=@BlogId`);
 
-    const del = await req.dbPool.request()
+    const del = await req.db.request()
       .input('Id', sql.NVarChar(36), id)
       .query(`DELETE FROM dbo.blogs OUTPUT DELETED.id WHERE id=@Id`);
 

@@ -3,7 +3,7 @@ require('dotenv').config();
 const sql = require('mssql');
 
 function dbReady(req) {
-  return req.dbPool && req.dbPool.connected;
+  return req.db && req.db.connected;  // ← FIXED
 }
 function devFakeAllowed() {
   return process.env.ALLOW_FAKE === '1';
@@ -59,7 +59,7 @@ exports.createOrder = async (req, res) => {
 
     // Load products
     const inList = ids.map((_, i) => `@P${i}`).join(',');
-    const prodReq = req.dbPool.request();
+    const prodReq = req.db.request();
     ids.forEach((id, i) => prodReq.input(`P${i}`, sql.Int, id));
 
     const prodRes = await prodReq.query(`

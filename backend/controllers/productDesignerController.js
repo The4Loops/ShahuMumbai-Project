@@ -23,7 +23,7 @@ exports.createProductDesignerLink = async (req, res) => {
   try {
     const { ProductId, DesignerId } = req.body;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('ProductId', sql.Int, ProductId)
       .input('DesignerId', sql.Int, DesignerId)
       .query(`
@@ -47,7 +47,7 @@ exports.createProductDesignerLink = async (req, res) => {
 // GET All ProductDesignerLinks — Public
 exports.getAllProductDesignerLinks = async (req, res) => {
   try {
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .query('SELECT * FROM productdesigner');
 
     const data = result.recordset;
@@ -70,7 +70,7 @@ exports.deleteProductDesignerLink = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('ProductDesignerId', sql.Int, id)
       .query(`
         DELETE FROM productdesigner

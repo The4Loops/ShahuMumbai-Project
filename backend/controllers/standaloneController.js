@@ -12,7 +12,7 @@ exports.subscribeAndWelcome = async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Valid email required' });
     }
 
-    const pool = req.dbPool || await sql.connect(sqlConfig);
+    const pool = req.db || await sql.connect(sqlConfig);
 
     // Check if email exists in InviteRequests
     const find = await pool.request()
@@ -81,7 +81,7 @@ exports.login = async (req, res) => {
     }
 
     // Fetch user by email with role information
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('email', sql.NVarChar, Email)
       .query(`
         SELECT 
@@ -156,7 +156,7 @@ exports.getInviteRequests = async (req, res) => {
     }
 
     // Fetch all records from InviteRequests table
-    const result = await req.dbPool.request().query(`
+    const result = await req.db.request().query(`
       SELECT 
         Id,
         Email,

@@ -44,14 +44,14 @@ exports.listOrders = async (req, res) => {
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
     `;
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(p => request.input(p.name, p.type, p.value));
     request.input('offset', sql.Int, offset);
     request.input('limit', sql.Int, limit);
     const result = await request.query(query);
 
     const countQuery = `SELECT COUNT(*) AS total FROM dbo.Orders${whereClause}`;
-    const countRequest = req.dbPool.request();
+    const countRequest = req.db.request();
     parameters.forEach(p => countRequest.input(p.name, p.type, p.value));
     const countResult = await countRequest.query(countQuery);
     const total = countResult.recordset[0].total;
@@ -116,7 +116,7 @@ exports.updateFulfillmentStatus = async (req, res) => {
       WHERE OrderNumber = @orderNumber
     `;
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(p => request.input(p.name, p.type, p.value));
     const result = await request.query(query);
 
@@ -143,7 +143,7 @@ exports.updateTracking = async (req, res) => {
       return res.status(400).json({ error: 'carrier_too_long' });
     }
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     request.input('orderNumber', sql.NVarChar, orderNumber);
     request.input('trackingNumber', sql.NVarChar(100), trackingNumber.trim());
     request.input('carrier', sql.NVarChar(50), carrier ? carrier.trim() : null);
@@ -210,7 +210,7 @@ exports.getUserOrders = async (req, res) => {
       ORDER BY o.PlacedAt DESC
     `;
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     request.input('userId', sql.Int, userId);
     const result = await request.query(query);
 

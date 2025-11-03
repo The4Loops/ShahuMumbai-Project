@@ -31,8 +31,7 @@ exports.trackEvent = async (req, res) => {
       req.ip ||
       null;
 
-    const r = await req.dbPool
-      .request()
+    const r = await req.db.request()
       .input('name', sql.NVarChar(100), String(name))
       .input('anon_id', sql.NVarChar(64), String(anon_id))
       .input('user_id', user_id == null ? sql.Int : sql.Int, user_id ?? null)
@@ -67,7 +66,7 @@ exports.getSummary = async (req, res) => {
     // EXEC analytics_kpis @p_from, @p_to
     // Fallback: compute KPIs in SQL inline to avoid fetching 5000 rows
 
-    const kpiReq = req.dbPool.request();
+    const kpiReq = req.db.request();
     if (p_from) kpiReq.input('from', sql.DateTime2, new Date(p_from));
     if (p_to)   kpiReq.input('to', sql.DateTime2, new Date(p_to));
 
@@ -99,7 +98,7 @@ exports.getSummary = async (req, res) => {
     };
 
     // Top products: try proc equivalent to analytics_top_products; else do quick tally from add_to_cart
-    const tpReq = req.dbPool.request();
+    const tpReq = req.db.request();
     if (p_from) tpReq.input('from', sql.DateTime2, new Date(p_from));
     if (p_to)   tpReq.input('to', sql.DateTime2, new Date(p_to));
 
@@ -138,7 +137,7 @@ exports.getDailyCounts = async (req, res) => {
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    const r = req.dbPool.request();
+    const r = req.db.request();
     if (name)   r.input('name', sql.NVarChar(100), name);
     if (p_from) r.input('from', sql.DateTime2, new Date(p_from));
     if (p_to)   r.input('to', sql.DateTime2, new Date(p_to));
@@ -174,7 +173,7 @@ exports.getEvents = async (req, res) => {
     const offset = Math.max(Number(req.query.offset || 0), 0);
     const name   = req.query.name || null;
 
-    const r = req.dbPool.request()
+    const r = req.db.request()
       .input('limit', sql.Int, limit)
       .input('offset', sql.Int, offset);
 
@@ -216,7 +215,7 @@ exports.getSalesReport = async (req, res) => {
     const paidPaymentStatuses = ['PAID', 'SUCCESS', 'CAPTURED'];
     const paidOrderStatuses   = ['PAID', 'COMPLETED', 'SUCCESS', 'FULFILLED'];
 
-    const reqBase = req.dbPool.request()
+    const reqBase = req.db.request()
       .input('d24', sql.DateTime2, last24h)
       .input('d30', sql.DateTime2, last30d);
 
@@ -241,7 +240,7 @@ exports.getSalesReport = async (req, res) => {
     const sRow = sRes.recordset?.[0] || { c24: 0, c30: 0, call: 0 };
 
     // Top products from ALL paid orders
-    const paidIdsRes = await req.dbPool.request().query(`
+    const paidIdsRes = await req.db.request().query(`
       ;WITH paid AS (
         SELECT OrderId
         FROM orders
@@ -259,7 +258,7 @@ exports.getSalesReport = async (req, res) => {
     let topProducts = [];
     if (paidIds.length) {
       // chunk IN() to avoid parameter limits if needed; assuming small here
-      const r = await req.dbPool.request().query(`
+      const r = await req.db.request().query(`
         SELECT
           MAX(ProductId) AS id,
           MAX(ProductTitle) AS name,

@@ -26,7 +26,7 @@ exports.createRole = async (req, res) => {
       return res.status(400).json({ error: 'Role label is required' });
     }
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('Label', sql.NVarChar, label)
       .input('IsActive', sql.Char(1), 'Y')
       .input('CreatedAt', sql.DateTime, new Date())
@@ -73,7 +73,7 @@ exports.getRoles = async (req, res) => {
 
     query += ' ORDER BY Label ASC';
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(param => request.input(param.name, param.type, param.value));
     const rolesResult = await request.query(query);
 
@@ -86,7 +86,7 @@ exports.getRoles = async (req, res) => {
     }
 
     // For roletags query: use named parameters for IN clause
-    const roletagsRequest = req.dbPool.request();
+    const roletagsRequest = req.db.request();
     const roletagsInClause = roleIds.map((_, index) => `@role${index}`).join(',');
     const roletagsQuery = `
       SELECT rt.RoleId, rt.MenuId, m.Label AS menu_label
@@ -107,7 +107,7 @@ exports.getRoles = async (req, res) => {
     });
 
     // For users query: use named parameters for IN clause
-    const usersRequest = req.dbPool.request();
+    const usersRequest = req.db.request();
     const usersInClause = roleIds.map((_, index) => `@role${index}`).join(',');
     const usersQuery = `
       SELECT u.UserId AS id, u.Email AS email, u.RoleId
@@ -152,7 +152,7 @@ exports.updateRole = async (req, res) => {
       return res.status(400).json({ error: 'Role label is required' });
     }
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('RoleId', sql.Int, id)
       .input('Label', sql.NVarChar, label)
       .input('IsActive', sql.Char(1), is_active ?? 'Y')
@@ -185,7 +185,7 @@ exports.deleteRole = async (req, res) => {
     const { id } = req.params;
 
     // Check if role is assigned to users
-    const usersResult = await req.dbPool.request()
+    const usersResult = await req.db.request()
       .input('RoleId', sql.Int, id)
       .query('SELECT UserId FROM users WHERE RoleId = @RoleId');
 
@@ -193,7 +193,7 @@ exports.deleteRole = async (req, res) => {
       return res.status(400).json({ error: 'Cannot delete role assigned to users' });
     }
 
-    const deleteResult = await req.dbPool.request()
+    const deleteResult = await req.db.request()
       .input('RoleId', sql.Int, id)
       .query('DELETE FROM roles WHERE RoleId = @RoleId');
 
@@ -221,18 +221,18 @@ exports.assignRoleToUser = async (req, res) => {
     }
 
     // Verify user and role exist
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('UserId', sql.Int, user_id)
       .query('SELECT UserId FROM users WHERE UserId = @UserId');
 
-    const roleResult = await req.dbPool.request()
+    const roleResult = await req.db.request()
       .input('RoleId', sql.Int, role_id)
       .query('SELECT RoleId FROM roles WHERE RoleId = @RoleId');
 
     if (!userResult.recordset[0]) return res.status(404).json({ error: 'User not found' });
     if (!roleResult.recordset[0]) return res.status(404).json({ error: 'Role not found' });
 
-    const updateResult = await req.dbPool.request()
+    const updateResult = await req.db.request()
       .input('UserId', sql.Int, user_id)
       .input('RoleId', sql.Int, role_id)
       .query(`

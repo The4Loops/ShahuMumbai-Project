@@ -23,7 +23,7 @@ exports.createDesigner = async (req, res) => {
   try {
     const { name, bio, imageurl, sociallink, role, isactive } = req.body;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('name', sql.NVarChar, name)
       .input('bio', sql.NVarChar, bio || null)
       .input('imageurl', sql.NVarChar, imageurl || null)
@@ -51,7 +51,7 @@ exports.createDesigner = async (req, res) => {
 // GET All Designers — Public
 exports.getAllDesigners = async (req, res) => {
   try {
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .query('SELECT * FROM designer');
 
     const data = result.recordset;
@@ -106,7 +106,7 @@ exports.updateDesigner = async (req, res) => {
 
     query = query.slice(0, -2) + ' OUTPUT INSERTED.* WHERE designerid = @designerid';
 
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('designerid', sql.Int, id);
 
     values.forEach((val) => {
@@ -135,7 +135,7 @@ exports.deleteDesigner = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('designerid', sql.Int, id)
       .query(`
         DELETE FROM designer

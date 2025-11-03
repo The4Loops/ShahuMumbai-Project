@@ -8,7 +8,7 @@ exports.createContact = async (req, res) => {
       return res.status(400).json({ error: "Missing required fields" });
     }
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input("Name", sql.NVarChar, name)
       .input("Email", sql.NVarChar, email)
       .input("Subject", sql.NVarChar, subject)
@@ -57,7 +57,7 @@ exports.getAllContact = async (req, res) => {
     query += ` ORDER BY CreatedAt DESC
                OFFSET @Offset ROWS FETCH NEXT @Limit ROWS ONLY`;
 
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input("Limit", sql.Int, limit)
       .input("Offset", sql.Int, offset);
 
@@ -77,7 +77,7 @@ exports.getContact = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input("Id", sql.Int, id)
       .query(`SELECT Id, Name, Email, Subject, Message, Status, CreatedAt FROM ContactUs WHERE Id = @Id`);
 
@@ -116,7 +116,7 @@ exports.updateContact = async (req, res) => {
       WHERE ContactUsId = @Id
     `;
 
-    const request = req.dbPool.request().input("Id", sql.Int, id);
+    const request = req.db.request().input("Id", sql.Int, id);
     if (name) request.input("Name", sql.NVarChar, name);
     if (email) request.input("Email", sql.NVarChar, email);
     if (subject) request.input("Subject", sql.NVarChar, subject);
@@ -141,7 +141,7 @@ exports.deleteContact = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input("Id", sql.Int, id)
       .query(`DELETE FROM ContactUs OUTPUT DELETED.* WHERE Id = @Id`);
 

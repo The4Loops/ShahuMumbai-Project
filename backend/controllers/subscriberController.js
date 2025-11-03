@@ -7,7 +7,7 @@ const sql = require('mssql');
 exports.getSubscribeUser = async (req, res) => {
   try {
     // Fetch registered users with newsletter subscription
-    const userResult = await req.dbPool.request().query(`
+    const userResult = await req.db.request().query(`
       SELECT 
         UserId AS id,
         FullName AS full_name,
@@ -35,7 +35,7 @@ exports.getSubscribeUser = async (req, res) => {
     `);
 
     // Fetch pending subscriptions
-    const subscriptionResult = await req.dbPool.request().query(`
+    const subscriptionResult = await req.db.request().query(`
       SELECT 
         SubscriptionId AS id,
         Email AS email,
@@ -121,7 +121,7 @@ exports.deleteUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('UserId', sql.Int, id)
       .input('NewsLetterSubscription', sql.Char(1),'N')
       .input('UpdatedAt', sql.DateTime, new Date().toISOString())
@@ -153,7 +153,7 @@ exports.sendSubscriberMail = async (req, res) => {
     }
 
     // Fetch user to verify existence
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('Email', sql.NVarChar, email)
       .query(`
         SELECT UserId, Email, NewsLetterSubscription
@@ -165,7 +165,7 @@ exports.sendSubscriberMail = async (req, res) => {
     let updatedRecord;
 
     // Fetch email content from module table
-    const moduleResult = await req.dbPool.request()
+    const moduleResult = await req.db.request()
       .input('mailtype', sql.NVarChar, 'Subscriber')
       .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
 
@@ -203,7 +203,7 @@ exports.sendSubscriberMail = async (req, res) => {
 
     if (user) {
       // Existing user: Update newsletter subscription
-      const updateResult = await req.dbPool.request()
+      const updateResult = await req.db.request()
         .input('UserId', sql.Int, user.UserId)
         .input('NewsLetterSubscription', sql.Char(1), 'Y')
         .input('UpdatedAt', sql.DateTime, new Date().toISOString())
@@ -220,7 +220,7 @@ exports.sendSubscriberMail = async (req, res) => {
       }
     } else {
       // New user: Insert into subscriptions table
-      const insertResult = await req.dbPool.request()
+      const insertResult = await req.db.request()
         .input('Email', sql.NVarChar, email)
         .input('CreatedAt', sql.DateTime, new Date().toISOString())
         .input('UpdatedAt', sql.DateTime, new Date().toISOString())
@@ -255,7 +255,7 @@ exports.sendNewsletterMail = async (req, res) => {
     }
 
     // Fetch users with newsletter_subscription: true
-    const usersResult = await req.dbPool.request()
+    const usersResult = await req.db.request()
       .query(`SELECT Email FROM users WHERE NewsLetterSubscription ='Y'  `);
 
     const users = usersResult.recordset;
@@ -310,7 +310,7 @@ exports.getNewsletterStatus = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Ensure JWT_SECRET is set in env
     const userId = decoded.id; // Assuming 'id' is the UserId in token payload
 
-    const userResult = await req.dbPool.request()
+    const userResult = await req.db.request()
       .input('UserId', sql.Int, userId)
       .query(`
         SELECT NewsLetterSubscription, OptOutNewsletterPopup
@@ -341,7 +341,7 @@ exports.optOutNewsletter = async (req, res) => {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('UserId', sql.Int, userId)
       .input('OptOutNewsletterPopup', sql.Char(1), 'Y')
       .input('UpdatedAt', sql.DateTime, new Date().toISOString())

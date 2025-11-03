@@ -24,7 +24,7 @@ exports.createBanner = async (req, res) => {
 
     if (!title) return res.status(400).json({ message: 'Title is required' });
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('Title', sql.NVarChar, title.trim())
       .input('Description', sql.NVarChar, description ?? null)
       .input('ImageUrl', sql.NVarChar, image_url || null)
@@ -52,7 +52,7 @@ exports.createBanner = async (req, res) => {
 /* --------------------------- read all --------------------------- */
 exports.getAllBanners = async (req, res) => {
   try {
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .query(`
         SELECT BannerId, Title, Description, ImageUrl, IsActive, CreatedAt, UpdatedAt
         FROM banners
@@ -72,7 +72,7 @@ exports.getBannerById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('BannerId', sql.Int, id)
       .query(`
         SELECT BannerId, Title, Description, ImageUrl, IsActive, CreatedAt, UpdatedAt
@@ -123,7 +123,7 @@ exports.updateBanner = async (req, res) => {
     }
     query += ' OUTPUT INSERTED.* WHERE BannerId = @BannerId';
 
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('BannerId', sql.Int, id)
       .input('UpdatedAt', sql.DateTime, patch.UpdatedAt);
     if (patch.Title) request.input('Title', sql.NVarChar, patch.Title);
@@ -153,7 +153,7 @@ exports.deleteBanner = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('BannerId', sql.Int, id)
       .query(`
         DELETE FROM banners

@@ -43,7 +43,7 @@ exports.adminCreateUser = async (req, res) => {
     }
 
     // Fetch the RoleId from roles table
-    const roleResult = await req.dbPool.request()
+    const roleResult = await req.db.request()
       .input('Label', sql.NVarChar, role || 'user')
       .query('SELECT RoleId FROM roles WHERE Label = @Label');
     if (!roleResult.recordset[0]) {
@@ -53,7 +53,7 @@ exports.adminCreateUser = async (req, res) => {
 
     const hashedPassword = Password ? await bcrypt.hash(Password, 10) : null;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('FullName', sql.NVarChar, FullName)
       .input('Email', sql.NVarChar, Email)
       .input('Password', sql.NVarChar, hashedPassword)
@@ -107,7 +107,7 @@ exports.getAllUsers = async (req, res) => {
 
     // Filter by role
     if (role && role !== 'All') {
-      const roleResult = await req.dbPool.request()
+      const roleResult = await req.db.request()
         .input('Label', sql.NVarChar, role)
         .query('SELECT RoleId FROM roles WHERE Label = @Label');
       if (!roleResult.recordset[0]) {
@@ -125,7 +125,7 @@ exports.getAllUsers = async (req, res) => {
 
     // Exclude specific role
     if (excludeRole) {
-      const excludeRoleResult = await req.dbPool.request()
+      const excludeRoleResult = await req.db.request()
         .input('exclude_Label', sql.NVarChar, excludeRole)
         .query('SELECT RoleId FROM roles WHERE Label = @exclude_Label');
       if (!excludeRoleResult.recordset[0]) {
@@ -135,7 +135,7 @@ exports.getAllUsers = async (req, res) => {
       parameters.push({ name: 'excludeRoleId', type: sql.Int, value: excludeRoleResult.recordset[0].RoleId });
     }
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(param => {
       request.input(param.name, param.type, param.value);
     });
@@ -171,7 +171,7 @@ exports.updateUser = async (req, res) => {
     }
 
     // Fetch the RoleId from roles table
-    const roleResult = await req.dbPool.request()
+    const roleResult = await req.db.request()
       .input('Label', sql.NVarChar, role || 'Users')
       .query('SELECT RoleId FROM roles WHERE Label = @Label');
     if (!roleResult.recordset[0]) {
@@ -191,7 +191,7 @@ exports.updateUser = async (req, res) => {
       updates.Password = await bcrypt.hash(Password, 10);
     }
 
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('UserId', sql.Int, UserId)
       .input('FullName', sql.NVarChar, updates.FullName)
       .input('Email', sql.NVarChar, updates.Email)
@@ -251,7 +251,7 @@ exports.deleteUser = async (req, res) => {
   try {
     const { UserId } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('UserId', sql.Int, UserId)
       .query(`
         DELETE FROM users
@@ -298,7 +298,7 @@ exports.updateUserProfile = async (req, res) => {
     }
 
     // Fetch current user data to check NewsLetterSubscription status
-    const currentUserResult = await req.dbPool.request()
+    const currentUserResult = await req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .query('SELECT NewsLetterSubscription FROM users WHERE UserId = @UserId');
     if (!currentUserResult.recordset[0]) {
@@ -335,7 +335,7 @@ exports.updateUserProfile = async (req, res) => {
     // Send newsletter email if it's the first time subscription
     if (isFirstTimeSubscription) {
       // Fetch email content from module table
-      const moduleResult = await req.dbPool.request()
+      const moduleResult = await req.db.request()
         .input('mailtype', sql.NVarChar, 'Subscriber')
         .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
       if (!moduleResult.recordset[0]) {
@@ -372,7 +372,7 @@ exports.updateUserProfile = async (req, res) => {
     }
 
     // Update user in MSSQL
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .input('FullName', sql.NVarChar, updates.FullName)
       .input('Email', sql.NVarChar, updates.Email)
@@ -479,7 +479,7 @@ exports.getUserProfile = async (req, res) => {
   if (authError) return res.status(401).json({ error: authError });
 
   try {
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .query(`
         SELECT 

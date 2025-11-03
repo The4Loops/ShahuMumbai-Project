@@ -6,7 +6,7 @@ const now = () => new Date();
 const toInt = (v) => (Number.isInteger(v) ? v : parseInt(v, 10));
 
 function dbReady(req) {
-  return req.dbPool && req.dbPool.connected;
+  return req.db && req.db.connected;
 }
 function devFakeAllowed() {
   return process.env.ALLOW_FAKE === '1';
@@ -35,17 +35,8 @@ exports.addToCart = async (req, res) => {
       return res.status(400).json({ error: 'quantity must be >= 1' });
     }
 
-    // Loud logging for diagnosis
-    console.log('[POST /api/cart] request', {
-      owner,
-      product_id,
-      qty,
-      mode,
-      cookies: Object.keys(req.signedCookies || {}),
-    });
-
     // Does a row already exist for this owner+product?
-    const sel = await req.dbPool.request()
+    const sel = await req.db.request()
       .input('UserId', sql.NVarChar(128), String(owner))
       .input('ProductId', sql.Int, Number(product_id))
       .query(`
@@ -59,7 +50,7 @@ exports.addToCart = async (req, res) => {
     if (existing) {
       const newQty = mode === 'set' ? qty : (Number(existing.Quantity) + qty);
 
-      const upd = await req.dbPool.request()
+      const upd = await req.db.request()
         .input('Id', sql.NVarChar(50), String(existing.Id))               // using alias we selected
         .input('UserId', sql.NVarChar(128), String(owner))
         .input('Qty', sql.Int, newQty)
@@ -85,7 +76,7 @@ exports.addToCart = async (req, res) => {
     }
 
     // Insert new row
-    const ins = await req.dbPool.request()
+    const ins = await req.db.request()
       .input('UserId', sql.NVarChar(128), String(owner))
       .input('ProductId', sql.Int, Number(product_id))
       .input('Qty', sql.Int, qty)
@@ -130,7 +121,7 @@ exports.getCartItems = async (req, res) => {
       return res.status(200).json([]);
     }
 
-    const q = await req.dbPool.request()
+    const q = await req.db.request()
       .input('UserId', sql.NVarChar(128), String(owner))
       .query(`
         SELECT
@@ -227,7 +218,7 @@ exports.updateCartItem = async (req, res) => {
       });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('Id', sql.NVarChar(50), id)
       .input('UserId', sql.NVarChar(128), String(owner))
       .input('Qty', sql.Int, qty)
@@ -263,7 +254,7 @@ exports.deleteCartItem = async (req, res) => {
       return res.status(200).json({ message: 'Cart item deleted successfully' });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('Id', sql.NVarChar(50), id)
       .input('UserId', sql.NVarChar(128), String(owner))
       .query(`
@@ -293,7 +284,7 @@ exports.clearCart = async (req, res) => {
       return res.status(200).json({ message: 'Cart cleared successfully' });
     }
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('UserId', sql.NVarChar(128), String(owner))
       .query(`
         DELETE FROM dbo.carts

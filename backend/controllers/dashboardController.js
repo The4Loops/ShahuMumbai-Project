@@ -16,7 +16,9 @@ const getExchangeRate = async (dbPool, currency = 'USD') => {
 
 const toStart = (d) => (d ? `${d} 00:00:00.000` : null);
 const toEnd   = (d) => (d ? `${d} 23:59:59.999` : null);
-const dbReady = (req) => req.dbPool && req.dbPool.connected;
+function dbReady(req) {
+  return req.db && req.db.connected;  // ← FIXED
+}
 const devFakeAllowed = () => process.env.ALLOW_FAKE === '1';
 
 /* 
@@ -33,7 +35,7 @@ exports.getSummary = async (req, res) => {
     const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
     const clauses = [];
-    const req1 = req.dbPool.request();
+    const req1 = req.db.request();
     if (p_from) { clauses.push('PlacedAt >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
     if (p_to)   { clauses.push('PlacedAt <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
@@ -81,7 +83,7 @@ exports.getSummary = async (req, res) => {
     if (orders.length) {
       const ids = orders.map(o => o.OrderId);
       const inList = ids.map((_, i) => `@O${i}`).join(',');
-      const itemsReq = req.dbPool.request();
+      const itemsReq = req.db.request();
       ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
 
       // Fetch order items with order's currency
@@ -140,7 +142,7 @@ exports.getSales = async (req, res) => {
     const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
     const clauses = [];
-    const req1 = req.dbPool.request();
+    const req1 = req.db.request();
     if (p_from) { clauses.push('PlacedAt >= @From'); req1.input('From', sql.DateTime2, new Date(p_from)); }
     if (p_to)   { clauses.push('PlacedAt <= @To');   req1.input('To',   sql.DateTime2, new Date(p_to)); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
@@ -218,7 +220,7 @@ exports.getTopProducts = async (req, res) => {
 
     // limit to orders in window
     const clauses = [];
-    const ordersReq = req.dbPool.request();
+    const ordersReq = req.db.request();
     if (p_from) { clauses.push('PlacedAt >= @From'); ordersReq.input('From', sql.DateTime2, new Date(p_from)); }
     if (p_to)   { clauses.push('PlacedAt <= @To');   ordersReq.input('To',   sql.DateTime2, new Date(p_to)); }
     const where = clauses.length ? 'WHERE ' + clauses.join(' AND ') : '';
@@ -235,7 +237,7 @@ exports.getTopProducts = async (req, res) => {
     if (orders.length) {
       const ids = orders.map(o => o.OrderId);
       const inList = ids.map((_, i) => `@O${i}`).join(',');
-      const itemsReq = req.dbPool.request();
+      const itemsReq = req.db.request();
       ids.forEach((id, i) => itemsReq.input(`O${i}`, sql.Int, id));
 
       const iRes = await itemsReq.query(`
@@ -300,7 +302,7 @@ exports.getRecentOrders = async (req, res) => {
     const { currency = 'USD' } = req.query;
     const exchangeRate = await getExchangeRate(req.dbPool, currency);
 
-    const ordersRes = await req.dbPool.request()
+    const ordersRes = await req.db.request()
       .input('Limit', sql.Int, limit)
       .query(`
         SELECT TOP (@Limit)
@@ -325,7 +327,7 @@ exports.getRecentOrders = async (req, res) => {
     let userMap = new Map();
     if (userIds.length) {
       const inList = userIds.map((_, i) => `@U${i}`).join(',');
-      const uReq = req.dbPool.request();
+      const uReq = req.db.request();
       userIds.forEach((id, i) => uReq.input(`U${i}`, sql.Int, id));
       const uRes = await uReq.query(`
         SELECT UserId, FullName, Email

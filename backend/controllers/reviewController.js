@@ -37,7 +37,7 @@ exports.createReview = async (req, res) => {
     }
 
     // Check if a review already exists for this user and product
-    const existingReviewResult = await req.dbPool.request()
+    const existingReviewResult = await req.db.request()
       .input('UserId', sql.Int, userid)
       .input('ProductId', sql.Int, productid)
       .query(`
@@ -53,7 +53,7 @@ exports.createReview = async (req, res) => {
     }
 
     // Insert review
-    const insertResult = await req.dbPool.request()
+    const insertResult = await req.db.request()
       .input('UserId', sql.Int, userid)
       .input('ProductId', sql.Int, productid)
       .input('Rating', sql.Int, parseInt(rating))
@@ -83,7 +83,7 @@ exports.getReviewsByProductId = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('ProductId', sql.Int, id)
       .query(`
         SELECT 
@@ -130,7 +130,7 @@ exports.updateReview = async (req, res) => {
     }
 
     // Fetch the review to check ownership
-    const existingReviewResult = await req.dbPool.request()
+    const existingReviewResult = await req.db.request()
       .input('ReviewId', sql.Int, ReviewId)
       .query(`
         SELECT UserId
@@ -167,7 +167,7 @@ exports.updateReview = async (req, res) => {
       parameters.push({ name: 'Comment', type: sql.NVarChar, value: Comment });
     }
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(param => request.input(param.name, param.type, param.value));
     const updateResult = await request.query(updateQuery);
 
@@ -175,7 +175,7 @@ exports.updateReview = async (req, res) => {
       return res.status(404).json({ message: 'Review not found' });
     }
 
-    const { data: review, error: reviewError } = await req.dbPool.request()
+    const { data: review, error: reviewError } = await req.db.request()
       .input('ReviewId', sql.Int, ReviewId)
       .query(`
         SELECT *
@@ -203,7 +203,7 @@ exports.deleteReview = async (req, res) => {
     const { ReviewId } = req.params;
 
     // Fetch the review to check ownership
-    const existingReviewResult = await req.dbPool.request()
+    const existingReviewResult = await req.db.request()
       .input('ReviewId', sql.Int, ReviewId)
       .query(`
         SELECT UserId
@@ -221,7 +221,7 @@ exports.deleteReview = async (req, res) => {
     }
 
     // Soft delete by setting IsActive to false
-    const updateResult = await req.dbPool.request()
+    const updateResult = await req.db.request()
       .input('ReviewId', sql.Int, ReviewId)
       .input('IsActive', sql.Char(1), 'N')
       .input('UpdatedAt', sql.DateTime, new Date().toISOString())
@@ -245,7 +245,7 @@ exports.deleteReview = async (req, res) => {
 // Get All Reviews
 exports.getAllReviews = async (req, res) => {
   try {
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .query(`
         SELECT 
           r.ReviewId,

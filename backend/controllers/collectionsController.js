@@ -2,7 +2,9 @@ const sql = require('mssql');
 
 const intRe = /^\d+$/;
 const now = () => new Date();
-const dbReady = (req) => req.dbPool && req.dbPool.connected;
+function dbReady(req) {
+  return req.db && req.db.connected;  // ← FIXED
+}
 const devFakeAllowed = () => process.env.ALLOW_FAKE === '1';
 
 function parseBoolStr(v) {
@@ -48,7 +50,7 @@ exports.listCollections = async (req, res) => {
     }
 
     const clauses = [];
-    const reqst = req.dbPool.request();
+    const reqst = req.db.request();
 
     if (q) {
       reqst.input('Q', sql.NVarChar(400), `%${q}%`);
@@ -73,7 +75,7 @@ exports.listCollections = async (req, res) => {
     `);
     const total = countRes.recordset?.[0]?.total || 0;
 
-    const pageReq = req.dbPool.request();
+    const pageReq = req.db.request();
     if (q) pageReq.input('Q', sql.NVarChar(400), `%${q}%`);
     if (status) pageReq.input('Status', sql.NVarChar(30), String(status).toUpperCase());
     if (is_active !== undefined && is_active !== '') {
@@ -110,7 +112,7 @@ exports.listCollections = async (req, res) => {
 
     const ids = rows.map(r => r.id);
     const inList = ids.map((_, i) => `@C${i}`).join(',');
-    const catReq = req.dbPool.request();
+    const catReq = req.db.request();
     ids.forEach((val, i) => catReq.input(`C${i}`, sql.Int, val));
 
     const catsRes = await catReq.query(`
@@ -166,7 +168,7 @@ exports.getCollection = async (req, res) => {
       });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input("Id", sql.Int, parseInt(id))
       .query(`
         SELECT
@@ -186,7 +188,7 @@ exports.getCollection = async (req, res) => {
     const data = r.recordset?.[0];
     if (!data) return res.status(404).json({ error: "Collection not found" });
 
-    const map = await req.dbPool.request()
+    const map = await req.db.request()
       .input("Id", sql.Int, parseInt(id))
       .query(`
         SELECT 

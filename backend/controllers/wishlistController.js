@@ -40,7 +40,7 @@ exports.addToWishlist = async (req, res) => {
     }
 
     // Check if product exists
-    const productResult = await req.dbPool.request()
+    const productResult = await req.db.request()
       .input('ProductId', sql.Int, product_id)
       .query('SELECT ProductId FROM products WHERE ProductId = @ProductId');
     if (!productResult.recordset[0]) {
@@ -48,7 +48,7 @@ exports.addToWishlist = async (req, res) => {
     }
 
     // Check if item is already in wishlist
-    const existingItemResult = await req.dbPool.request()
+    const existingItemResult = await req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .input('ProductId', sql.Int, product_id)
       .query('SELECT WishListId FROM wishlist WHERE UserId = @UserId AND ProductId = @ProductId');
@@ -57,7 +57,7 @@ exports.addToWishlist = async (req, res) => {
     }
 
     // Add to wishlist
-    const insertResult = await req.dbPool.request()
+    const insertResult = await req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .input('ProductId', sql.Int, product_id)
       .query(`
@@ -81,9 +81,9 @@ exports.getWishlist = async (req, res) => {
 
   try {
     const { currency = 'USD' } = req.query;
-    const exchangeRate = await getExchangeRate(req.dbPool, currency);
+    const exchangeRate = await getExchangeRate(req.db, currency);
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .query(`
         SELECT 
@@ -163,7 +163,7 @@ exports.removeFromWishlist = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('WishListId', sql.Int, id)
       .input('UserId', sql.Int, decoded.id)
       .query(`
@@ -189,7 +189,7 @@ exports.clearWishlist = async (req, res) => {
   if (error) return res.status(401).json({ error });
 
   try {
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('UserId', sql.Int, decoded.id)
       .query(`
         DELETE FROM wishlist

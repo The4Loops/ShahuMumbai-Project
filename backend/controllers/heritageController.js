@@ -31,7 +31,7 @@ exports.create = async (req, res) => {
       is_active: !!is_active,
     };
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('year_label', sql.NVarChar, payload.year_label)
       .input('title', sql.NVarChar, payload.title)
       .input('description', sql.NVarChar, payload.description)
@@ -101,7 +101,7 @@ exports.list = async (req, res) => {
     query += whereClause;
     query += ' ORDER BY SortOrder ASC, CreatedAt DESC OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY';
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(param => request.input(param.name, param.type, param.value));
     request.input('offset', sql.Int, offset);
     request.input('limit', sql.Int, limit);
@@ -112,7 +112,7 @@ exports.list = async (req, res) => {
     let countQuery = 'SELECT COUNT(*) AS total FROM HeritageMileStones';
     if (whereClause.includes('WHERE')) {
       countQuery += whereClause.replace(' WHERE', ' WHERE');
-      const countRequest = req.dbPool.request();
+      const countRequest = req.db.request();
       parameters.forEach(param => countRequest.input(param.name, param.type, param.value));
       const countResult = await countRequest.query(countQuery);
       const total = countResult.recordset[0].total;
@@ -131,7 +131,7 @@ exports.getOne = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('id', sql.Int, id)
       .query(`
         SELECT 
@@ -182,7 +182,7 @@ exports.update = async (req, res) => {
     }
 
     let query = 'UPDATE HeritageMileStones SET ';
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('id', sql.Int, id);
     const values = [];
 
@@ -246,7 +246,7 @@ exports.remove = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('id', sql.Int, id)
       .query(`
         DELETE FROM HeritageMileStones

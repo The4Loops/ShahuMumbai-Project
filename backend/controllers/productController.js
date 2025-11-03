@@ -47,7 +47,7 @@ exports.createProduct = async (req, res) => {
       return res.status(400).json({ message: 'At least one image must be set as hero image' });
     }
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('Name', sql.NVarChar, Name)
       .input('Description', sql.NVarChar, Description)
       .input('ShortDescription', sql.NVarChar, ShortDescription)
@@ -83,7 +83,7 @@ exports.createProduct = async (req, res) => {
     // images
     let totalImagesInserted = 0;
     for (const img of images) {
-      const r = await req.dbPool.request()
+      const r = await req.db.request()
         .input('product_id', sql.Int, product.ProductId)
         .input('image_url', sql.NVarChar, img.url)
         .input('is_hero', sql.Char(1), img.is_hero === true ? 'Y' : 'N')
@@ -133,7 +133,7 @@ exports.getAllProducts = async (req, res) => {
       query += ' ORDER BY p.UpdatedAt DESC';
     }
 
-    const request = req.dbPool.request();
+    const request = req.db.request();
     parameters.forEach(param => request.input(param.name, param.type, param.value));
     const result = await request.query(query);
 
@@ -175,7 +175,7 @@ exports.getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('ProductId', sql.Int, id)
       .query(`
         SELECT 
@@ -289,7 +289,7 @@ exports.updateProduct = async (req, res) => {
     if (LaunchingDate) updateFields.LaunchingDate = new Date(LaunchingDate);
 
     let query = 'UPDATE products SET UpdatedAt = @UpdatedAt';
-    const request = req.dbPool.request()
+    const request = req.db.request()
       .input('ProductId', sql.Int, id)
       .input('UpdatedAt', sql.DateTime, updateFields.UpdatedAt);
 
@@ -314,10 +314,10 @@ exports.updateProduct = async (req, res) => {
     if (!product) return res.status(404).json({ message: 'Product not found' });
 
     if (images && images.length > 0) {
-      await req.dbPool.request().input('product_id', sql.Int, id).query('DELETE FROM ProductImages WHERE ProductId = @product_id');
+      await req.db.request().input('product_id', sql.Int, id).query('DELETE FROM ProductImages WHERE ProductId = @product_id');
       let totalImagesInserted = 0;
       for (const img of images) {
-        const r = await req.dbPool.request()
+        const r = await req.db.request()
           .input('product_id', sql.Int, id)
           .input('image_url', sql.NVarChar, img.url)
           .input('is_hero', sql.Char(1), img.is_hero === true ? 'Y' : 'N')
@@ -345,11 +345,11 @@ exports.deleteProduct = async (req, res) => {
 
     const { id } = req.params;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('ProductId', sql.Int, id)
       .query(`DELETE FROM products WHERE ProductId = @ProductId`);
 
-    await req.dbPool.request()
+    await req.db.request()
       .input('ProductId', sql.Int, id)
       .query(`DELETE FROM ProductImages WHERE ProductId = @ProductId`);
 
@@ -365,7 +365,7 @@ exports.deleteProduct = async (req, res) => {
 /* ------------------------- Top Latest (Home) --------------------------- */
 exports.getTopLatestProducts = async (req, res) => {
   try {
-    const result = await req.dbPool.request().query(`
+    const result = await req.db.request().query(`
       SELECT 
         p.*,
         pi.ProductImageId AS image_id,
@@ -419,7 +419,7 @@ exports.setProductCollection = async (req, res) => {
     const { id } = req.params;
     const { CollectionId } = req.body;
 
-    const result = await req.dbPool.request()
+    const result = await req.db.request()
       .input('ProductId', sql.Int, id)
       .input('CollectionId', sql.Int, CollectionId || null)
       .input('UpdatedAt', sql.DateTime, new Date())
@@ -442,7 +442,7 @@ exports.setProductCollection = async (req, res) => {
 /* --------------------------- Upcoming (INR) ---------------------------- */
 exports.getUpcomingProducts = async (req, res) => {
   try {
-    const result = await req.dbPool.request().query(`
+    const result = await req.db.request().query(`
       SELECT 
         p.*,
         pi.ProductImageId AS image_id,

@@ -14,7 +14,7 @@ function verifyAdmin(req) {
 }
 
 function dbReady(req) {
-  return req.dbPool && req.dbPool.connected;
+  return req.db && req.db.connected;  // ← FIXED
 }
 function devFakeAllowed() {
   return process.env.ALLOW_FAKE === '1';
@@ -47,7 +47,7 @@ exports.createCategory = async (req, res) => {
       });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('Name', sql.NVarChar(255), String(name).trim())
       .input('Slug', sql.NVarChar(255), String(slug).trim())
       .input('Image', sql.NVarChar(1024), image || null)
@@ -80,7 +80,7 @@ exports.getAllCategories = async (req, res) => {
     }
 
  
-    const r = await req.dbPool.request().query(`
+    const r = await req.db.request().query(`
       SELECT
         c.CategoryId AS categoryid,
         c.Name       AS name,
@@ -113,7 +113,7 @@ exports.getCategoryById = async (req, res) => {
       return res.status(200).json({ categoryid: id, name: 'Sample', slug: 'sample', image: null, products_count: 0 });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('Id', sql.Int, id)
       .query(`
         SELECT CategoryId AS categoryid, Name AS name, Slug AS slug, Image AS image
@@ -124,7 +124,7 @@ exports.getCategoryById = async (req, res) => {
     const cat = r.recordset?.[0];
     if (!cat) return res.status(404).json({ message: 'Category not found' });
 
-    const countRes = await req.dbPool.request()
+    const countRes = await req.db.request()
       .input('Id', sql.Int, id)
       .query(`SELECT COUNT(*) AS cnt FROM dbo.products WHERE CategoryId = @Id`);
 
@@ -164,7 +164,7 @@ exports.updateCategory = async (req, res) => {
     }
 
     const sets = [];
-    const q = req.dbPool.request().input('Id', sql.Int, id);
+    const q = req.db.request().input('Id', sql.Int, id);
 
     if (name !== undefined) { sets.push('Name=@Name'); q.input('Name', sql.NVarChar(255), name); }
     if (slug !== undefined) { sets.push('Slug=@Slug'); q.input('Slug', sql.NVarChar(255), slug); }
@@ -207,7 +207,7 @@ exports.deleteCategory = async (req, res) => {
       return res.status(200).json({ message: 'Category deleted successfully' });
     }
 
-    const r = await req.dbPool.request()
+    const r = await req.db.request()
       .input('Id', sql.Int, id)
       .query(`
         DELETE FROM dbo.categories

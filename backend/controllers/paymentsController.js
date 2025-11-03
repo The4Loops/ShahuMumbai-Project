@@ -14,7 +14,7 @@ const razorpay = new Razorpay({
 async function sendOrderEmail({ req,to, orderNumber, total, currency = '₹', name,productname,phoneno,address }) {
   try {
 
-    const moduleResult = await req.dbPool.request()
+    const moduleResult = await req.db.request()
       .input('mailtype', sql.NVarChar, 'OrderConfirmation')
       .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
     const module = moduleResult.recordset[0];
@@ -131,7 +131,7 @@ exports.createRazorpayOrder = async (req, res) => {
     const { order_number } = req.body || {};
     if (!order_number) return res.status(400).json({ message: 'missing_order_number' });
 
-    const orderRes = await req.dbPool.request()
+    const orderRes = await req.db.request()
       .input('OrderNumber', sql.NVarChar(50), order_number)
       .query(`
         SELECT OrderId, OrderNumber, Total, Currency, Meta, PaymentStatus
@@ -147,7 +147,7 @@ exports.createRazorpayOrder = async (req, res) => {
 
     // Reuse existing RZP order if present & unpaid
     let rzpOrder;
-    const existing = await getExistingRzpOrderId(req.dbPool, order.OrderId);
+    const existing = await getExistingRzpOrderId(req.db, order.OrderId);
     if (existing) {
       try { rzpOrder = await razorpay.orders.fetch(existing); } catch {}
     }
@@ -175,7 +175,7 @@ exports.createRazorpayOrder = async (req, res) => {
       };
 
       const { error: updErr } = await mergeOrderMetaById(
-        req.dbPool,
+        req.db,
         order.OrderId,
         metaPatch,
         { PaymentStatus: 'unpaid', UpdatedAt: new Date() }
@@ -212,7 +212,7 @@ exports.verifyPayment = async (req, res) => {
     const sigOk = expected === razorpay_signature;
 
     // Find our order by RZP order id in Meta
-    const ordersRes = await req.dbPool.request()
+    const ordersRes = await req.db.request()
       .input('rzpOrderId', sql.NVarChar(100), razorpay_order_id)
       .query(`
         SELECT 
@@ -241,7 +241,7 @@ exports.verifyPayment = async (req, res) => {
     if (!ord) return res.status(404).json({ ok: false, message: 'order_not_found' });
 
     if (!sigOk) {
-      await mergeOrderMetaById(req.dbPool, ord.OrderId, {
+      await mergeOrderMetaById(req.db, ord.OrderId, {
         razorpay_payment_id, razorpay_signature, verify_ok: false,
       }, {
         PaymentStatus: 'unpaid',
@@ -256,7 +256,7 @@ exports.verifyPayment = async (req, res) => {
     }
 
     // Transaction: decrement stock then mark paid (do NOT change Status)
-    const tx = new sql.Transaction(req.dbPool);
+    const tx = new sql.Transaction(req.db);
     await tx.begin();
 
     try {
@@ -304,14 +304,14 @@ exports.verifyPayment = async (req, res) => {
       await tx.commit();
 
       // Merge extra meta (non-critical)
-      await mergeOrderMetaById(req.dbPool, ord.OrderId, {
+      await mergeOrderMetaById(req.db, ord.OrderId, {
         razorpay_order_id, razorpay_payment_id, razorpay_signature, verify_ok: true,
       }, {});
 
       // Clear the cart best-effort
       try {
         if (ord.UserId != null) {
-          await req.dbPool.request()
+          await req.db.request()
             .input('UserId', sql.NVarChar(128), String(ord.UserId))
             .query(`DELETE FROM dbo.carts WHERE UserId = @UserId`);
         }

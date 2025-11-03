@@ -35,15 +35,14 @@ exports.getMenusWithItems = async (req, res) => {
     const { error: authError, decoded } = verifyUser(req);
     let result;
     
-    // Use MSSQL connection pool from req.dbPool
     if (authError) {
-      result = await req.dbPool.request()
+      result = await req.db.request()
         .execute('SP_GetMenuUnAuthenticated');
     } else {
       if (!decoded.id) {
         return res.status(400).json({ error: 'Invalid JWT: Missing user ID' });
       }
-      result = await req.dbPool.request()
+      result = await req.db.request()
         .input('UserId', sql.Int, parseInt(decoded.id))
         .execute('get_menus_authenticated');
     }

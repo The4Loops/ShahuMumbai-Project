@@ -1,11 +1,15 @@
+// UpcomingCarousel.jsx
 import React, { useState, useEffect } from "react";
 import Slider from "react-slick";
-import "slick-carousel/slick/slick.css";
-import "slick-carousel/slick/slick-theme.css";
+import "slick-carousel/slick/slick.css";               // ← ONLY this one
+// NO slick-theme.css → no font loading
 import { toast } from "react-toastify";
 import { apiWithCurrency } from "../supabase/axios";
 import placeholder from "../assets/products/coat.jpg";
 import { useCurrency } from "../supabase/CurrencyContext";
+
+// react-icons
+import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const formatDateTime = (dateStr) => {
   const date = new Date(dateStr);
@@ -63,27 +67,25 @@ function UpcomingCarousel() {
     if (!selectedProduct) return;
 
     try {
-      // Create order from backend
-      const amountInCents = Math.round((selectedProduct.Price / 2) * 100); // 50% in cents
+      const amountInCents = Math.round((selectedProduct.Price / 2) * 100);
       const { data } = await apiWithCurrency(currency).post("/api/payment/create-order", {
         amount: amountInCents,
-        currency: selectedProduct.currency || currency, // Use product currency
+        currency: selectedProduct.currency || currency,
       });
 
       const options = {
-        key: "rzp_test_1234567890", // 🔑 Replace with your Razorpay Key ID
+        key: "rzp_test_1234567890",
         amount: data.amount,
         currency: data.currency,
         name: "Vintage Store",
         description: `50% Payment for ${selectedProduct.Name}`,
         order_id: data.id,
         handler: function (response) {
-          toast.success("Payment Successful ✅");
+          toast.success("Payment Successful");
           setWaitlist((prev) => [...prev, selectedProduct.ProductId]);
           setShowModal(false);
           setSelectedProduct(null);
 
-          // Save payment to backend (verification)
           apiWithCurrency(currency).post("/api/payment/verify", {
             razorpay_payment_id: response.razorpay_payment_id,
             razorpay_order_id: response.razorpay_order_id,
@@ -96,9 +98,7 @@ function UpcomingCarousel() {
           email: "john@example.com",
           contact: "9876543210",
         },
-        theme: {
-          color: "#E3BDB4",
-        },
+        theme: { color: "#E3BDB4" },
       };
 
       const rzp = new window.Razorpay(options);
@@ -120,13 +120,37 @@ function UpcomingCarousel() {
     }).format(value);
   };
 
+  // ---- Custom Arrows with react-icons ----
+  const PrevArrow = ({ onClick }) => (
+    <button
+      onClick={onClick}
+      className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white rounded-full p-3 shadow-xl transition-all hover:scale-110"
+      style={{ left: "-20px" }}
+      aria-label="Previous slide"
+    >
+      <FiChevronLeft className="w-6 h-6 text-[#4B2C20]" />
+    </button>
+  );
+
+  const NextArrow = ({ onClick }) => (
+    <button
+      onClick={onClick}
+      className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white rounded-full p-3 shadow-xl transition-all hover:scale-110"
+      style={{ right: "-20px" }}
+      aria-label="Next slide"
+    >
+      <FiChevronRight className="w-6 h-6 text-[#4B2C20]" />
+    </button>
+  );
+
   const settings = {
     dots: true,
     infinite: products.length > 4,
     speed: 500,
     slidesToShow: 4,
     slidesToScroll: 1,
-    arrows: true,
+    prevArrow: <PrevArrow />,
+    nextArrow: <NextArrow />,
     responsive: [
       { breakpoint: 1024, settings: { slidesToShow: 3 } },
       { breakpoint: 768, settings: { slidesToShow: 2 } },
@@ -191,24 +215,21 @@ function UpcomingCarousel() {
         </Slider>
       )}
 
-      {/* Vintage-Modern Payment Modal */}
+      {/* Payment Modal */}
       {showModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-[#FAF3F0] border border-[#D9C5BC] p-6 rounded-2xl shadow-2xl w-96 relative animate-fadeIn">
-            {/* Close Button */}
             <button
               onClick={() => setShowModal(false)}
               className="absolute top-3 right-3 text-[#4B2C20] hover:text-[#2c1810] transition"
             >
-              ✕
+              X
             </button>
 
-            {/* Title */}
             <h2 className="text-2xl font-serif text-[#4B2C20] mb-4">
               Confirm Your Spot
             </h2>
 
-            {/* Product Info */}
             <div className="bg-white border border-[#E3BDB4] rounded-xl p-4 mb-4 shadow-sm">
               <p className="mb-2 text-[#4B2C20]">
                 Product:{" "}
@@ -225,7 +246,6 @@ function UpcomingCarousel() {
               </p>
             </div>
 
-            {/* Action Buttons */}
             <div className="flex justify-center gap-3">
               <button
                 onClick={confirmPayment}
