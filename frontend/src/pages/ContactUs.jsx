@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import {
-  FaFacebookF,
+  // FaFacebookF,
   FaInstagram,
   FaLinkedinIn,
   FaPaperPlane,
@@ -68,13 +68,23 @@ function ContactPage() {
   };
 
   const socialLinks = [
-    { icon: FaFacebookF, label: "Facebook" },
-    { icon: FaInstagram, label: "Instagram" },
-    { icon: FaLinkedinIn, label: "LinkedIn" },
+    // { icon: FaFacebookF, label: "Facebook" },
+    {
+      icon: FaInstagram,
+      label: "Instagram",
+      link: "https://www.instagram.com/shahumumbai?utm_source=ig_web_button_share_sheet&igsh=bmltZzIzbWZyYnRv",
+    },
+    {
+      icon: FaLinkedinIn,
+      label: "LinkedIn",
+      link: "https://www.linkedin.com/posts/shahu-mumbai_coming-soon-activity-7349481105764352000-u6wv?utm_source=share&utm_medium=member_desktop&rcm=ACoAAD89RIkBB9QBhLGZcISmZYzucSOA_3DstLk",
+    },
   ];
 
   const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
   const pageUrl = `${baseUrl}/contactus`;
 
   // JSON-LD
@@ -92,7 +102,8 @@ function ContactPage() {
     "@type": "ContactPage",
     name: "Contact Shahu Mumbai",
     url: pageUrl,
-    description: "Contact Shahu Mumbai for inquiries, collaborations, or support.",
+    description:
+      "Contact Shahu Mumbai for inquiries, collaborations, or support.",
   };
 
   return (
@@ -113,8 +124,12 @@ function ContactPage() {
         <meta property="og:url" content={pageUrl} />
         <meta property="og:image" content={`${baseUrl}/og/contact.jpg`} />
         <meta name="twitter:card" content="summary_large_image" />
-        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(contactPageJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbJsonLd)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(contactPageJsonLd)}
+        </script>
       </Helmet>
 
       <div className="bg-[#F1E7E5] px-6 md:px-16 lg:px-24 py-16 text-[#2e2e2e]">
@@ -136,21 +151,27 @@ function ContactPage() {
           <div className="space-y-8">
             <div>
               <h2 className="text-2xl font-serif mb-2">Contact Details</h2>
-              <p className="text-[#555]">Email — bhumi.founder@shahumumbai.com</p>
+              <p className="text-[#555]">
+                Email — bhumi.founder@shahumumbai.com
+              </p>
               <p className="text-[#555]">Phone — +91 9920678152</p>
             </div>
 
             <div>
               <h2 className="text-2xl font-serif mb-2">Follow Us</h2>
               <div className="flex gap-6 mt-3">
-                {socialLinks.map(({ icon: Icon, label }, idx) => (
-                  <div
+                {socialLinks.map(({ icon: Icon, label, link }, idx) => (
+                  <a
                     key={idx}
-                    className="p-3 bg-white rounded-full shadow transition transform hover:scale-110 hover:shadow-md cursor-pointer"
+                    href={link}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     title={label}
                   >
-                    <Icon className="text-[#6B4226]" size={20} />
-                  </div>
+                    <div className="p-3 bg-white rounded-full shadow transition transform hover:scale-110 hover:shadow-md cursor-pointer">
+                      <Icon className="text-[#6B4226]" size={20} />
+                    </div>
+                  </a>
                 ))}
               </div>
             </div>
@@ -215,13 +236,11 @@ function ContactPage() {
         </div>
 
         {/* Map */}
-        <div className="mt-16 w-full h-72 md:h-96 rounded-xl overflow-hidden shadow">
+        <div className="mt-16 w-full aspect-[16/9] rounded-xl overflow-hidden shadow">
           <iframe
             title="Shahu Mumbai Location"
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3770.975916574955!2d72.832465!3d18.922003!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7d1c73a0d5cad%3A0xc70a25a7209c733c!2sGateway%20Of%20India%20Mumbai!5e0!3m2!1sen!2sin!4v1692978472528!5m2!1sen!2sin"
-            width="100%"
-            height="100%"
-            style={{ border: 0 }}
+            className="w-full h-full border-0"
             allowFullScreen=""
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
