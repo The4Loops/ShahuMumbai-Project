@@ -24,6 +24,8 @@ async function sendOrderEmail({ req,to, orderNumber, total, currency = '₹', na
     }
 
     let mailContent = module.maildescription;
+    const viewOrderUrl = `https://shahumumbai.com/orders/${orderNumber}`;
+    const contactUrl   = 'https://shahumumbai.com/contactus';
   
     mailContent = mailContent.replace(/#name/g, name || '');
     mailContent = mailContent.replace(/#email/g, to);
@@ -33,6 +35,8 @@ async function sendOrderEmail({ req,to, orderNumber, total, currency = '₹', na
     mailContent = mailContent.replace(/#orderNumber/g, orderNumber || '');
     mailContent = mailContent.replace(/#total/g, Number(total).toFixed(2) || 0.00);
     mailContent = mailContent.replace(/#currency/g, currency || 'INR');
+    mailContent = mailContent.replace(/https:\/\/shahumumbai\.com\/myorders/g, viewOrderUrl);
+    mailContent = mailContent.replace(/https:\/\/shahumumbai\.com\/contactus/g, contactUrl);
 
     const plainTextContent = mailContent
       .replace(/<[^>]+>/g, '')

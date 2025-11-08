@@ -131,7 +131,7 @@ exports.createOrder = async (req, res) => {
     try {
       const orderReq = new sql.Request(tx);
       orderReq
-        .input('UserId', sql.NVarChar(1000), decoded.id || String(owner))
+        .input('UserId', sql.NVarChar(1000), decoded.id ? decoded.id.toString() : string(owner))
         .input('CustName', sql.NVarChar(255), String(customer.name))
         .input('CustEmail', sql.NVarChar(255), String(customer.email || ''))
         .input('CustPhoneNo', sql.NVarChar(255), String(customer.phone || ''))
