@@ -14,11 +14,6 @@ function devFakeAllowed() {
 // Always INR now; keep function in case you re-enable FX later.
 const getExchangeRate = async (_dbPool, _currency = 'INR') => 1;
 
-/**
- * POST /api/checkout/order
- * Creates an internal order record with PaymentStatus='unpaid' in INR
- * Body: { customer, items: [{product_id, product_title?, unit_price?, qty}], discount_total?, tax_total?, shipping_total?, payment_method?, meta? }
- */
 exports.createOrder = async (req, res) => {
   const token = req.headers.authorization?.split(' ')[1];
   const owner = currentCartOwner(req);
@@ -131,7 +126,7 @@ exports.createOrder = async (req, res) => {
     try {
       const orderReq = new sql.Request(tx);
       orderReq
-        .input('UserId', sql.NVarChar(1000), decoded.id ? decoded.id.toString() : string(owner))
+        .input('UserId', sql.NVarChar(1000), decoded.id ? decoded.id.toString() : String(owner))
         .input('CustName', sql.NVarChar(255), String(customer.name))
         .input('CustEmail', sql.NVarChar(255), String(customer.email || ''))
         .input('CustPhoneNo', sql.NVarChar(255), String(customer.phone || ''))
