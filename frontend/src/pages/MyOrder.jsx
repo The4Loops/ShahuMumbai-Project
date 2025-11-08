@@ -15,18 +15,6 @@ import { apiWithCurrency } from "../supabase/axios";
 import { useCurrency } from "../supabase/CurrencyContext";
 import { toast } from "react-toastify";
 
-const getItemIcon = (name = "") => {
-  const n = String(name || "").toLowerCase();
-  if (n.includes("scarf")) return { icon: <FaFeatherAlt />, color: "bg-pink-100 text-[#EF4E9C]" };
-  if (n.includes("bag")) return { icon: <FaShoppingBag />, color: "bg-yellow-100 text-yellow-600" };
-  if (n.includes("boots")) return { icon: <FaShoePrints />, color: "bg-gray-200 text-gray-700" };
-  if (n.includes("hat") || n.includes("fedora")) return { icon: <FaHatCowboy />, color: "bg-green-100 text-green-700" };
-  if (n.includes("sunglasses") || n.includes("glasses")) return { icon: <FaGlasses />, color: "bg-blue-100 text-blue-600" };
-  if (n.includes("dress") || n.includes("shirt")) return { icon: <FaTshirt />, color: "bg-indigo-100 text-indigo-600" };
-  if (n.includes("brooch") || n.includes("pearl")) return { icon: <FaGem />, color: "bg-purple-100 text-purple-600" };
-  return { icon: <FaQuestion />, color: "bg-gray-100 text-gray-600" };
-};
-
 const formatPrice = (value = 0, currency = "USD") =>
   new Intl.NumberFormat("en-US", { style: "currency", currency }).format(Number(value || 0));
 
@@ -45,19 +33,8 @@ const MyOrders = () => {
       try {
         setLoading(true);
 
-        const token = sessionStorage.getItem("token") || localStorage.getItem("token");
-        if (!token) {
-          toast.error("Please sign in to view your orders.");
-          setLoading(false);
-          return;
-        }
-
         const api = apiWithCurrency(currency || "USD");
-        const res = await api.get("/api/orders/user", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        console.log("Orders API:", res.data); // ✅ Debugging
+        const res = await api.get("/api/orders/user");
         setOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
       } catch (err) {
         console.error("Failed to load orders:", err);
@@ -112,11 +89,11 @@ const MyOrders = () => {
                 {selectedOrderId === order.id && (
                   <div className="p-4 space-y-4">
                     {order.items.map((item, idx) => {
-                      const { icon, color } = getItemIcon(item.product_name);
+                      let color = "bg-gray-200 text-gray-800";
                       return (
                         <div key={idx} className="flex items-center gap-4 bg-[#FFF4E8] p-3 rounded-md">
                           <div className={`w-14 h-14 rounded-md flex items-center justify-center ${color} text-xl`}>
-                            {icon}
+                            <img src={item.image_url} alt={item.product_name} />
                           </div>
                           <div className="flex-1">
                             <p className="font-medium">{item.product_name}</p>

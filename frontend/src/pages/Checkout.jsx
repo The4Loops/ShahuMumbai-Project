@@ -5,6 +5,7 @@ import { MdEmail, MdPhone, MdPerson, MdHome } from "react-icons/md";
 import Layout from "../layout/Layout";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
+import api from "../supabase/axios";
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
 
@@ -69,9 +70,8 @@ function Checkout() {
       if (!API) setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
       try {
         setLoadingCart(true);
-        const r = await fetch(`${API}/api/cartById`, { credentials: "include" });
-        const text = await r.text();
-        const data = JSON.parse(text);
+        const response = await api.get(`${API}/api/cartById`);
+        const data = response.data; 
         setCart(Array.isArray(data) ? data : []);
         setCurrency(data?.[0]?.product?.currency || "INR");
       } catch (e) {
@@ -128,9 +128,8 @@ function Checkout() {
     // 0) Reload cart (authoritative)
     let serverCart = [];
     try {
-      const r = await fetch(`${API}/api/cartById`, { credentials: "include" });
-      const text = await r.text();
-      serverCart = JSON.parse(text) || [];
+      const response = await api.get(`${API}/api/cartById`);
+      serverCart = response.data || [];
     } catch (e) {
       console.error("Failed to reload cart:", e);
       alert("Could not load your cart. Please refresh and try again.");
@@ -180,12 +179,7 @@ function Checkout() {
 
     // 1) Create order (INR)
     let orderNumber;
-    try {
-      const resp = await fetch(`${API}/api/checkout/order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
+    const data=JSON.stringify({
           customer: {
             name: formData.name,
             email: formData.email,
@@ -202,26 +196,19 @@ function Checkout() {
           status: "pending",
           payment_status: "unpaid",
           meta: { transaction_token: newToken, source: "checkout" },
-        }),
-      });
+        })
+    try {
+      const resp = await api.post(`${API}/api/checkout/order`,data);
+      const text = resp.data;
 
-      const text = await resp.text();
-      const j = (() => {
-        try {
-          return JSON.parse(text);
-        } catch {
-          return null;
-        }
-      })();
-
-      if (!resp.ok || !j?.ok) {
-        console.error("Checkout failed", j || text);
-        if (j?.missing?.length) alert(`Order create failed: missing product IDs ${j.missing.join(", ")}`);
-        else if (j?.error === "product_inactive") alert("One of your cart items is inactive. Please remove it and try again.");
+      if (!text?.ok) {
+        console.error("Checkout failed", text);
+        if (text?.missing?.length) alert(`Order create failed: missing product IDs ${text.missing.join(", ")}`);
+        else if (text?.error === "product_inactive") alert("One of your cart items is inactive. Please remove it and try again.");
         else alert("Something went wrong creating your order. Please try again.");
         return;
       }
-      orderNumber = j.order_number;
+      orderNumber = text.order_number;
     } catch (err) {
       console.error("Order create network error:", err);
       alert("Network error during checkout (order create).");
@@ -230,25 +217,13 @@ function Checkout() {
 
     // 2) Create Razorpay order
     try {
-      const r = await fetch(`${API}/api/payments/create-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ order_number: orderNumber }),
-      });
+      const response = await api.post(`${API}/api/payments/create-order`, {order_number: orderNumber },);
 
-      const rText = await r.text();
-      const rz = (() => {
-        try {
-          return JSON.parse(rText);
-        } catch {
-          return null;
-        }
-      })();
+      const rz = response.data;
 
-      if (!r.ok || !rz?.rzp?.order_id) {
-        console.error("Razorpay order creation failed", rz || rText);
-        alert(`Unable to start payment: ${rz?.message || rz?.error || r.status}`);
+      if (!rz?.rzp?.order_id) {
+        console.error("Razorpay order creation failed", rz);
+        alert(`Unable to start payment: ${rz?.message || rz?.error || "Unknown error"}`);
         return;
       }
 
@@ -268,22 +243,10 @@ function Checkout() {
         redirect: false, // 👈 keep modal, handle result here
         handler: async (response) => {
           try {
-            const v = await fetch(`${API}/api/payments/verify`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify(response),
-            });
-            const vText = await v.text();
-            const vr = (() => {
-              try {
-                return JSON.parse(vText);
-              } catch {
-                return null;
-              }
-            })();
+            const v = await api.post(`${API}/api/payments/verify`,response);
+            const vr = v.data;
 
-            if (v.ok && vr?.ok) {
+            if (v.status === 200 && vr?.ok) {
               // GA purchase (use finalUnitPrice)
               try {
                 const gaItems = validLines.map((ci) => ({

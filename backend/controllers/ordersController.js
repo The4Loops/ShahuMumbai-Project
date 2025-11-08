@@ -1,5 +1,6 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
+const currentCartOwner = require('../utils/currentCartOwner');
 
 /* GET /api/orders?status=All|Pending|Shipped|Delivered&q=&limit=50&offset=0 */
 exports.listOrders = async (req, res) => {
@@ -180,48 +181,80 @@ exports.updateTracking = async (req, res) => {
 exports.getUserOrders = async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'missing_or_invalid_token' });
-    }
-    const token = authHeader.split(' ')[1];
     let userId;
-    try {
+    let isGuest = true; 
+
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       userId = decoded.id;
-    } catch {
-      return res.status(401).json({ error: 'invalid_token' });
+      isGuest = false;
+    } else {
+      userId = String(currentCartOwner(req));
     }
-    if (!userId) return res.status(400).json({ error: 'missing_user_id' });
 
-    const query = `
-      SELECT 
-        o.OrderId, o.OrderNumber, o.CustomerName, o.CustomerEmail,
-        o.FulFillmentStatus, o.PlacedAt, o.ShippedAt, o.DeliveredAt,
-        o.SubTotal, o.ShippingTotal, o.TaxTotal, o.TrackingNumber, o.Carrier,
-        o.Currency,  -- Added for currency support
-        u.UserId, u.FullName, u.Email,
-        p.ProductId, p.Name, p.Price,  
-        oi.Qty, oi.UnitPrice
-      FROM dbo.Orders o
-      INNER JOIN dbo.Users u       ON o.UserId = u.UserId
-      LEFT  JOIN dbo.OrderItems oi ON o.OrderId = oi.OrderId
-      LEFT  JOIN dbo.Products p    ON oi.ProductId = p.ProductId
-      WHERE o.UserId = @userId
-      ORDER BY o.PlacedAt DESC
-    `;
+    let query;
+    
+    if (!isGuest) {
+      query = `
+        SELECT 
+          o.OrderId, o.OrderNumber, o.CustomerName, o.CustomerEmail,
+          o.FulFillmentStatus, o.PlacedAt, o.ShippedAt, o.DeliveredAt,
+          o.SubTotal, o.ShippingTotal, o.TaxTotal, o.TrackingNumber, o.Carrier,
+          o.Currency,
+          u.UserId, u.FullName, u.Email,
+          p.ProductId, p.Name, p.Price, pi.ImageUrl,
+          oi.Qty, oi.UnitPrice
+        FROM dbo.Orders o
+        INNER JOIN dbo.Users u          ON o.UserId = CAST(u.UserId AS VARCHAR(50))
+        LEFT  JOIN dbo.OrderItems oi    ON o.OrderId = oi.OrderId
+        LEFT  JOIN dbo.Products p       ON oi.ProductId = p.ProductId
+        LEFT  JOIN dbo.ProductImages pi ON p.ProductId = pi.ProductId AND pi.isHero = 'Y'
+        WHERE u.UserId = @userId
+        ORDER BY o.PlacedAt DESC;
+      `;
+    } else {
+      query = `
+        SELECT 
+          o.OrderId, o.OrderNumber, o.CustomerName, o.CustomerEmail,
+          o.FulFillmentStatus, o.PlacedAt, o.ShippedAt, o.DeliveredAt,
+          o.SubTotal, o.ShippingTotal, o.TaxTotal, o.TrackingNumber, o.Carrier,
+          o.Currency,
+          p.ProductId, p.Name, p.Price, pi.ImageUrl,
+          oi.Qty, oi.UnitPrice
+        FROM dbo.Orders o
+        LEFT  JOIN dbo.OrderItems oi    ON o.OrderId = oi.OrderId
+        LEFT  JOIN dbo.Products p       ON oi.ProductId = p.ProductId
+        LEFT  JOIN dbo.ProductImages pi ON p.ProductId = pi.ProductId AND pi.isHero = 'Y'
+        WHERE o.UserId = @userId
+        ORDER BY o.PlacedAt DESC;
+      `;
+    }
 
     const request = req.db.request();
-    request.input('userId', sql.Int, userId);
+
+    if (!isGuest) {
+      request.input('userId', sql.Int, parseInt(userId, 10));
+    } else {
+      request.input('userId', sql.VarChar(100), userId);
+    }
+
     const result = await request.query(query);
 
     const ordersMap = new Map();
+
     for (const row of result.recordset) {
       const key = row.OrderNumber;
+
       if (!ordersMap.has(key)) {
         ordersMap.set(key, {
           id: row.OrderNumber,
-          customer: { name: row.CustomerName || row.CustomerEmail || 'Guest', email: row.Email || row.CustomerEmail || null },
-          status: (row.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()),
+          customer: {
+            name: row.CustomerName || (row.FullName || row.CustomerEmail) || 'Guest',
+            email: row.Email || row.CustomerEmail || null
+          },
+          status: (row.FulFillmentStatus || 'pending')
+            .replace(/^\w/, c => c.toUpperCase()),
           placed_at: row.PlacedAt,
           shipped_at: row.ShippedAt || null,
           delivered_at: row.DeliveredAt || null,
@@ -230,21 +263,25 @@ exports.getUserOrders = async (req, res) => {
           tax: row.TaxTotal || 0,
           tracking_number: row.TrackingNumber || null,
           carrier: row.Carrier || null,
-          currency: row.Currency || 'USD',  // Added
+          currency: row.Currency || 'USD',
           items: []
         });
       }
+
       if (row.ProductId) {
         ordersMap.get(key).items.push({
           product_id: row.ProductId,
           product_name: row.Name,
           quantity: row.Qty,
+          image_url: row.ImageUrl || null,
           unit_price: row.UnitPrice,
           total_price: (row.Qty || 0) * (row.UnitPrice || 0)
         });
       }
     }
-    return res.json({ orders: Array.from(ordersMap.values()), total: ordersMap.size });
+
+    const orders = Array.from(ordersMap.values());
+    return res.json({ orders, total: orders.length });
   } catch (e) {
     console.error('orders.getUserOrders error:', e);
     return res.status(500).json({ error: 'internal_error' });

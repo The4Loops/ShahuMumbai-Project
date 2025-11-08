@@ -1,6 +1,8 @@
 // controllers/checkoutController.js
 require('dotenv').config();
 const sql = require('mssql');
+const jwt = require('jsonwebtoken');
+const currentCartOwner = require('../utils/currentCartOwner');
 
 function dbReady(req) {
   return req.db && req.db.connected;  // ← FIXED
@@ -18,6 +20,13 @@ const getExchangeRate = async (_dbPool, _currency = 'INR') => 1;
  * Body: { customer, items: [{product_id, product_title?, unit_price?, qty}], discount_total?, tax_total?, shipping_total?, payment_method?, meta? }
  */
 exports.createOrder = async (req, res) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  const owner = currentCartOwner(req);
+  var decoded={};
+  if(token){
+    decoded = jwt.verify(token, process.env.JWT_SECRET) || {};
+  }
+  
   const {
     customer,
     currency = 'INR',
@@ -122,7 +131,7 @@ exports.createOrder = async (req, res) => {
     try {
       const orderReq = new sql.Request(tx);
       orderReq
-        .input('UserId', sql.Int, null)
+        .input('UserId', sql.NVarChar(1000), decoded.id || String(owner))
         .input('CustName', sql.NVarChar(255), String(customer.name))
         .input('CustEmail', sql.NVarChar(255), String(customer.email || ''))
         .input('CustPhoneNo', sql.NVarChar(255), String(customer.phone || ''))
