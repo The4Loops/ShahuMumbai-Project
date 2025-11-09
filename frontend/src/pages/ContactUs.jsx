@@ -154,7 +154,7 @@ function ContactPage() {
               <p className="text-[#555]">
                 Email — bhumi.founder@shahumumbai.com
               </p>
-              <p className="text-[#555]">Phone — +91 9920678152</p>
+              <p className="text-[#555]">Phone — +1 (929)715-5118 and +91 9594545119</p>
             </div>
 
             <div>
@@ -236,7 +236,7 @@ function ContactPage() {
         </div>
 
         {/* Map */}
-        <div className="mt-16 w-full aspect-[16/9] rounded-xl overflow-hidden shadow">
+        {/* <div className="mt-16 w-full aspect-[16/9] rounded-xl overflow-hidden shadow">
           <iframe
             title="Shahu Mumbai Location"
             src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3770.975916574955!2d72.832465!3d18.922003!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x3be7d1c73a0d5cad%3A0xc70a25a7209c733c!2sGateway%20Of%20India%20Mumbai!5e0!3m2!1sen!2sin!4v1692978472528!5m2!1sen!2sin"
@@ -245,7 +245,7 @@ function ContactPage() {
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
           ></iframe>
-        </div>
+        </div> */}
       </div>
     </Layout>
   );
