@@ -248,9 +248,9 @@ export default function Navbar() {
         </div>
 
         {/* Desktop Navigation */}
-        <div className="hidden lg:flex items-center py-3 px-20 bg-transparent backdrop-blur-sm border-t border-[#e0d8d1]">
+        <div className="hidden lg:flex items-center justify-between py-3 px-20 bg-transparent backdrop-blur-sm border-t border-[#e0d8d1]">
           {/* Search */}
-          <div className="relative flex items-center">
+          <div className="flex flex-[1] justify-start">
             <FaSearch
               className="absolute left-3 text-[#aaaaaa] cursor-pointer"
               onClick={() => {
