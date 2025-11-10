@@ -224,7 +224,8 @@ export default function OrderDashboard() {
               <thead>
                 <tr className="bg-[#F1E7E5] text-[#6B4226]">
                   <th className="p-3 text-left">Order ID</th>
-                  <th className="p-3 text-left">Customer</th>
+                  <th className="p-3 text-left">Customer Name</th>
+                  <th className="p-3 text-left">Carrire Name</th>
                   <th className="p-3 text-left">Tracking</th>
                   <th className="p-3 text-center">Status</th>
                 </tr>
@@ -513,4 +514,4 @@ export default function OrderDashboard() {
       )}
     </div>
   );
-}
+} 

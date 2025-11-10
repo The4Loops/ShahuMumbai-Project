@@ -5,12 +5,12 @@ const faqs = [
   {
     question: "What is your return policy?",
     answer:
-      "We offer a 30-day return policy. If you're not satisfied with your purchase, you can return it within 30 days for a full refund.",
+      "On the website it is mentioned 30 days. Needs to be changed to 2 days of receiving the order",
   },
   {
     question: "Do you offer international shipping?",
     answer:
-      "Yes, we ship to most countries worldwide. Shipping costs and delivery times vary depending on the destination.",
+      "Yes, we ship internationally to 4 countries. USA, UK, Canada, Dubai. The estimated delivery timeline for the same is 1 to 3 days if the order is not made to order. If the order is made to order, it takes up to 15 to 20 days to be delivered. ",
   },
   {
     question: "How can I track my order?",
@@ -20,7 +20,7 @@ const faqs = [
   {
     question: "Can I change or cancel my order?",
     answer:
-      "You can change or cancel your order within 24 hours of purchase by contacting our support team.",
+      "Initiate cancel through the website itself - Go to the orders section and select ‘Cancel My Order’. Same follows for changing the order too. All cancellations and changes to an order MUST be made within 24 hours of placing the order. ",
   },
 ];
 
