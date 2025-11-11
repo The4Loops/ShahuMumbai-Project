@@ -1,14 +1,14 @@
 // controllers/analytics.controller.js
 const sql = require('mssql');
 
-// Helpers: YYYY-MM-DD → UTC day bounds (store/report in UTC)
+// Helpers: YYYY-MM-DD → UTC bounds
 const toStart = (d) => (d ? `${d}T00:00:00.000Z` : null);
 const toEnd   = (d) => (d ? `${d}T23:59:59.999Z` : null);
 
-// Safely stringify JSON for MSSQL NVARCHAR(MAX)
+// Safely stringify JSON
 const jsonOrNull = (v) => (v == null ? null : JSON.stringify(v));
 
-// POST /api/track
+// POST /api/analytics/track
 exports.trackEvent = async (req, res) => {
   try {
     const {
@@ -31,10 +31,10 @@ exports.trackEvent = async (req, res) => {
       req.ip ||
       null;
 
-    const r = await req.db.request()
+    await req.db.request()
       .input('name', sql.NVarChar(100), String(name))
       .input('anon_id', sql.NVarChar(64), String(anon_id))
-      .input('user_id', user_id == null ? sql.Int : sql.Int, user_id ?? null)
+      .input('user_id', sql.Int, user_id ?? null)
       .input('url', sql.NVarChar(sql.MAX), url || null)
       .input('referrer', sql.NVarChar(sql.MAX), referrer || null)
       .input('utm', sql.NVarChar(sql.MAX), jsonOrNull(utm))
@@ -42,7 +42,7 @@ exports.trackEvent = async (req, res) => {
       .input('user_agent', sql.NVarChar(512), user_agent)
       .input('ip', sql.NVarChar(64), ip)
       .query(`
-        INSERT INTO analytics_events
+        INSERT INTO dbo.AnalyticsEvent
           (name, AnonId, UserId, url, referrer, utm, props, UserAgent, ip, OccurredAt)
         VALUES
           (@name, @anon_id, @user_id, @url, @referrer, @utm, @props, @user_agent, @ip, SYSUTCDATETIME());
@@ -62,10 +62,6 @@ exports.getSummary = async (req, res) => {
     const p_from = toStart(from);
     const p_to   = toEnd(to);
 
-    // If you’ve created a proc similar to supabase.rpc('analytics_kpis')
-    // EXEC analytics_kpis @p_from, @p_to
-    // Fallback: compute KPIs in SQL inline to avoid fetching 5000 rows
-
     const kpiReq = req.db.request();
     if (p_from) kpiReq.input('from', sql.DateTime2, new Date(p_from));
     if (p_to)   kpiReq.input('to', sql.DateTime2, new Date(p_to));
@@ -78,7 +74,7 @@ exports.getSummary = async (req, res) => {
     const kpiSql = `
       ;WITH base AS (
         SELECT name, AnonId, UserId
-        FROM AnalyticsEvent
+        FROM dbo.AnalyticsEvent
         ${whereSql}
       )
       SELECT
@@ -97,7 +93,6 @@ exports.getSummary = async (req, res) => {
       view_item: 0, add_to_cart: 0, begin_checkout: 0, purchase: 0
     };
 
-    // Top products: try proc equivalent to analytics_top_products; else do quick tally from add_to_cart
     const tpReq = req.db.request();
     if (p_from) tpReq.input('from', sql.DateTime2, new Date(p_from));
     if (p_to)   tpReq.input('to', sql.DateTime2, new Date(p_to));
@@ -110,7 +105,7 @@ exports.getSummary = async (req, res) => {
             WHEN JSON_VALUE(props, '$.item_name') IS NOT NULL THEN JSON_VALUE(props, '$.item_name')
             ELSE 'Unknown'
           END AS product_title
-        FROM AnalyticsEvent
+        FROM dbo.AnalyticsEvent
         WHERE name = 'add_to_cart'
           ${p_from ? 'AND OccurredAt >= @from' : ''}
           ${p_to   ? 'AND OccurredAt <= @to'   : ''}
@@ -153,7 +148,7 @@ exports.getDailyCounts = async (req, res) => {
         CAST(OccurredAt AS date) AS day,
         name,
         COUNT(*) AS count
-      FROM AnalyticsEvent
+      FROM dbo.AnalyticsEvent
       ${whereSql}
       GROUP BY CAST(OccurredAt AS date), name
       ORDER BY day ASC;
@@ -190,7 +185,7 @@ exports.getEvents = async (req, res) => {
         referrer,
         utm,
         props
-      FROM AnalyticsEvent
+      FROM dbo.AnalyticsEvent
       ${name ? 'WHERE name = @name' : ''}
       ORDER BY OccurredAt DESC
       OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY;
@@ -203,15 +198,13 @@ exports.getEvents = async (req, res) => {
   }
 };
 
-// GET /api/analytics/sales-report
+// (optional) sales report kept as-is
 exports.getSalesReport = async (req, res) => {
   try {
     const now = new Date();
     const last24h = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const last30d = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    // If your schema matches Supabase tables:
-    // orders(id, placed_at, payment_status, status), order_items(order_id, product_id, product_title, qty)
     const paidPaymentStatuses = ['PAID', 'SUCCESS', 'CAPTURED'];
     const paidOrderStatuses   = ['PAID', 'COMPLETED', 'SUCCESS', 'FULFILLED'];
 
@@ -219,17 +212,11 @@ exports.getSalesReport = async (req, res) => {
       .input('d24', sql.DateTime2, last24h)
       .input('d30', sql.DateTime2, last30d);
 
-    // Count paid orders (payment_status) with fallback to status, across three windows
     const salesSql = `
       ;WITH paid AS (
-        SELECT OrderId, PlacedAt
-        FROM orders
-        WHERE PaymentStatus IN (${paidPaymentStatuses.map((_, i) => `'${paidPaymentStatuses[i]}'`).join(', ')})
+        SELECT OrderId, PlacedAt FROM orders WHERE PaymentStatus IN (${paidPaymentStatuses.map(s => `'${s}'`).join(', ')})
         UNION
-        SELECT OrderId, PlacedAt
-        FROM orders
-        WHERE PaymentStatus IS NULL
-          AND status IN (${paidOrderStatuses.map((_, i) => `'${paidOrderStatuses[i]}'`).join(', ')})
+        SELECT OrderId, PlacedAt FROM orders WHERE PaymentStatus IS NULL AND status IN (${paidOrderStatuses.map(s => `'${s}'`).join(', ')})
       )
       SELECT
         (SELECT COUNT(*) FROM paid WHERE PlacedAt >= @d24) AS c24,
@@ -239,17 +226,11 @@ exports.getSalesReport = async (req, res) => {
     const sRes = await reqBase.query(salesSql);
     const sRow = sRes.recordset?.[0] || { c24: 0, c30: 0, call: 0 };
 
-    // Top products from ALL paid orders
     const paidIdsRes = await req.db.request().query(`
       ;WITH paid AS (
-        SELECT OrderId
-        FROM orders
-        WHERE PaymentStatus IN (${paidPaymentStatuses.map(s => `'${s}'`).join(', ')})
+        SELECT OrderId FROM orders WHERE PaymentStatus IN (${paidPaymentStatuses.map(s => `'${s}'`).join(', ')})
         UNION
-        SELECT OrderId
-        FROM orders
-        WHERE PaymentStatus IS NULL
-          AND status IN (${paidOrderStatuses.map(s => `'${s}'`).join(', ')})
+        SELECT OrderId FROM orders WHERE PaymentStatus IS NULL AND status IN (${paidOrderStatuses.map(s => `'${s}'`).join(', ')})
       )
       SELECT OrderId AS id FROM paid;
     `);
@@ -257,7 +238,6 @@ exports.getSalesReport = async (req, res) => {
 
     let topProducts = [];
     if (paidIds.length) {
-      // chunk IN() to avoid parameter limits if needed; assuming small here
       const r = await req.db.request().query(`
         SELECT
           MAX(ProductId) AS id,
@@ -272,7 +252,7 @@ exports.getSalesReport = async (req, res) => {
       topProducts = (r.recordset || []).map(x => ({
         id: x.id,
         name: x.name || 'Untitled',
-        image: null, // populate later if you join to a products table
+        image: null,
         sales: Number(x.sales || 0),
       }));
     }

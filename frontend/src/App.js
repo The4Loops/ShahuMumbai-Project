@@ -37,10 +37,23 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 import AddBlogPost from "./admin/AddBlogPost";
+import { trackDB } from "./analytics-db";
+import { useLocation } from "react-router-dom";
+import { useEffect } from "react";
+
+function useTrackPageViews(userId) {
+  const { pathname, search } = useLocation();
+  useEffect(() => {
+    trackDB("page_view", {}, userId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, search]);
+}
+
 
 function App() {
   useAutoLogout();
-
+  const userId = JSON.parse(localStorage.getItem("user") || "null")?.id || null;
+  useTrackPageViews(userId);
   const siteUrl =
     typeof window !== "undefined"
       ? window.location.origin

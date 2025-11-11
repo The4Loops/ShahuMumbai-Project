@@ -312,205 +312,143 @@ export default function OrderDashboard() {
           {ordersLoading && <div className="p-3 text-sm text-[#6B4226]/70">Loading…</div>}
 
           {/* Desktop Table */}
-          <div className="hidden md:block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
-            <table className="w-full table-auto">
-              <thead>
-                <tr className="bg-[#F1E7E5] text-[#6B4226]">
-                  <th className="p-3 text-left">Order ID</th>
-                  <th className="p-3 text-left">Customer</th>
-                  <th className="p-3 text-left">Tracking / Carrier</th>
-                  <th className="p-3 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {orders.map((order) => {
-                  const d = getDraft(order);
-                  const disabled = savingRow === order.id;
-
-                  return (
-                    <tr key={order.id} className="border-t border-[#E6DCD2]">
-                      <td className="p-3 text-[#6B4226]">{order.id}</td>
-                      <td className="p-3 text-[#6B4226]">
-                        {/* Show customer name if object, else string */}
-                        {typeof order.customer === "string"
-                          ? order.customer
-                          : (order.customer?.name || order.customer?.email || "Guest")}
-                      </td>
-                      <td className="p-3 text-[#6B4226]">
-                        <div className="flex items-center gap-2">
-                          <input
-                            value={d.trackingNumber}
-                            onChange={(e) => setDraft(order.id, { trackingNumber: e.target.value })}
-                            placeholder="Tracking"
-                            className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm w-40"
-                            disabled={disabled}
-                          />
-                          <select
-                            value={d.carrier}
-                            onChange={(e) => setDraft(order.id, { carrier: e.target.value })}
-                            className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm"
-                            disabled={disabled}
-                          >
-                            {CARRIERS.map((c) => (
-                              <option key={c} value={c}>{c}</option>
-                            ))}
-                          </select>
-                          <button
-                            onClick={async () => {
-                              if (!d.trackingNumber.trim()) return toast.error("Enter tracking number");
-                              try {
-                                setSavingRow(order.id);
-                                const updated = await saveTracking(order.id, d.trackingNumber.trim(), d.carrier);
-                                setOrders((list) =>
-                                  list.map((o) =>
-                                    o.id === order.id
-                                      ? {
-                                          ...o,
-                                          TrackingNumber: updated.TrackingNumber,
-                                          Carrier: updated.Carrier,
-                                          ShippedAt: updated.ShippedAt,
-                                          status: updated.FulFillmentStatus
-                                            ? updated.FulFillmentStatus.replace(/^\w/, (c) => c.toUpperCase())
-                                            : o.status,
-                                        }
-                                      : o
-                                  )
-                                );
-                                toast.success("Tracking saved");
-                              } catch (e) {
-                                if (!isCanceled(e)) toast.error("Failed to save");
-                              } finally {
-                                setSavingRow(null);
+          {/* Desktop Table (md and up) */}
+<div className="hidden md:block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
+  <table className="w-full table-auto">
+    <thead>
+      <tr className="bg-[#F1E7E5] text-[#6B4226]">
+        <th className="p-3 text-left">Order ID</th>
+        <th className="p-3 text-left">Customer</th>
+        <th className="p-3 text-left">Tracking / Carrier</th>
+        <th className="p-3 text-center">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {orders.map((order) => {
+        const d = getDraft(order);
+        const disabled = savingRow === order.id;
+        return (
+          <tr key={order.id} className="border-t border-[#E6DCD2]">
+            <td className="p-3 text-[#6B4226]">{order.id}</td>
+            <td className="p-3 text-[#6B4226]">
+              {typeof order.customer === "string"
+                ? order.customer
+                : (order.customer?.name || order.customer?.email || "Guest")}
+            </td>
+            <td className="p-3 text-[#6B4226]">
+              <div className="flex items-center gap-2">
+                <input
+                  value={d.trackingNumber}
+                  onChange={(e) => setDraft(order.id, { trackingNumber: e.target.value })}
+                  placeholder="Tracking"
+                  className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm w-40"
+                  disabled={disabled}
+                />
+                <select
+                  value={d.carrier}
+                  onChange={(e) => setDraft(order.id, { carrier: e.target.value })}
+                  className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm"
+                  disabled={disabled}
+                >
+                  {CARRIERS.map((c) => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+                <button
+                  onClick={async () => {
+                    if (!d.trackingNumber.trim()) return toast.error("Enter tracking number");
+                    try {
+                      setSavingRow(order.id);
+                      const updated = await saveTracking(order.id, d.trackingNumber.trim(), d.carrier);
+                      setOrders((list) =>
+                        list.map((o) =>
+                          o.id === order.id
+                            ? {
+                                ...o,
+                                TrackingNumber: updated.TrackingNumber,
+                                Carrier: updated.Carrier,
+                                ShippedAt: updated.ShippedAt,
+                                status: updated.FulFillmentStatus
+                                  ? updated.FulFillmentStatus.charAt(0).toUpperCase() +
+                                    updated.FulFillmentStatus.slice(1)
+                                  : o.status,
                               }
-                            }}
-                            className="px-3 py-1.5 border rounded text-sm hover:bg-[#F5EFED] disabled:opacity-50"
-                            disabled={disabled}
-                          >
-                            {disabled ? "Saving…" : "Save"}
-                          </button>
-                        </div>
-                        <div className="text-xs text-[#6B4226]/70 mt-1">
-                          Current: {order.TrackingNumber || "—"}
-                          {order.Carrier ? ` · ${order.Carrier}` : ""}
-                          {order.ShippedAt ? ` · ${new Date(order.ShippedAt).toLocaleString()}` : ""}
-                        </div>
-                      </td>
-                      <td className="p-3 text-center">
-                        <span
-                          className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                            order.status === "Delivered"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : order.status === "Shipped"
-                              ? "bg-[#F3DEDE] text-[#6B4226]"
-                              : "bg-rose-100 text-rose-700"
-                          }`}
-                        >
-                          {order.status}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })}
-                {!ordersLoading && orders.length === 0 && (
-                  <tr>
-                    <td colSpan={4} className="p-3 text-center text-sm text-[#6B4226]/70">
-                      No orders found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                            : o
+                        )
+                      );
+                      toast.success("Tracking saved");
+                    } catch (e) {
+                      if (!isCanceled(e)) toast.error("Failed to save");
+                    } finally {
+                      setSavingRow(null);
+                    }
+                  }}
+                  className="px-3 py-1.5 border rounded text-sm hover:bg-[#F5EFED] disabled:opacity-50"
+                  disabled={disabled}
+                >
+                  {disabled ? "Saving…" : "Save"}
+                </button>
+              </div>
+            </td>
+            <td className="p-3 text-center">
+              <span
+                className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+                  order.status === "Delivered"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : order.status === "Shipped"
+                    ? "bg-[#F3DEDE] text-[#6B4226]"
+                    : "bg-rose-100 text-rose-700"
+                }`}
+              >
+                {order.status}
+              </span>
+            </td>
+          </tr>
+        );
+      })}
+      {!ordersLoading && orders.length === 0 && (
+        <tr>
+          <td colSpan={4} className="p-3 text-center text-sm text-[#6B4226]/70">
+            No orders found.
+          </td>
+        </tr>
+      )}
+    </tbody>
+  </table>
+</div>
 
-          {/* Mobile Cards */}
-          <div className="grid grid-cols-1 gap-3">
-            {orders.map((order) => {
-              const d = getDraft(order);
-              const disabled = savingRow === order.id;
 
-              return (
-                <div key={order.id} className="p-4 rounded-lg border border-[#E6DCD2] bg-white">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="font-semibold text-[#6B4226]">{order.id}</p>
-                      <p className="text-sm text-[#6B4226]/70">
-                        {typeof order.customer === "string"
-                          ? order.customer
-                          : (order.customer?.name || order.customer?.email || "Guest")}
-                      </p>
-                    </div>
-                    <span
-                      className={`px-2.5 py-1 rounded-full text-xs font-medium ${
-                        order.status === "Delivered"
-                          ? "bg-emerald-100 text-emerald-700"
-                          : order.status === "Shipped"
-                          ? "bg-[#F3DEDE] text-[#6B4226]"
-                          : "bg-rose-100 text-rose-700"
-                      }`}
-                    >
-                      {order.status}
-                    </span>
-                  </div>
-                  <div className="text-xs text-[#6B4226]/70 mt-2">
-                    Current: {order.TrackingNumber || "—"}
-                    {order.Carrier ? ` · ${order.Carrier}` : ""}
-                  </div>
-                  <div className="flex gap-2 mt-3">
-                    <input
-                      value={d.trackingNumber}
-                      onChange={(e) => setDraft(order.id, { trackingNumber: e.target.value })}
-                      placeholder="Tracking"
-                      className="flex-1 rounded-md px-2 py-1 border border-[#E6DCD2] text-sm"
-                      disabled={disabled}
-                    />
-                    <select
-                      value={d.carrier}
-                      onChange={(e) => setDraft(order.id, { carrier: e.target.value })}
-                      className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm"
-                      disabled={disabled}
-                    >
-                      {CARRIERS.map((c) => (
-                        <option key={c} value={c}>{c}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={async () => {
-                        if (!d.trackingNumber.trim()) return toast.error("Enter tracking");
-                        try {
-                          setSavingRow(order.id);
-                          const updated = await saveTracking(order.id, d.trackingNumber.trim(), d.carrier);
-                          setOrders((list) =>
-                            list.map((o) =>
-                              o.id === order.id
-                                ? {
-                                    ...o,
-                                    TrackingNumber: updated.TrackingNumber,
-                                    Carrier: updated.Carrier,
-                                    ShippedAt: updated.ShippedAt,
-                                    status: updated.FulFillmentStatus
-                                      ? updated.FulFillmentStatus.replace(/^\w/, (c) => c.toUpperCase())
-                                      : o.status,
-                                  }
-                                : o
-                            )
-                          );
-                          toast.success("Saved");
-                        } catch (e) {
-                          if (!isCanceled(e)) toast.error("Failed");
-                        } finally {
-                          setSavingRow(null);
-                        }
-                      }}
-                      className="px-3 py-1.5 border rounded text-sm disabled:opacity-50"
-                      disabled={disabled}
-                    >
-                      {disabled ? "…" : "Save"}
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+{/* Mobile Cards (only visible below md) */}
+<div className="grid grid-cols-1 gap-3 md:hidden">
+  {orders.map((order) => {
+    return (
+      <div key={order.id} className="p-4 rounded-lg border border-[#E6DCD2] bg-white">
+        <div className="flex justify-between items-start">
+          <div>
+            <p className="font-semibold text-[#6B4226]">{order.id}</p>
+            <p className="text-sm text-[#6B4226]/70">
+              {typeof order.customer === "string"
+                ? order.customer
+                : (order.customer?.name || order.customer?.email || "Guest")}
+            </p>
           </div>
+          <span
+            className={`px-2.5 py-1 rounded-full text-xs font-medium ${
+              order.status === "Delivered"
+                ? "bg-emerald-100 text-emerald-700"
+                : order.status === "Shipped"
+                ? "bg-[#F3DEDE] text-[#6B4226]"
+                : "bg-rose-100 text-rose-700"
+            }`}
+          >
+            {order.status}
+          </span>
+        </div>
+      </div>
+    );
+  })}
+</div>
+
 
           {/* Pagination */}
           <div className="mt-4 flex items-center gap-3 text-sm text-[#6B4226]">

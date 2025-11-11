@@ -1,6 +1,7 @@
-import api from "./supabase/axios";
+// Save user events to your Node API (MSSQL), not Supabase
+import api from "./supabase/axios"; // your axios instance (baseURL http://localhost:5000)
 
-const ANON_KEY = 'anon_id';
+const ANON_KEY = "anon_id";
 
 function getAnonId() {
   let id = localStorage.getItem(ANON_KEY);
@@ -13,24 +14,46 @@ function getAnonId() {
 
 function getUTM() {
   const params = new URLSearchParams(window.location.search);
-  const known = ['utm_source','utm_medium','utm_campaign','utm_term','utm_content'];
+  const known = ["utm_source","utm_medium","utm_campaign","utm_term","utm_content"];
   const utm = {};
-  known.forEach(k => { if (params.get(k)) utm[k.replace('utm_','')] = params.get(k); });
+  for (const k of known) {
+    const v = params.get(k);
+    if (v) utm[k.replace("utm_","")] = v;
+  }
   return utm;
 }
 
-export async function trackDB(name, properties = {}, userId = null) {
+// Primary transport: axios
+async function sendViaAxios(payload) {
+  return api.post("/api/analytics/track", payload);
+}
+
+// Fallback: Beacon (non-blocking, survives unload)
+function sendViaBeacon(payload) {
   try {
-    await api.post('/api/track', {
-      name,
-      anon_id: getAnonId(),
-      user_id: userId || null,
-      url: window.location.href,
-      referrer: document.referrer || null,
-      utm: getUTM(),
-      properties
-    });
-  } catch (_) {
-    // silent fail; analytics must not break UX
+    const url = (api.defaults.baseURL || "").replace(/\/$/, "") + "/api/analytics/track";
+    const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
+    return navigator.sendBeacon(url, blob);
+  } catch {
+    return false;
+  }
+}
+
+export async function trackDB(name, properties = {}, userId = null) {
+  const payload = {
+    name,
+    anon_id: getAnonId(),
+    user_id: userId || null,
+    url: window.location.href,
+    referrer: document.referrer || null,
+    utm: getUTM(),
+    properties
+  };
+
+  try {
+    await sendViaAxios(payload);
+  } catch {
+    // try beacon silently
+    sendViaBeacon(payload);
   }
 }
