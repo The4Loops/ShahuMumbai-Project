@@ -123,7 +123,7 @@ export default function OrderDashboard() {
     params.set("limit", String(ordersLimit));
     params.set("offset", String(ordersOffset));
 
-    const url = `/api/orders?${params.toString()}`;
+    const url = `/api/orders/listOrders?${params.toString()}`;
 
     try {
       setOrdersLoading(true);
