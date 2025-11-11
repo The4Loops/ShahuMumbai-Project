@@ -251,27 +251,29 @@ export default function Navbar() {
         <div className="hidden lg:flex items-center justify-between py-3 px-20 bg-transparent backdrop-blur-sm border-t border-[#e0d8d1]">
           {/* Search */}
           <div className="flex flex-[1] justify-start">
-            <FaSearch
-              className="absolute left-3 text-[#aaaaaa] cursor-pointer"
-              onClick={() => {
-                if (searchQuery.trim()) {
-                  navigate(
-                    `/products?search=${encodeURIComponent(searchQuery.trim())}`
-                  );
-                  setSearchQuery("");
-                }
-              }}
-            />
+    <div className="relative">
+      <FaSearch
+        className="absolute left-3 top-1/2 -translate-y-1/2 text-[#aaaaaa] cursor-pointer"
+        onClick={() => {
+          if (searchQuery.trim()) {
+            navigate(
+              `/products?search=${encodeURIComponent(searchQuery.trim())}`
+            );
+            setSearchQuery("");
+          }
+        }}
+      />
 
-            <input
-              type="text"
-              placeholder="Search..."
-              className="w-[300px] pl-10 pr-3 py-1.5 bg-transparent backdrop-blur-sm font-bold rounded-full border border-gray-300 focus:outline-none"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={handleSearchSubmit}
-            />
-          </div>
+      <input
+        type="text"
+        placeholder="Search..."
+        className="w-[300px] pl-10 pr-3 py-1.5 bg-white/20 backdrop-blur-sm font-bold rounded-full border border-gray-300 focus:outline-none"
+        value={searchQuery}
+        onChange={(e) => setSearchQuery(e.target.value)}
+        onKeyDown={handleSearchSubmit}
+      />
+    </div>
+  </div>
 
           {/* Menus */}
           <ul className="flex items-center justify-center gap-8 flex-[1]">

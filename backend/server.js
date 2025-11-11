@@ -4,8 +4,6 @@ const helmet = require('helmet');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
 const cookieParser = require('cookie-parser');
-const sql = require('mssql');
-const sqlConfig = require('./config/db');
 const dbPool = require('./utils/dbPool');
 
 // Middlewares
@@ -44,9 +42,7 @@ const paymentsController = require('./controllers/paymentsController');
 
 const app = express();
 app.set('trust proxy', 1);
-
-
-
+app.set('etag', false);
 app.use(helmet());
 
 const rawAllowed = process.env.ALLOWED_ORIGINS || process.env.FRONTEND_ORIGIN || 'http://localhost:3000';
@@ -70,10 +66,61 @@ app.use(cors({
 
 app.use(async (req, _res, next) => {
   try {
-    req.db = await dbPool.getPool();   // <-- use req.db in all route handlers
+    req.db = await dbPool.getPool();
     next();
   } catch (err) {
     next(err);
+  }
+});
+
+app.get('/api/orders/diag', async (req, res) => {
+  try {
+    const id = await req.db.request().query(
+      "SELECT DB_NAME() AS currentDb, @@SERVERNAME AS serverName"
+    );
+
+    const { currentDb, serverName } = id.recordset[0];
+    const envDb = process.env.SQL_DATABASE || process.env.DB_DATABASE || process.env.DB_NAME || 'ShahuMumbai';
+    const fqnCurrent = `[${currentDb}].[dbo].[Orders]`;
+    const fqnEnv     = `[${envDb}].[dbo].[Orders]`;
+
+    const count = async (fqn) => {
+      const q = `
+        IF OBJECT_ID('${fqn}','U') IS NOT NULL
+          SELECT COUNT(*) AS c FROM ${fqn} WITH (NOLOCK)
+        ELSE
+          SELECT -1 AS c;
+      `;
+      const r = await req.db.request().query(q);
+      return r.recordset[0].c;
+    };
+
+    const count_currentDb = await count(fqnCurrent);
+    const count_envDb     = await count(fqnEnv);
+
+    let sample = [];
+    if (count_envDb > 0) {
+      const s = await req.db.request().query(
+        `SELECT TOP (3) OrderId, OrderNumber, CustomerName, Status, FulFillmentStatus, PlacedAt
+         FROM ${fqnEnv} WITH (NOLOCK)
+         ORDER BY PlacedAt DESC`
+      );
+      sample = s.recordset;
+    }
+
+    res.json({
+      ok: true,
+      serverName,
+      currentDb,
+      fqn_currentDb: fqnCurrent,
+      fqn_envDb: fqnEnv,
+      count_currentDb,
+      count_envDb,
+      sample
+    });
+  } catch (e) {
+    console.error('[diag] error', e);
+    res.status(500).json({ ok: false, error: e.message });
   }
 });
 
@@ -85,8 +132,7 @@ app.use(rateLimit({ windowMs: 30 * 60 * 1000, max: 1000 }));
 app.use(guestSession);
 app.use(optional);
 
-
-app.get('/health', (_req, res) => res.json({ ok: true }));
+// Mount Routes
 app.use('/api/auth', authRoutes);
 app.use('/api', productRoutes);
 app.use('/api', categoryRoutes);
@@ -104,13 +150,16 @@ app.use('/api', cartRoutes);
 app.use('/api', analyticsRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', checkoutRoutes);
-app.use('/api/orders', ordersRoutes);
+app.use('/api/orders', (req, _res, next) => {
+  console.log('[router:/api/orders]', req.method, req.url);
+  next();
+}, ordersRoutes);
 app.use('/api', contactUsRoutes);
 app.use('/api', teamMembersRoutes);
 app.use('/api', collectionsRoutes);
 app.use('/api', subscriberRoutes);
 app.use('/api', wishlistRoutes);
-app.use('/api/payments', paymentsRoutes); 
+app.use('/api/payments', paymentsRoutes);
 app.use('/api', heritageRoutes);
 app.use('/api', standaloneRoutes);
 app.use('/api', waitlistRoutes);
@@ -122,6 +171,6 @@ app.listen(PORT, () => {
 
 process.on('SIGTERM', async () => {
   console.log('Shutting down...');
-  if (pool) await pool.close();
+  if (dbPool.close) await dbPool.close();
   process.exit(0);
 });

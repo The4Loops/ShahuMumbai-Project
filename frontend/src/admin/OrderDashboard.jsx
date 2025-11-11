@@ -6,6 +6,57 @@ import { toast } from "react-toastify";
 const STATUS = ["All", "Pending", "Shipped", "Delivered"];
 const CARRIERS = ["Other", "FedEx", "UPS", "USPS", "DHL", "BlueDart", "Delhivery"];
 
+function normalizeOrder(row, idx = 0) {
+  // id (robust fallbacks)
+  const id =
+    row?.id ??
+    row?.OrderNumber ??
+    row?.order_id ??
+    (row?.OrderId ? String(row.OrderId) : undefined) ??
+    (row?.invoice ?? row?.number) ??                // extra safety
+    `ROW-${idx}`;                                   // last resort
+
+  // customer string
+  const customerStr =
+    typeof row?.customer === "string"
+      ? row.customer
+      : row?.customer?.name || row?.CustomerName || row?.CustomerEmail || "Guest";
+
+  // status in TitleCase for badge
+  const rawStatus = row?.status ?? row?.FulFillmentStatus ?? "pending";
+  const status = rawStatus ? rawStatus.replace(/^\w/, (c) => c.toUpperCase()) : "Pending";
+
+  // dates
+  const placed_at = row?.placed_at ?? row?.occurred_at ?? row?.PlacedAt ?? null;
+  const shipped_at = row?.ShippedAt ?? row?.shipped_at ?? null;
+  const delivered_at = row?.DeliveredAt ?? row?.delivered_at ?? null;
+
+  // money
+  const subtotal = row?.SubTotal ?? row?.subtotal ?? row?.total ?? 0;
+
+  return {
+    id,
+    customer: customerStr,
+    status,
+    placed_at,
+    shipped_at,
+    delivered_at,
+    subtotal,
+    shipping: row?.ShippingTotal ?? 0,
+    tax: row?.TaxTotal ?? 0,
+    currency: row?.Currency ?? "INR",
+    TrackingNumber: row?.TrackingNumber ?? null,
+    Carrier: row?.Carrier ?? null,
+    items: row?.items ?? [],
+  };
+}
+
+
+// Helper to ignore intentional cancellations from AbortController/Axios
+function isCanceled(e) {
+  return e?.code === "ERR_CANCELED" || e?.name === "CanceledError" || e?.message === "canceled";
+}
+
 export default function OrderDashboard() {
   const [active, setActive] = useState("orders");
 
@@ -61,6 +112,7 @@ export default function OrderDashboard() {
 
   // === LOAD ORDERS (ONE CALL) ===
   const loadOrders = async () => {
+    // cancel prior in-flight request
     if (ordersAbortRef.current) ordersAbortRef.current.abort();
     const controller = new AbortController();
     ordersAbortRef.current = controller;
@@ -80,15 +132,18 @@ export default function OrderDashboard() {
       const res = await api.get(url, { signal: controller.signal });
       setLastResponseStatus(res.status);
 
-      const { orders = [], total = 0 } = res.data || {};
-      setOrders(orders);
+      const rawOrders = res?.data?.orders ?? [];
+      const mapped = rawOrders.map((r, i) => normalizeOrder(r, i));
+      const total = (typeof res?.data?.total === "number") ? res.data.total : mapped.length;
+
+      setOrders(mapped);
       setOrdersTotal(total);
 
-      toast.success(`Loaded ${orders.length} orders`);
+      toast.success(`Loaded ${mapped.length} orders`);
     } catch (e) {
-      if (e.name === "AbortError") return;
+      if (isCanceled(e)) return; // ✅ ignore cancellations
       console.error("[Orders] ERROR", e);
-      toast.error(e.response?.data?.error || e.message || "Failed to load orders");
+      toast.error(e?.response?.data?.error || e?.message || "Failed to load orders");
       setOrders([]);
       setOrdersTotal(0);
     } finally {
@@ -98,6 +153,7 @@ export default function OrderDashboard() {
 
   // === LOAD WAITLIST (ONE CALL) ===
   const loadWaitlist = async () => {
+    // cancel prior in-flight request
     if (waitlistAbortRef.current) waitlistAbortRef.current.abort();
     const controller = new AbortController();
     waitlistAbortRef.current = controller;
@@ -117,7 +173,7 @@ export default function OrderDashboard() {
       setWaitlist(items);
       setWlTotal(total);
     } catch (e) {
-      if (e.name === "AbortError") return;
+      if (isCanceled(e)) return; // ✅ ignore cancellations
       console.error("[Waitlist] ERROR", e);
       toast.error("Failed to load waitlist");
       setWaitlist([]);
@@ -128,13 +184,33 @@ export default function OrderDashboard() {
   };
 
   // === EFFECTS ===
+  // Debounced orders loader (prevents spam while typing)
   useEffect(() => {
-    if (active === "orders") loadOrders();
+    if (active !== "orders") return;
+    const t = setTimeout(() => {
+      loadOrders();
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, filter, query, ordersOffset]);
 
+  // Debounced waitlist loader
   useEffect(() => {
-    if (active === "waitlist") loadWaitlist();
+    if (active !== "waitlist") return;
+    const t = setTimeout(() => {
+      loadWaitlist();
+    }, 300);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active, wlQuery, wlPage]);
+
+  // Cleanup pending requests on unmount or tab switch
+  useEffect(() => {
+    return () => {
+      if (ordersAbortRef.current) ordersAbortRef.current.abort();
+      if (waitlistAbortRef.current) waitlistAbortRef.current.abort();
+    };
+  }, []);
 
   // === PAGINATION ===
   const wlPages = Math.max(1, Math.ceil(wlTotal / wlPageSize));
@@ -187,7 +263,24 @@ export default function OrderDashboard() {
           </button>
         </div>
       )}
+      {active === "orders" && debugOpen && orders.length > 0 && (
+        <div className="mb-2 text-xs text-[#6B4226]">
+          <div><b>Preview IDs:</b> {orders.slice(0,5).map(o => o.id).join(", ")}</div>
+          <div><b>First row:</b> <code>{JSON.stringify(orders[0])}</code></div>
+        </div>
+      )}
 
+      <div className="mb-3 p-2 text-xs border rounded bg-[#FFF9F6] text-[#6B4226]">
+        <div><b>orders.length:</b> {orders.length}</div>
+        {orders.length > 0 && (
+          <>
+            <div><b>first.id:</b> {String(orders[0].id)}</div>
+            <div><b>first.customer:</b> {typeof orders[0].customer === "string" ? orders[0].customer : (orders[0].customer?.name || orders[0].customer?.email || "Guest")}</div>
+            <div><b>first.status:</b> {orders[0].status}</div>
+            <div><b>first.placed_at:</b> {String(orders[0].placed_at || "—")}</div>
+          </>
+        )}
+      </div>
       {/* === ORDERS === */}
       {active === "orders" && (
         <>
@@ -224,9 +317,8 @@ export default function OrderDashboard() {
               <thead>
                 <tr className="bg-[#F1E7E5] text-[#6B4226]">
                   <th className="p-3 text-left">Order ID</th>
-                  <th className="p-3 text-left">Customer Name</th>
-                  <th className="p-3 text-left">Carrire Name</th>
-                  <th className="p-3 text-left">Tracking</th>
+                  <th className="p-3 text-left">Customer</th>
+                  <th className="p-3 text-left">Tracking / Carrier</th>
                   <th className="p-3 text-center">Status</th>
                 </tr>
               </thead>
@@ -238,14 +330,19 @@ export default function OrderDashboard() {
                   return (
                     <tr key={order.id} className="border-t border-[#E6DCD2]">
                       <td className="p-3 text-[#6B4226]">{order.id}</td>
-                      <td className="p-3 text-[#6B4226]">{order.customer}</td>
+                      <td className="p-3 text-[#6B4226]">
+                        {/* Show customer name if object, else string */}
+                        {typeof order.customer === "string"
+                          ? order.customer
+                          : (order.customer?.name || order.customer?.email || "Guest")}
+                      </td>
                       <td className="p-3 text-[#6B4226]">
                         <div className="flex items-center gap-2">
                           <input
                             value={d.trackingNumber}
                             onChange={(e) => setDraft(order.id, { trackingNumber: e.target.value })}
                             placeholder="Tracking"
-            className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm w-40"
+                            className="rounded-md px-2 py-1 border border-[#E6DCD2] text-sm w-40"
                             disabled={disabled}
                           />
                           <select
@@ -281,7 +378,7 @@ export default function OrderDashboard() {
                                 );
                                 toast.success("Tracking saved");
                               } catch (e) {
-                                toast.error("Failed to save");
+                                if (!isCanceled(e)) toast.error("Failed to save");
                               } finally {
                                 setSavingRow(null);
                               }
@@ -326,7 +423,7 @@ export default function OrderDashboard() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="grid grid-cols-1 gap-3 md:hidden">
+          <div className="grid grid-cols-1 gap-3">
             {orders.map((order) => {
               const d = getDraft(order);
               const disabled = savingRow === order.id;
@@ -336,7 +433,11 @@ export default function OrderDashboard() {
                   <div className="flex justify-between items-start">
                     <div>
                       <p className="font-semibold text-[#6B4226]">{order.id}</p>
-                      <p className="text-sm text-[#6B4226]/70">{order.customer}</p>
+                      <p className="text-sm text-[#6B4226]/70">
+                        {typeof order.customer === "string"
+                          ? order.customer
+                          : (order.customer?.name || order.customer?.email || "Guest")}
+                      </p>
                     </div>
                     <span
                       className={`px-2.5 py-1 rounded-full text-xs font-medium ${
@@ -394,8 +495,8 @@ export default function OrderDashboard() {
                             )
                           );
                           toast.success("Saved");
-                        } catch {
-                          toast.error("Failed");
+                        } catch (e) {
+                          if (!isCanceled(e)) toast.error("Failed");
                         } finally {
                           setSavingRow(null);
                         }
@@ -448,7 +549,7 @@ export default function OrderDashboard() {
 
           {wlLoading && <div className="p-3 text-sm text-[#6B4226]/70">Loading…</div>}
 
-          <div className="hidden md:block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
+          <div className="block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
             <table className="w-full table-auto">
               <thead>
                 <tr className="bg-[#F1E7E5] text-[#6B4226]">
@@ -514,4 +615,4 @@ export default function OrderDashboard() {
       )}
     </div>
   );
-} 
+}

@@ -5,59 +5,42 @@ const currentCartOwner = require('../utils/currentCartOwner');
 /* GET /api/orders?status=All|Pending|Shipped|Delivered&q=&limit=50&offset=0 */
 exports.listOrders = async (req, res) => {
   try {
-    const { status = 'All', q = '', limit: limitStr = '50', offset: offsetStr = '0' } = req.query;
-    const limit = Math.min(Math.max(parseInt(limitStr, 10) || 50, 1), 100);
-    const offset = Math.max(parseInt(offsetStr, 10) || 0, 0);
+    // kill caching completely
+    res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    res.set('Pragma', 'no-cache');
+    res.set('Expires', '0');
+    res.set('Surrogate-Control', 'no-store');
 
-    const parameters = [];
-    const whereConditions = [];
+    // ---- loud proof logs
+    console.log('[listOrders] HIT', { url: req.originalUrl, query: req.query });
+    const id = await req.db.request().query("SELECT DB_NAME() AS currentDb, @@SERVERNAME AS serverName");
+    const { currentDb, serverName } = id.recordset[0];
+    console.log('[listOrders] server/db:', serverName, currentDb);
 
-    if (status && status !== 'All') {
-      const normalizedStatus = String(status).toLowerCase();
-      if (!['pending', 'shipped', 'delivered'].includes(normalizedStatus)) {
-        return res.status(400).json({ error: 'invalid_status' });
-      }
-      whereConditions.push('FulFillmentStatus = @status');
-      parameters.push({ name: 'status', type: sql.NVarChar, value: normalizedStatus });
-    }
-
-    if (q) {
-      whereConditions.push('(OrderNumber LIKE @q OR CustomerName LIKE @q)');
-      parameters.push({ name: 'q', type: sql.NVarChar, value: `%${q}%` });
-    }
-
-    const whereClause = whereConditions.length > 0 ? ' WHERE ' + whereConditions.join(' AND ') : '';
-
-    const query = `
-      SELECT 
-        OrderId,
-        OrderNumber,
-        CustomerName,
-        CustomerEmail,
-        FulFillmentStatus,
-        PlacedAt,
-        TrackingNumber,
-        Carrier,
-        ShippedAt
-      FROM dbo.Orders
-      ${whereClause}
-      ORDER BY PlacedAt DESC
-      OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
+    // ---- ZERO-FILTER, DIRECT SELECT from the DB we proved has rows
+    const q = `
+      SELECT TOP (50)
+        o.OrderId,
+        o.OrderNumber,
+        o.CustomerName,
+        o.CustomerEmail,
+        COALESCE(NULLIF(o.FulFillmentStatus,''), o.Status) AS FulFillmentStatus,
+        o.PlacedAt,
+        o.TrackingNumber,
+        o.Carrier,
+        o.ShippedAt
+      FROM [ShahuMumbai].[dbo].[Orders] AS o WITH (NOLOCK)
+      ORDER BY o.PlacedAt DESC;
     `;
+    console.log('[listOrders] running SQL:\n', q);
 
-    const request = req.db.request();
-    parameters.forEach(p => request.input(p.name, p.type, p.value));
-    request.input('offset', sql.Int, offset);
-    request.input('limit', sql.Int, limit);
-    const result = await request.query(query);
+    const rs = await req.db.request().query(q);
+    console.log('[listOrders] rowcount:', rs.recordset?.length ?? 0);
 
-    const countQuery = `SELECT COUNT(*) AS total FROM dbo.Orders${whereClause}`;
-    const countRequest = req.db.request();
-    parameters.forEach(p => countRequest.input(p.name, p.type, p.value));
-    const countResult = await countRequest.query(countQuery);
-    const total = countResult.recordset[0].total;
+    const rows = rs.recordset || [];
 
-    const orders = result.recordset.map(o => ({
+    // map to UI shape (simple)
+    const orders = rows.map((o) => ({
       id: o.OrderNumber,
       customer: o.CustomerName || o.CustomerEmail || 'Guest',
       status: (o.FulFillmentStatus || 'pending').replace(/^\w/, c => c.toUpperCase()),
@@ -67,12 +50,18 @@ exports.listOrders = async (req, res) => {
       ShippedAt: o.ShippedAt || null,
     }));
 
-    return res.json({ orders, total });
+    // include debug so we *know* this handler responded
+    return res.status(200).json({
+      orders,
+      total: rows.length,
+      debug: { serverName, currentDb, controller: __filename, rowcount: rows.length }
+    });
   } catch (e) {
     console.error('orders.listOrders error:', e);
-    return res.status(500).json({ error: 'internal_error' });
+    return res.status(500).json({ error: 'internal_error', detail: e.message });
   }
 };
+
 
 /* PATCH /api/orders/:orderNumber/status */
 exports.updateFulfillmentStatus = async (req, res) => {
@@ -287,3 +276,4 @@ exports.getUserOrders = async (req, res) => {
     return res.status(500).json({ error: 'internal_error' });
   }
 };
+
