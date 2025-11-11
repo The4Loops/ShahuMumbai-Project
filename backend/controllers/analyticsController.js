@@ -240,19 +240,22 @@ exports.getSalesReport = async (req, res) => {
     if (paidIds.length) {
       const r = await req.db.request().query(`
         SELECT
-          MAX(ProductId) AS id,
-          MAX(ProductTitle) AS name,
-          SUM(TRY_CONVERT(int, qty)) AS sales
+          MAX(Products.ProductId) AS id,
+          MAX(OrderItems.ProductTitle) AS name,
+          ProductImages.ImageUrl AS image,
+          SUM(TRY_CONVERT(int, OrderItems.qty)) AS sales
         FROM OrderItems
-        WHERE OrderId IN (${paidIds.map(id => `'${id}'`).join(',')})
-        GROUP BY COALESCE(CAST(ProductId AS NVARCHAR(64)), CONCAT('title:', COALESCE(ProductTitle, 'Untitled')))
+        Inner Join Products ON OrderItems.ProductId = Products.ProductId
+        Inner Join ProductImages ON Products.ProductId = ProductImages.ProductId
+        WHERE ProductImages.IsHero='Y' and OrderId IN (${paidIds.map(id => `'${id}'`).join(',')})
+        GROUP BY COALESCE(CAST(Products.ProductId AS NVARCHAR(64)), CONCAT('title:', COALESCE(OrderItems.ProductTitle, 'Untitled'))),ProductImages.ImageUrl
         ORDER BY sales DESC
         OFFSET 0 ROWS FETCH NEXT 6 ROWS ONLY;
       `);
       topProducts = (r.recordset || []).map(x => ({
         id: x.id,
         name: x.name || 'Untitled',
-        image: null,
+        image: x.image,
         sales: Number(x.sales || 0),
       }));
     }
