@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { jwtDecode } from "jwt-decode";
 import {
   // FaFacebookF,
@@ -10,8 +10,10 @@ import Layout from "../layout/Layout";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
+import { useLoading } from "../context/LoadingContext";
 
 function ContactPage() {
+  const { setLoading } = useLoading();
   const token = localStorage.getItem("token");
   let decoded = {};
   if (token) {
@@ -22,6 +24,16 @@ function ContactPage() {
       localStorage.removeItem("token");
     }
   }
+
+  useEffect(() => {
+    setLoading(true);
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [setLoading]);
 
   const [form, setForm] = useState({
     name: decoded.fullname || "",
@@ -36,6 +48,7 @@ function ContactPage() {
   };
 
   const handleSubmit = async (e) => {
+    setLoading(true);
     e.preventDefault();
     if (!form.name || !form.email || !form.message) {
       toast.error("Please fill in all required fields.");
@@ -59,11 +72,14 @@ function ContactPage() {
         subject: "",
         message: "",
       });
+      setLoading(false);
     } catch (error) {
       toast.dismiss();
       toast.error(error.response?.data?.error || "Failed to send message.");
+      setLoading(false);
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 

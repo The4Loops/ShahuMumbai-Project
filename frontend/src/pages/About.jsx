@@ -1,7 +1,7 @@
 import { useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import Layout from "../layout/Layout";
-
+import { useLoading } from "../context/LoadingContext";
 import Challange from "../assets/About/Challange.png";
 import Roots from "../assets/About/Roots.png";
 import Craft from "../assets/About/Craft.png";
@@ -16,6 +16,18 @@ const AnimatedSection = ({ children, className = "" }) => (
 );
 
 function About() {
+  const { setLoading } = useLoading();
+
+  useEffect(() => {
+    setLoading(true);
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [setLoading]);
+
   useEffect(() => {
     window.scrollTo(0, 0);
   }, []);
@@ -25,24 +37,6 @@ function About() {
       ? window.location.origin
       : "https://www.shahumumbai.com";
   const url = `${base}/about`;
-
-  const breadcrumbJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "Home", item: `${base}/` },
-      { "@type": "ListItem", position: 2, name: "About", item: url },
-    ],
-  };
-
-  const aboutPageJsonLd = {
-    "@context": "https://schema.org",
-    "@type": "AboutPage",
-    name: "About Shahu Mumbai",
-    url,
-    description:
-      "Shahu is a luxury fashion house rooted in India’s heritage and crafted sustainably by contemporary artisans.",
-  };
 
   return (
     <Layout>

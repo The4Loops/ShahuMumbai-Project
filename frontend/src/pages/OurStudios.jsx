@@ -6,11 +6,25 @@ import father from "../assets/OurStudios/Father.png";
 import widow from "../assets/OurStudios/widow.png";
 import mini from "../assets/OurStudios/bgmini.png";
 import { Helmet } from "react-helmet-async";
+import { useEffect } from "react";
+import { useLoading } from "../context/LoadingContext";
 
 function OurStudios() {
+  const { setLoading } = useLoading();
+
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const canonical = `${baseUrl}/ourstudios`;
+
+  useEffect(() => {
+      setLoading(true);
+  
+      const timer = setTimeout(() => {
+        setLoading(false);
+      }, 2000);
+  
+      return () => clearTimeout(timer);
+    }, [setLoading]);
 
   const breadcrumbJsonLd = {
     "@context": "https://schema.org",

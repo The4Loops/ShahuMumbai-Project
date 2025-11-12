@@ -8,6 +8,7 @@ import { FiFilter, FiChevronDown, FiX, FiSearch } from "react-icons/fi";
 import { Helmet } from "react-helmet-async";
 import { motion, AnimatePresence } from "framer-motion";
 import { useCurrency } from "../supabase/CurrencyContext";
+import { useLoading } from "../context/LoadingContext";
 
 const ITEMS_PER_PAGE = 30;
 const FALLBACK_CATEGORIES = ["Men", "Women", "Accessories"];
@@ -46,6 +47,7 @@ const pickImageUrl = (img) =>
 
 const useDebounced = (value, delay = 300) => {
   const [v, setV] = useState(value);
+
   useEffect(() => {
     const t = setTimeout(() => setV(value), delay);
     return () => clearTimeout(t);
@@ -56,7 +58,8 @@ const useDebounced = (value, delay = 300) => {
 const Products = () => {
   const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [allProducts, setAllProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useLoading();
+  const [loading, setLocalLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [search, setSearch] = useState("");
   const debouncedSearch = useDebounced(search, 400);
@@ -96,12 +99,19 @@ const Products = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
+      setLocalLoading(true);
+
+      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+
       const api = apiWithCurrency(currency);
       // Pass category name as query param if selectedCategories is not empty
       const category = searchParams.get("name") || Array.from(selectedCategories)[0] || "";
       const response = await api.get(`/api/products`, {
         params: { category: category || undefined, search: debouncedSearch || undefined },
       });
+
+      await minDelay;
+      
       const products = response.data || [];
 
       const mapped = products.map((p) => {
@@ -129,10 +139,11 @@ const Products = () => {
       setAllProducts([]);
     } finally {
       setLoading(false);
+      setLocalLoading(false);
     }
   };
 
-  useEffect(() => {
+ useEffect(() => {
     if (!currencyLoading) {
       fetchProducts();
     }

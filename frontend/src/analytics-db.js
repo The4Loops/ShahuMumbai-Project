@@ -25,13 +25,13 @@ function getUTM() {
 
 // Primary transport: axios
 async function sendViaAxios(payload) {
-  return api.post("/api/analytics/track", payload);
+  return api.post("/api/track", payload);
 }
 
 // Fallback: Beacon (non-blocking, survives unload)
 function sendViaBeacon(payload) {
   try {
-    const url = (api.defaults.baseURL || "").replace(/\/$/, "") + "/api/analytics/track";
+    const url = (api.defaults.baseURL || "").replace(/\/$/, "") + "/api/track";
     const blob = new Blob([JSON.stringify(payload)], { type: "application/json" });
     return navigator.sendBeacon(url, blob);
   } catch {
@@ -49,11 +49,11 @@ export async function trackDB(name, properties = {}, userId = null) {
     utm: getUTM(),
     properties
   };
-
+  console.log("trackDB", payload);
   try {
     await sendViaAxios(payload);
-  } catch {
-    // try beacon silently
+  } catch(e) {
+    console.warn("trackDB axios failed",e);
     sendViaBeacon(payload);
   }
 }

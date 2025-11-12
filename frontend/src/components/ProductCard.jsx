@@ -11,6 +11,12 @@ const ProductCard = ({ product, currency }) => {
     }).format(value);
   };
 
+  const maxLength = 120;
+  const truncatedDescription =
+    description.length > maxLength
+      ? description.slice(0, maxLength).trim() + '…'
+      : description;
+
   return (
     <div className="bg-[#F9F5F0] border border-[#D4A5A5] rounded-xl shadow-[0_4px_10px_rgba(139,115,105,0.15)] p-5 relative overflow-hidden group transition-transform duration-300 hover:-translate-y-1">
       <Link to={`/products/${id}`} className="group">
@@ -28,7 +34,7 @@ const ProductCard = ({ product, currency }) => {
         <div className="flex flex-col gap-2 font-serif">
           <h3 className="text-2xl font-bold text-[#6B4226] tracking-wide">{name}</h3>
           <p className="text-sm italic text-[#A3B18A]">{category}</p>
-          <p className="text-[1rem] text-[#3E2C23] leading-relaxed">{description}</p>
+          <p className="text-[1rem] text-[#3E2C23] leading-relaxed">{truncatedDescription}</p>
           <p className="text-lg font-semibold text-[#6B4226] mt-1">
             {formatPrice(price, productCurrency || currency)}
           </p>

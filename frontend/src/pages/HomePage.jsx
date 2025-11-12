@@ -7,6 +7,7 @@ import Collections from "../components/Collections";
 import UpcomingProducts from "../components/UpcomingProduct";
 import { Link, useLocation } from "react-router-dom";
 import api from "../supabase/axios";
+import { useLoading } from "../context/LoadingContext";
 
 function HomePage() {
   const location = useLocation();
@@ -17,6 +18,7 @@ function HomePage() {
 
   // null = unknown (loading / network error), true/false = known
   const [hasUpcoming, setHasUpcoming] = useState(null);
+  const { setLoading } = useLoading();
 
   useEffect(() => {
     let alive = true;
@@ -24,6 +26,7 @@ function HomePage() {
     // We only need a quick check, not full data.
     // Strategy: fetch products & check if any have LaunchingDate in the future.
     const checkUpcoming = async () => {
+      setLoading(true);
       try {
         const { data } = await api.get("/api/products");
         if (!alive) return;
@@ -41,6 +44,8 @@ function HomePage() {
       } catch (e) {
         // Don’t block the page—fallback to rendering the normal component
         setHasUpcoming(null);
+      }finally {
+        if (alive) setLoading(false); // Always stop loading
       }
     };
 

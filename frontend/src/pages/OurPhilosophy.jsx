@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useEffect } from "react";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
+import { useLoading } from "../context/LoadingContext";
 
 function OurPhilosophy() {
   const beliefs = [
@@ -25,6 +26,18 @@ function OurPhilosophy() {
       icon: "♻️",
     },
   ];
+
+  const { setLoading } = useLoading();
+
+  useEffect(() => {
+      setLoading(true);
+  
+      const timer = setTimeout(() => {
+        setLoading(false);
+      }, 2000);
+  
+      return () => clearTimeout(timer);
+    }, [setLoading]);
 
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";

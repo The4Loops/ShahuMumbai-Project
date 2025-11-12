@@ -1,5 +1,7 @@
+import React,{ useEffect } from "react";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
+import { useLoading } from "../context/LoadingContext";
 
 const services = [
   {
@@ -41,6 +43,8 @@ const services = [
 ];
 
 function ServicePage() {
+  const { setLoading } = useLoading();
+
   const origin =
     typeof window !== "undefined"
       ? window.location.origin
@@ -67,6 +71,16 @@ function ServicePage() {
       },
     })),
   };
+
+  useEffect(() => {
+        setLoading(true);
+    
+        const timer = setTimeout(() => {
+          setLoading(false);
+        }, 2000);
+    
+        return () => clearTimeout(timer);
+      }, [setLoading]);
 
   const title =
     "Our Services — Personal Styling, Curation & Restoration | Shahu Mumbai";

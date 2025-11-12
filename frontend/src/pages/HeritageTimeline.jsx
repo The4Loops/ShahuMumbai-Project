@@ -1,54 +1,71 @@
-// src/pages/HeritageTimeline.jsx
-import React, { useState, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import Layout from "../layout/Layout";
 import { GiStoneCrafting, GiSpinningWheel } from "react-icons/gi";
 import { MdOutlineDiamond } from "react-icons/md";
 import { IoMdClose } from "react-icons/io";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
-import { useTranslation } from "react-i18next";
 import { Helmet } from "react-helmet-async";
+import { useLoading } from "../context/LoadingContext";
 
-// Images (keep your assets)
 import inspirationImg from "../assets/Heritage/inspiration.png";
 import celebratingImg from "../assets/Heritage/Celebrating.png";
 import modernImg from "../assets/Heritage/modern.png";
 
-const iconMap = [GiStoneCrafting, GiSpinningWheel, MdOutlineDiamond];
-const colorMap = [
-  { titleColor: "text-amber-700", dotColor: "bg-amber-700" },
-  { titleColor: "text-red-600", dotColor: "bg-red-600" },
-  { titleColor: "text-blue-600", dotColor: "bg-blue-600" },
+const milestones = [
+  {
+    year: "1800s",
+    title: "Roots in Craft",
+    description:
+      "The tradition of handweaving in India traces back centuries, with artisans perfecting techniques passed down through generations.",
+    Icon: GiStoneCrafting,
+    image: inspirationImg,
+    titleColor: "text-amber-700",
+    dotColor: "bg-amber-700",
+  },
+  {
+    year: "1950s",
+    title: "Revival of the Loom",
+    description:
+      "Post-independence, master weavers revived ancient patterns, blending heritage with renewed pride in Indian textiles.",
+    Icon: GiSpinningWheel,
+    image: celebratingImg,
+    titleColor: "text-red-600",
+    dotColor: "bg-red-600",
+  },
+  {
+    year: "2020s",
+    title: "Modern Legacy",
+    description:
+      "Shahu Mumbai brings timeless craftsmanship into contemporary wardrobes — sustainable, ethical, and proudly handwoven.",
+    Icon: MdOutlineDiamond,
+    image: modernImg,
+    titleColor: "text-blue-600",
+    dotColor: "bg-blue-600",
+  },
 ];
-const imageMap = [inspirationImg, celebratingImg, modernImg];
 
 export default function HeritageTimeline() {
-  const { t } = useTranslation();
-
-  // milestones come from i18n array: heritage.milestones
-  const milestones = useMemo(() => {
-    const data = t("heritage.milestones", { returnObjects: true }) || [];
-    return data.map((item, idx) => ({
-      year: item.year,
-      title: item.title,
-      description: item.description,
-      Icon: iconMap[idx % iconMap.length],
-      image: imageMap[idx % imageMap.length],
-      ...colorMap[idx % colorMap.length],
-    }));
-  }, [t]);
-
+  const { setLoading } = useLoading();
   const [activeIndex, setActiveIndex] = useState(null);
+
+  useEffect(() => {
+    setLoading(true);
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [setLoading]);
 
   const handleNext = () => {
     setActiveIndex((prev) => (prev + 1) % milestones.length);
   };
+
   const handlePrev = () => {
-    setActiveIndex((prev) =>
-      prev === 0 ? milestones.length - 1 : prev - 1
-    );
+    setActiveIndex((prev) => (prev === 0 ? milestones.length - 1 : prev - 1));
   };
 
-  // --- SEO (invisible only) ---
   const baseUrl =
     typeof window !== "undefined"
       ? window.location.origin
@@ -60,7 +77,12 @@ export default function HeritageTimeline() {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
-      { "@type": "ListItem", position: 2, name: "Heritage Timeline", item: canonical },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Heritage Timeline",
+        item: canonical,
+      },
     ],
   };
 
@@ -139,7 +161,11 @@ export default function HeritageTimeline() {
             url: canonical,
             description:
               "Explore Shahu Mumbai’s heritage timeline—key inspirations, craftsmanship milestones, and modern evolutions across the years.",
-            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
+            isPartOf: {
+              "@type": "WebSite",
+              name: "Shahu Mumbai",
+              url: baseUrl,
+            },
             mainEntity: itemListJsonLd,
           })}
         </script>
@@ -148,7 +174,7 @@ export default function HeritageTimeline() {
       <section className="bg-[#F1E7E5] py-16">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-4xl font-bold text-center mb-16 text-gray-800 tracking-wide">
-            {t("heritage.title")}
+            Our Heritage Timeline
           </h2>
 
           {/* Desktop Timeline */}
@@ -225,9 +251,7 @@ export default function HeritageTimeline() {
                     <time className="block text-sm text-gray-500 mb-1">
                       {item.year}
                     </time>
-                    <h3
-                      className={`text-lg font-bold ${item.titleColor} mb-1`}
-                    >
+                    <h3 className={`text-lg font-bold ${item.titleColor} mb-1`}>
                       {item.title}
                     </h3>
                     <p className="text-gray-700 text-sm line-clamp-3">
