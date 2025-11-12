@@ -8,6 +8,7 @@ const storage = new CloudinaryStorage({
   params: {
     folder: "Uploads", // Cloudinary folder
     resource_type: "auto", // auto-detect image/video
+    secure: true
   },
 });
 
