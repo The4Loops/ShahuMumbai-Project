@@ -1,6 +1,7 @@
 const sql = require('mssql');
 const jwt = require('jsonwebtoken');
 const currentCartOwner = require('../utils/currentCartOwner');
+const nodemailer = require('nodemailer');
 
 /* GET /api/orders?status=All|Pending|Shipped|Delivered&q=&limit=50&offset=0 */
 exports.listOrders = async (req, res) => {
@@ -125,6 +126,7 @@ exports.updateTracking = async (req, res) => {
   try {
     const orderNumber = req.params.orderNumber;
     const { trackingNumber, carrier } = req.body || {};
+
     if (!orderNumber) return res.status(400).json({ error: 'missing_order_number' });
     if (!trackingNumber || typeof trackingNumber !== 'string' || trackingNumber.trim().length === 0) {
       return res.status(400).json({ error: 'invalid_tracking_number' });
@@ -140,31 +142,91 @@ exports.updateTracking = async (req, res) => {
     request.input('now', sql.DateTime2, new Date());
 
     const query = `
+      DECLARE @UpdatedOrders TABLE (
+        OrderId INT,
+        OrderNumber NVARCHAR(100),
+        TrackingNumber NVARCHAR(100),
+        Carrier NVARCHAR(50),
+        FulFillmentStatus NVARCHAR(50),
+        ShippedAt DATETIME2,
+        UpdatedAt DATETIME2,
+        Email NVARCHAR(255)
+      );
+
       UPDATE dbo.Orders
-      SET TrackingNumber   = @trackingNumber,
-          Carrier          = @carrier,
-          FulFillmentStatus= CASE WHEN FulFillmentStatus = 'delivered' THEN 'delivered' ELSE 'shipped' END,
-          ShippedAt        = ISNULL(ShippedAt, @now),
-          UpdatedAt        = @now
-      OUTPUT INSERTED.OrderId,
-             INSERTED.OrderNumber,
-             INSERTED.CustomerName,
-             INSERTED.FulFillmentStatus,
-             INSERTED.TrackingNumber,
-             INSERTED.Carrier,
-             INSERTED.ShippedAt
-      WHERE OrderNumber = @orderNumber
+      SET 
+          TrackingNumber    = @trackingNumber,
+          Carrier           = @carrier,
+          FulFillmentStatus = CASE WHEN FulFillmentStatus = 'delivered' THEN 'delivered' ELSE 'shipped' END,
+          ShippedAt         = ISNULL(ShippedAt, @now),
+          UpdatedAt         = @now
+      OUTPUT 
+          inserted.OrderId,
+          inserted.OrderNumber,
+          inserted.TrackingNumber,
+          inserted.Carrier,
+          inserted.FulFillmentStatus,
+          inserted.ShippedAt,
+          inserted.UpdatedAt,
+          inserted.CustomerEmail AS Email
+      INTO @UpdatedOrders
+      WHERE OrderNumber = @orderNumber;
+
+      SELECT * FROM @UpdatedOrders;
     `;
+
     const result = await request.query(query);
-    if (!result.rowsAffected || result.rowsAffected[0] === 0) {
-      return res.status(404).json({ error: 'Order not found' });
+
+    if (!result.recordset || result.recordset.length === 0) {
+      return res.status(404).json({ error: 'order_not_found' });
     }
+
+    const moduleResult = await req.db.request()
+      .input('mailtype', sql.NVarChar, 'OrderTracking')
+      .query('SELECT mailsubject, maildescription FROM module WHERE mailtype = @mailtype');
+
+    const module = moduleResult.recordset[0];
+
+    if (!module) {
+      return res.status(400).json({ error: 'Order tracking email template not found' });
+    }
+
+    let mailContent = module.maildescription.replace(/#trackingId/g, trackingNumber);
+
+    const plainTextContent = `
+      Thank you for your purchase from Shahu Mumbai!
+      Your Tracking Id: ${trackingNumber}
+      Use this ID to track your order: https://shahumumbai.com/myorder
+      Keep this token secure. Do not share it with anyone.
+      Need help? Contact us at shahumumbai@gmail.com
+      Shahu Mumbai — Mumbai, India
+    `.trim();
+
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to: result.recordset[0].Email,
+      subject: module.mailsubject,
+      html: mailContent,
+      text: plainTextContent,
+    };
+
+    await transporter.sendMail(mailOptions);
+
     return res.json({ ok: true, order: result.recordset[0] });
   } catch (e) {
     console.error('orders.updateTracking error:', e);
     return res.status(500).json({ error: 'internal_error' });
   }
 };
+
 
 /* GET /api/user/orders (Bearer) */
 exports.getUserOrders = async (req, res) => {
