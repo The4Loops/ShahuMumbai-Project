@@ -147,7 +147,7 @@ app.use('/api', roleRoutes);
 app.use('/api', menuRoutes);
 app.use('/api', blogRoutes);
 app.use('/api', cartRoutes);
-app.use('/api', analyticsRoutes);
+app.use('/api/analytics', analyticsRoutes);
 app.use('/api', dashboardRoutes);
 app.use('/api', checkoutRoutes);
 app.use('/api/orders',ordersRoutes);

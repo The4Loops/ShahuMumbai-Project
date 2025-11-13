@@ -15,6 +15,7 @@ import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
 import { useCurrency } from "../supabase/CurrencyContext";
+import { trackDB } from "../analytics-db"; // 🔹 DB tracking
 
 // ---------- helpers ----------
 const asBool = (v) =>
@@ -162,7 +163,11 @@ const ProductDetails = () => {
   const token = localStorage.getItem("token");
   let decoded = "";
   if (token) {
-    try { decoded = jwtDecode(token); } catch { decoded = ""; }
+    try {
+      decoded = jwtDecode(token);
+    } catch {
+      decoded = "";
+    }
   }
   const userid = decoded?.id;
   const fullName = decoded?.fullname || "Anonymous";
@@ -360,14 +365,32 @@ const ProductDetails = () => {
       );
 
       try {
+        const price = getSalePrice(product);
+
+        // GA e-com
         Ecom.addToCart({
           id: product.ProductId,
           title: product.Name,
           category: categoryName(product),
-          price: getSalePrice(product),
+          price,
           quantity: qty,
           currency: "INR",
         });
+
+        // 🔹 DB analytics: add_to_cart
+        trackDB(
+          "add_to_cart",
+          {
+            product_id: product.ProductId,
+            title: product.Name,
+            category: categoryName(product),
+            price,
+            quantity: qty,
+            value: price * qty,
+            source: "product_details_add_to_cart",
+          },
+          userid || null
+        );
       } catch {}
     } catch (e) {
       toast.dismiss();
@@ -394,12 +417,13 @@ const ProductDetails = () => {
       setBuyNowSubmitting(true);
 
       const salePrice = getSalePrice(product);
+      const quantity = Number(qty || 1);
       const items = [
         {
           product_id: product.ProductId,
           product_title: product.Name,
           unit_price: Number(Number(salePrice).toFixed(2)), // client hint; server recalcs
-          qty: Number(qty || 1),
+          qty: quantity,
         },
       ];
 
@@ -412,11 +436,26 @@ const ProductDetails = () => {
               title: product.Name,
               category: categoryName(product),
               price: salePrice,
-              quantity: Number(qty || 1),
+              quantity,
               currency: "INR",
             },
           ],
           "buy_now"
+        );
+
+        // 🔹 DB analytics: begin_checkout
+        trackDB(
+          "begin_checkout",
+          {
+            product_id: product.ProductId,
+            title: product.Name,
+            category: categoryName(product),
+            price: salePrice,
+            quantity,
+            value: salePrice * quantity,
+            source: "product_details_buy_now",
+          },
+          userid || null
         );
       } catch {}
 
@@ -443,16 +482,36 @@ const ProductDetails = () => {
           discount_total: 0,
           status: "pending",
           payment_status: "unpaid",
-          meta: { transaction_token: transactionToken, source: "product_details_buy_now" },
+          meta: {
+            transaction_token: transactionToken,
+            source: "product_details_buy_now",
+          },
         }),
       });
 
       const orderText = await orderResp.text();
       let orderJson;
-      try { orderJson = JSON.parse(orderText); } catch { orderJson = { ok: false, error: "non_json_response", raw: orderText }; }
+      try {
+        orderJson = JSON.parse(orderText);
+      } catch {
+        orderJson = { ok: false, error: "non_json_response", raw: orderText };
+      }
       if (!orderResp.ok || !orderJson?.ok || !orderJson?.order_number) {
         console.error("Order create failed", orderJson);
         toast.error("Unable to create order. Please try again.");
+
+        // 🔹 DB analytics: checkout_failed (order_create)
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "order_create",
+            reason: orderJson?.error || orderResp.status,
+            product_id: product.ProductId,
+            title: product.Name,
+            value: salePrice * quantity,
+          },
+          userid || null
+        );
         return;
       }
       const orderNumber = orderJson.order_number;
@@ -466,10 +525,31 @@ const ProductDetails = () => {
       });
       const rpText = await rpResp.text();
       let rpJson;
-      try { rpJson = JSON.parse(rpText); } catch { rpJson = { error: "non_json_response", raw: rpText }; }
+      try {
+        rpJson = JSON.parse(rpText);
+      } catch {
+        rpJson = { error: "non_json_response", raw: rpText };
+      }
       if (!rpResp.ok || !rpJson?.rzp?.order_id) {
         console.error("Razorpay order creation failed", rpJson);
-        toast.error(`Unable to start payment: ${rpJson?.message || rpJson?.error || rpResp.status}`);
+        toast.error(
+          `Unable to start payment: ${
+            rpJson?.message || rpJson?.error || rpResp.status
+          }`
+        );
+
+        // 🔹 DB analytics: checkout_failed (create_razorpay)
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "create_razorpay",
+            reason: rpJson?.message || rpJson?.error || rpResp.status,
+            product_id: product.ProductId,
+            title: product.Name,
+            value: salePrice * quantity,
+          },
+          userid || null
+        );
         return;
       }
 
@@ -477,6 +557,19 @@ const ProductDetails = () => {
       const loaded = await loadRazorpay();
       if (!loaded) {
         toast.error("Razorpay failed to load. Check your network/CSP.");
+
+        // 🔹 DB analytics: checkout_failed (razorpay_load)
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "razorpay_load",
+            reason: "script_load_failed",
+            product_id: product.ProductId,
+            title: product.Name,
+            value: salePrice * quantity,
+          },
+          userid || null
+        );
         return;
       }
 
@@ -500,24 +593,50 @@ const ProductDetails = () => {
             });
             const vText = await v.text();
             let vr;
-            try { vr = JSON.parse(vText); } catch { vr = { ok: false, error: "non_json_response", raw: vText }; }
+            try {
+              vr = JSON.parse(vText);
+            } catch {
+              vr = { ok: false, error: "non_json_response", raw: vText };
+            }
 
             if (v.ok && vr.ok) {
               try {
+                const txId = vr.order_number || orderNumber || transactionToken;
+
                 Ecom.purchase({
-                  transactionId: vr.order_number || orderNumber || transactionToken,
-                  items: [{
-                    id: product.ProductId,
-                    title: product.Name,
-                    category: categoryName(product),
-                    price: salePrice,
-                    quantity: Number(qty || 1),
-                    currency: "INR",
-                  }],
-                  value: salePrice * Number(qty || 1),
+                  transactionId: txId,
+                  items: [
+                    {
+                      id: product.ProductId,
+                      title: product.Name,
+                      category: categoryName(product),
+                      price: salePrice,
+                      quantity,
+                      currency: "INR",
+                    },
+                  ],
+                  value: salePrice * quantity,
                   tax: 0,
                   shipping: 0,
                 });
+
+                // 🔹 DB analytics: purchase
+                trackDB(
+                  "purchase",
+                  {
+                    transaction_id: txId,
+                    product_id: product.ProductId,
+                    title: product.Name,
+                    category: categoryName(product),
+                    price: salePrice,
+                    quantity,
+                    value: salePrice * quantity,
+                    payment_id: response.razorpay_payment_id,
+                    payment_order_id: response.razorpay_order_id,
+                    source: "product_details_buy_now",
+                  },
+                  userid || null
+                );
               } catch {}
 
               // 🎉 Thank-you modal (NO redirect)
@@ -526,10 +645,36 @@ const ProductDetails = () => {
               setThankOpen(true);
             } else {
               toast.error(vr?.message || "Payment verification failed");
+
+              // 🔹 DB analytics: checkout_failed (verify)
+              trackDB(
+                "checkout_failed",
+                {
+                  stage: "verify",
+                  reason: vr?.message || vr?.error || "verify_failed",
+                  product_id: product.ProductId,
+                  title: product.Name,
+                  value: salePrice * quantity,
+                },
+                userid || null
+              );
             }
           } catch (e) {
             console.error("Verify error:", e);
             toast.error("Payment verification failed");
+
+            // 🔹 DB analytics: checkout_failed (verify_exception)
+            trackDB(
+              "checkout_failed",
+              {
+                stage: "verify_exception",
+                reason: String(e?.message || e),
+                product_id: product.ProductId,
+                title: product.Name,
+                value: salePrice * quantity,
+              },
+              userid || null
+            );
           }
         },
         modal: { ondismiss: () => console.log("Razorpay modal closed") },
@@ -539,6 +684,23 @@ const ProductDetails = () => {
     } catch (err) {
       console.error("Buy Now error:", err);
       toast.error("Could not start payment. Please try again.");
+
+      // 🔹 DB analytics: checkout_failed (client_error)
+      try {
+        const salePrice = getSalePrice(product);
+        const quantity = Number(qty || 1);
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "client_error",
+            reason: String(err?.message || err),
+            product_id: product.ProductId,
+            title: product.Name,
+            value: salePrice * quantity,
+          },
+          userid || null
+        );
+      } catch {}
     } finally {
       setBuyNowSubmitting(false);
     }
@@ -562,7 +724,9 @@ const ProductDetails = () => {
   if (error) {
     return (
       <Layout>
-        <Helmet><title>Error - Shahu Mumbai</title></Helmet>
+        <Helmet>
+          <title>Error - Shahu Mumbai</title>
+        </Helmet>
         <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5]">
           <p className="p-6 text-center text-red-500">{error}</p>
         </div>
@@ -577,16 +741,29 @@ const ProductDetails = () => {
       <Layout>
         <Helmet>
           <title>{`${product.Name} — Coming Soon | Shahu Mumbai`}</title>
-          <meta name="description" content={`Coming soon: ${product.Name} from Shahu Mumbai.`} />
+          <meta
+            name="description"
+            content={`Coming soon: ${product.Name} from Shahu Mumbai.`}
+          />
           <link rel="canonical" href={canonical} />
-          <meta property="og:title" content={`${product.Name} — Coming Soon`} />
-          <meta property="og:description" content="Launching soon at Shahu Mumbai." />
+          <meta
+            property="og:title"
+            content={`${product.Name} — Coming Soon`}
+          />
+          <meta
+            property="og:description"
+            content="Launching soon at Shahu Mumbai."
+          />
         </Helmet>
 
         <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5] font-serif">
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-[#6B4226] mb-4">Coming Soon</h1>
-            <p className="text-lg text-[#3E2C23]">{product.Name} will be available soon!</p>
+            <h1 className="text-4xl font-bold text-[#6B4226] mb-4">
+              Coming Soon
+            </h1>
+            <p className="text-lg text-[#3E2C23]">
+              {product.Name} will be available soon!
+            </p>
             <p className="text-sm text-[#3E2C23] mt-2">
               Launching on:{" "}
               {new Date(product.LaunchingDate).toLocaleString("en-IN", {
@@ -602,11 +779,19 @@ const ProductDetails = () => {
   }
 
   const sliderSettings = {
-    dots: false, infinite: true, speed: 400, slidesToShow: 1, slidesToScroll: 1,
-    arrows: true, nextArrow: <NextArrow />, prevArrow: <PrevArrow />,
+    dots: false,
+    infinite: true,
+    speed: 400,
+    slidesToShow: 1,
+    slidesToScroll: 1,
+    arrows: true,
+    nextArrow: <NextArrow />,
+    prevArrow: <PrevArrow />,
   };
 
-  const imgs = Array.isArray(product.product_images) ? product.product_images : [];
+  const imgs = Array.isArray(product.product_images)
+    ? product.product_images
+    : [];
   const orderedImages = [
     ...imgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
     ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
@@ -634,26 +819,53 @@ const ProductDetails = () => {
     image: images.length ? images : [hero],
     sku: String(product.ProductId),
     category: categoryName(product),
-    ...(product.BrandDesigner && { brand: { "@type": "Brand", name: product.BrandDesigner } }),
-    additionalProperty: [{ "@type": "PropertyValue", name: "Category", value: categoryName(product) }],
+    ...(product.BrandDesigner && {
+      brand: { "@type": "Brand", name: product.BrandDesigner },
+    }),
+    additionalProperty: [
+      {
+        "@type": "PropertyValue",
+        name: "Category",
+        value: categoryName(product),
+      },
+    ],
     offers: {
       "@type": "Offer",
       url: canonical,
       priceCurrency: "INR",
       price: Number(salePrice).toFixed(2),
       availability:
-        Number(product.Stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+        Number(product.Stock) > 0
+          ? "https://schema.org/InStock"
+          : "https://schema.org/OutOfStock",
       itemCondition: "https://schema.org/NewCondition",
-      ...(product.Stock != null ? { inventoryLevel: { "@type": "QuantitativeValue", value: Number(product.Stock) } } : {}),
+      ...(product.Stock != null
+        ? {
+            inventoryLevel: {
+              "@type": "QuantitativeValue",
+              value: Number(product.Stock),
+            },
+          }
+        : {}),
     },
     ...(reviewCount > 0
-      ? { aggregateRating: { "@type": "AggregateRating", ratingValue: String(avgRating), reviewCount: String(reviewCount) } }
+      ? {
+          aggregateRating: {
+            "@type": "AggregateRating",
+            ratingValue: String(avgRating),
+            reviewCount: String(reviewCount),
+          },
+        }
       : {}),
     ...(Array.isArray(reviews) && reviews.length
       ? {
           review: reviews.slice(0, 3).map((r) => ({
             "@type": "Review",
-            author: { "@type": "Person", name: r?.users?.full_name || r?.FullName || "Anonymous" },
+            author: {
+              "@type": "Person",
+              name:
+                r?.users?.full_name || r?.FullName || "Anonymous",
+            },
             datePublished: r?.created_at || r?.CreatedAt || undefined,
             reviewBody: r?.comment || r?.Comment || "",
             reviewRating: {
@@ -672,8 +884,18 @@ const ProductDetails = () => {
     "@type": "BreadcrumbList",
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
-      { "@type": "ListItem", position: 2, name: "Products", item: `${baseUrl}/products` },
-      { "@type": "ListItem", position: 3, name: product.Name, item: canonical },
+      {
+        "@type": "ListItem",
+        position: 2,
+        name: "Products",
+        item: `${baseUrl}/products`,
+      },
+      {
+        "@type": "ListItem",
+        position: 3,
+        name: product.Name,
+        item: canonical,
+      },
     ],
   };
 
@@ -692,7 +914,9 @@ const ProductDetails = () => {
             "handwoven sarees",
             "artisan-made",
             "sustainable luxury",
-          ].filter(Boolean).join(", ")}
+          ]
+            .filter(Boolean)
+            .join(", ")}
         />
         <link rel="canonical" href={canonical} />
         <link rel="alternate" hrefLang="en-IN" href={canonical} />
@@ -700,15 +924,25 @@ const ProductDetails = () => {
         <meta property="og:type" content="product" />
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
-        <meta property="og:title" content={`${product.Name} — Shahu Mumbai`} />
+        <meta
+          property="og:title"
+          content={`${product.Name} — Shahu Mumbai`}
+        />
         <meta property="og:description" content={metaDescription} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={images[0] || hero} />
-        <meta property="og:image:alt" content={`${product.Name} — product image`} />
+        <meta
+          property="og:image:alt"
+          content={`${product.Name} — product image`}
+        />
         <meta name="product:price:amount" content={String(salePrice)} />
         <meta name="product:price:currency" content="INR" />
-        <script type="application/ld+json">{JSON.stringify(productJsonLd)}</script>
-        <script type="application/ld+json">{JSON.stringify(breadcrumbJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify(productJsonLd)}
+        </script>
+        <script type="application/ld+json">
+          {JSON.stringify(breadcrumbJsonLd)}
+        </script>
       </Helmet>
 
       <div className="min-h-screen px-4 md:px-6 py-16 pt-[60px] bg-[#F1E7E5] font-serif">
@@ -716,14 +950,21 @@ const ProductDetails = () => {
         <nav className="max-w-6xl mx-auto text-sm mb-4 text-[#6B4226]">
           <ol className="flex flex-wrap gap-1">
             <li>
-              <Link to="/" className="hover:underline">Home</Link>
+              <Link to="/" className="hover:underline">
+                Home
+              </Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
             <li>
-              <Link to="/products" className="hover:underline">Our Products</Link>
+              <Link to="/products" className="hover:underline">
+                Our Products
+              </Link>
               <span className="mx-2 text-[#D4A5A5]">/</span>
             </li>
-            <li className="text-[#3E2C23] truncate max-w-[60%]" title={product.Name}>
+            <li
+              className="text-[#3E2C23] truncate max-w-[60%]"
+              title={product.Name}
+            >
               {product.Name}
             </li>
           </ol>
@@ -746,7 +987,9 @@ const ProductDetails = () => {
                       src={img}
                       alt={`${product.Name} thumbnail ${idx + 1}`}
                       className="w-full h-full object-contain"
-                      onError={(e) => { e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`; }}
+                      onError={(e) => {
+                        e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+                      }}
                     />
                   </button>
                 ))
@@ -767,7 +1010,9 @@ const ProductDetails = () => {
                         src={img}
                         alt={`${product.Name} view ${index + 1}`}
                         className="w-full h-auto max-h-[70vh] object-cover rounded-md border border-[#D4A5A5] shadow-sm bg-white"
-                        onError={(e) => { e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`; }}
+                        onError={(e) => {
+                          e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+                        }}
                       />
                     </div>
                   ))
@@ -785,7 +1030,10 @@ const ProductDetails = () => {
                 type="button"
                 onClick={() => {
                   if (navigator.share) {
-                    navigator.share({ title: product.Name, url: window.location.href });
+                    navigator.share({
+                      title: product.Name,
+                      url: window.location.href,
+                    });
                   } else {
                     navigator.clipboard.writeText(window.location.href);
                     alert("Link copied to clipboard");
@@ -794,7 +1042,8 @@ const ProductDetails = () => {
                 className="absolute bottom-2 right-2 inline-flex items-center gap-2 text-[#6B4226] bg-white/90 border border-[#D4A5A5] rounded-full px-3 py-1 shadow hover:bg-white"
                 aria-label="Share product"
               >
-                <IoMdShareAlt /><span className="text-sm">Share</span>
+                <IoMdShareAlt />
+                <span className="text-sm">Share</span>
               </button>
             </div>
           </div>
@@ -803,10 +1052,15 @@ const ProductDetails = () => {
           <aside className="lg:col-span-4 order-3">
             <div className="lg:sticky lg:top-24 flex flex-col gap-4">
               <div className="rounded-lg border border-[#D4A5A5] shadow-md bg-white p-5">
-                <h1 className="text-2xl font-bold text-[#6B4226] mb-1">{product.Name}</h1>
+                <h1 className="text-2xl font-bold text-[#6B4226] mb-1">
+                  {product.Name}
+                </h1>
                 <div className="flex items-center gap-2 mt-1">
                   <StarRating value={avgRating} />
-                  <span className="text-xs text-[#3E2C23]">{avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}</span>
+                  <span className="text-xs text-[#3E2C23]">
+                    {avgRating}/5 • {reviewCount} review
+                    {reviewCount === 1 ? "" : "s"}
+                  </span>
                 </div>
 
                 <p className="text-sm italic text-[#A3B18A] mt-1">
@@ -816,12 +1070,20 @@ const ProductDetails = () => {
                 <div className="mt-4">
                   {hasDiscount ? (
                     <div className="flex items-baseline gap-3">
-                      <p className="text-3xl font-extrabold text-[#6B4226]">{formatINR(salePrice)}</p>
-                      <p className="text-base text-gray-500 line-through">{formatINR(mrp)}</p>
-                      <p className="text-base text-[#A3B18A] font-semibold">{discountPercentage}% OFF</p>
+                      <p className="text-3xl font-extrabold text-[#6B4226]">
+                        {formatINR(salePrice)}
+                      </p>
+                      <p className="text-base text-gray-500 line-through">
+                        {formatINR(mrp)}
+                      </p>
+                      <p className="text-base text-[#A3B18A] font-semibold">
+                        {discountPercentage}% OFF
+                      </p>
                     </div>
                   ) : (
-                    <p className="text-3xl font-extrabold text-[#6B4226]">{formatINR(mrp)}</p>
+                    <p className="text-3xl font-extrabold text-[#6B4226]">
+                      {formatINR(mrp)}
+                    </p>
                   )}
                 </div>
 
@@ -832,7 +1094,9 @@ const ProductDetails = () => {
                     onChange={setQty}
                   />
                   {Number(product.Stock) > 0 ? (
-                    <p className="text-sm text-[#A3B18A]">In Stock: {product.Stock}</p>
+                    <p className="text-sm text-[#A3B18A]">
+                      In Stock: {product.Stock}
+                    </p>
                   ) : (
                     <p className="text-sm text-red-500">Out of Stock</p>
                   )}
@@ -841,10 +1105,14 @@ const ProductDetails = () => {
                 <div className="mt-5 grid grid-cols-1 gap-3">
                   <button
                     className={`bg-black hover:bg-slate-600 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.Stock) === 0 || cartSubmitting ? "opacity-50 cursor-not-allowed" : ""
+                      Number(product.Stock) === 0 || cartSubmitting
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
                     }`}
                     aria-label="Add this product to your shopping cart"
-                    disabled={Number(product.Stock) === 0 || cartSubmitting}
+                    disabled={
+                      Number(product.Stock) === 0 || cartSubmitting
+                    }
                     onClick={handleAddToCart}
                   >
                     {cartSubmitting ? "Adding..." : "Add to Cart"}
@@ -853,10 +1121,14 @@ const ProductDetails = () => {
                   {/* BUY NOW → Razorpay */}
                   <button
                     className={`bg-black hover:bg-slate-600 text-white px-6 py-3 rounded-md transition font-semibold shadow ${
-                      Number(product.Stock) === 0 || buyNowSubmitting ? "opacity-50 cursor-not-allowed" : ""
+                      Number(product.Stock) === 0 || buyNowSubmitting
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
                     }`}
                     aria-label="Buy now"
-                    disabled={Number(product.Stock) === 0 || buyNowSubmitting}
+                    disabled={
+                      Number(product.Stock) === 0 || buyNowSubmitting
+                    }
                     onClick={handleBuyNow}
                   >
                     {buyNowSubmitting ? "Starting Payment…" : "Buy Now"}
@@ -867,9 +1139,19 @@ const ProductDetails = () => {
                     <button
                       type="button"
                       className={`flex items-center justify-center w-12 h-12 rounded-md border border-[#D4A5A5] shadow transition ${
-                        isInWishlist ? "bg-[#D4A5A5] text-white" : "bg-black hover:bg-slate-600 text-[#D4A5A5]"
-                      } ${wishlistSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
-                      aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                        isInWishlist
+                          ? "bg-[#D4A5A5] text-white"
+                          : "bg-black hover:bg-slate-600 text-[#D4A5A5]"
+                      } ${
+                        wishlistSubmitting
+                          ? "opacity-50 cursor-not-allowed"
+                          : ""
+                      }`}
+                      aria-label={
+                        isInWishlist
+                          ? "Remove from wishlist"
+                          : "Add to wishlist"
+                      }
                       onClick={handleToggleWishlist}
                       disabled={wishlistSubmitting}
                     >
@@ -889,7 +1171,9 @@ const ProductDetails = () => {
 
               {/* About this item */}
               <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-4">
-                <h3 className="text-[#6B4226] font-semibold mb-2">About this item</h3>
+                <h3 className="text-[#6B4226] font-semibold mb-2">
+                  About this item
+                </h3>
                 <ul className="list-disc list-inside text-sm text-[#3E2C23] space-y-1">
                   {product.ShortDescription ? (
                     String(product.ShortDescription)
@@ -911,29 +1195,41 @@ const ProductDetails = () => {
         <section className="max-w-6xl mx-auto mt-10 grid grid-cols-1 lg:grid-cols-12 gap-6">
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h2 className="text-xl font-bold text-[#6B4226] mb-3">Product Description</h2>
+              <h2 className="text-xl font-bold text-[#6B4226] mb-3">
+                Product Description
+              </h2>
               <p className="text-base text-[#3E2C23] leading-relaxed whitespace-pre-line">
-                {product.Description || "No additional description provided."}
+                {product.Description ||
+                  "No additional description provided."}
               </p>
               {product.BrandDesigner && (
                 <div className="mt-4 text-md text-[#6B4226]">
-                  Designer: <span className="font-semibold">{product.BrandDesigner}</span>
+                  Designer:{" "}
+                  <span className="font-semibold">
+                    {product.BrandDesigner}
+                  </span>
                 </div>
               )}
             </div>
           </div>
           <div className="lg:col-span-4">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h3 className="text-lg font-bold text-[#6B4226] mb-2">Specifications</h3>
+              <h3 className="text-lg font-bold text-[#6B4226] mb-2">
+                Specifications
+              </h3>
               <dl className="text-sm text-[#3E2C23] grid grid-cols-1 gap-2">
                 <div className="flex justify-between border-b border-[#F1E7E5] pb-2">
                   <dt>Category</dt>
-                  <dd className="font-medium">{categoryName(product)}</dd>
+                  <dd className="font-medium">
+                    {categoryName(product)}
+                  </dd>
                 </div>
                 <div className="flex justify-between">
                   <dt>Stock</dt>
                   <dd className="font-medium">
-                    {Number(product.Stock) > 0 ? product.Stock : "Out of stock"}
+                    {Number(product.Stock) > 0
+                      ? product.Stock
+                      : "Out of stock"}
                   </dd>
                 </div>
               </dl>
@@ -946,41 +1242,62 @@ const ProductDetails = () => {
           <div className="lg:col-span-8">
             <div className="rounded-lg border border-[#D4A5A5] shadow bg-white p-3 xs:p-4 sm:p-6">
               <div className="flex items-center justify-between mb-2 xs:mb-3 sm:mb-4">
-                <h2 className="text-lg xs:text-xl font-bold text-[#6B4226]">Customer Reviews</h2>
+                <h2 className="text-lg xs:text-xl font-bold text-[#6B4226]">
+                  Customer Reviews
+                </h2>
                 <div className="flex items-center gap-1 xs:gap-2">
                   <StarRating value={avgRating} />
                   <span className="text-xs xs:text-sm text-[#3E2C23]">
-                    {avgRating}/5 • {reviewCount} review{reviewCount === 1 ? "" : "s"}
+                    {avgRating}/5 • {reviewCount} review
+                    {reviewCount === 1 ? "" : "s"}
                   </span>
                 </div>
               </div>
 
               {reviewLoading ? (
-                <p className="text-[#6B4226] text-sm xs:text-base">Loading reviews…</p>
+                <p className="text-[#6B4226] text-sm xs:text-base">
+                  Loading reviews…
+                </p>
               ) : reviewError ? (
-                <p className="text-red-500 text-sm xs:text-base">{reviewError}</p>
+                <p className="text-red-500 text-sm xs:text-base">
+                  {reviewError}
+                </p>
               ) : reviews.length === 0 ? (
-                <p className="text-[#3E2C23] text-sm xs:text-base">No reviews yet. Be the first to review!</p>
+                <p className="text-[#3E2C23] text-sm xs:text-base">
+                  No reviews yet. Be the first to review!
+                </p>
               ) : (
                 <ul className="space-y-2 xs:space-y-3 sm:space-y-4">
                   {reviews.map((r) => (
                     <li
                       key={
                         r.ReviewId ||
-                        `${r.userid}-${r.productid}-${r.CreatedAt || r.created_at || Math.random()}`
+                        `${r.userid}-${r.productid}-${
+                          r.CreatedAt ||
+                          r.created_at ||
+                          Math.random()
+                        }`
                       }
                       className="border border-[#F1E7E5] rounded-lg p-3 xs:p-4"
                     >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1 xs:gap-2">
-                          <StarRating value={Number(r.Rating || r.rating) || 0} />
+                          <StarRating
+                            value={
+                              Number(r.Rating || r.rating) || 0
+                            }
+                          />
                           <span className="text-xs xs:text-sm text-[#6B4226] font-semibold">
-                            {r.FullName || r?.users?.full_name || "Anonymous"}
+                            {r.FullName ||
+                              r?.users?.full_name ||
+                              "Anonymous"}
                           </span>
                         </div>
                         <time className="text-[10px] xs:text-xs text-[#3E2C23] opacity-70">
                           {r.CreatedAt || r.created_at
-                            ? new Date(r.CreatedAt || r.created_at).toLocaleDateString("en-IN")
+                            ? new Date(
+                                r.CreatedAt || r.created_at
+                              ).toLocaleDateString("en-IN")
                             : ""}
                         </time>
                       </div>
@@ -995,10 +1312,17 @@ const ProductDetails = () => {
           </div>
 
           <div className="lg:col-span-4">
-            <form onSubmit={submitReview} className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6">
-              <h3 className="text-lg font-bold text-[#6B4226] mb-3">Write a review</h3>
+            <form
+              onSubmit={submitReview}
+              className="rounded-lg border border-[#D4A5A5] shadow bg-white p-6"
+            >
+              <h3 className="text-lg font-bold text-[#6B4226] mb-3">
+                Write a review
+              </h3>
 
-              <label className="block text-sm text-[#3E2C23] mb-1">Your name (optional)</label>
+              <label className="block text-sm text-[#3E2C23] mb-1">
+                Your name (optional)
+              </label>
               <input
                 type="text"
                 value={reviewName}
@@ -1008,20 +1332,35 @@ const ProductDetails = () => {
                 readOnly
               />
 
-              <label className="block text-sm text-[#3E2C23] mb-1">Rating</label>
+              <label className="block text-sm text-[#3E2C23] mb-1">
+                Rating
+              </label>
               <select
                 value={reviewRating}
-                onChange={(e) => setReviewRating(Number(e.target.value))}
+                onChange={(e) =>
+                  setReviewRating(Number(e.target.value))
+                }
                 className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white"
               >
                 {[5, 4, 3, 2, 1].map((n) => (
                   <option key={n} value={n}>
-                    {n} - {n === 5 ? "Excellent" : n === 4 ? "Good" : n === 3 ? "Average" : n === 2 ? "Poor" : "Terrible"}
+                    {n} -{" "}
+                    {n === 5
+                      ? "Excellent"
+                      : n === 4
+                      ? "Good"
+                      : n === 3
+                      ? "Average"
+                      : n === 2
+                      ? "Poor"
+                      : "Terrible"}
                   </option>
                 ))}
               </select>
 
-              <label className="block text-sm text-[#3E2C23] mb-1">Review</label>
+              <label className="block text-sm text-[#3E2C23] mb-1">
+                Review
+              </label>
               <textarea
                 value={reviewText}
                 onChange={(e) => setReviewText(e.target.value)}
@@ -1045,23 +1384,37 @@ const ProductDetails = () => {
 
         {/* Related Products */}
         <div className="mt-16 px-2 max-w-[1440px] mx-auto font-serif">
-          <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">You May Also Like</h2>
+          <h2 className="text-2xl font-bold text-[#6B4226] mb-6 text-center">
+            You May Also Like
+          </h2>
           <div className="flex flex-wrap justify-center gap-8">
             {relatedProducts.map((related) => {
-              const rImgs = Array.isArray(related.product_images) ? related.product_images : [];
+              const rImgs = Array.isArray(related.product_images)
+                ? related.product_images
+                : [];
               const relatedOrdered = [
-                ...rImgs.filter((i) => asBool(i?.is_hero)).map(pickImageUrl),
-                ...rImgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
+                ...rImgs.filter((i) => asBool(i?.is_hero)).map(
+                  pickImageUrl
+                ),
+                ...rImgs
+                  .filter((i) => !asBool(i?.is_hero))
+                  .map(pickImageUrl),
               ].filter(Boolean);
-              const relatedImage = relatedOrdered[0] || "/assets/images/placeholder.png";
+              const relatedImage =
+                relatedOrdered[0] || "/assets/images/placeholder.png";
               const relatedSalePrice =
                 Number(related.DiscountPrice) > 0 &&
-                Number(related.DiscountPrice) < Number(related.Price)
-                  ? Number(related.Price) - Number(related.DiscountPrice)
+                Number(related.DiscountPrice) <
+                  Number(related.Price)
+                  ? Number(related.Price) -
+                    Number(related.DiscountPrice)
                   : Number(related.Price);
 
               return (
-                <div key={related.id || related.ProductId} className="w-[260px]">
+                <div
+                  key={related.id || related.ProductId}
+                  className="w-[260px]"
+                >
                   <RelatedCard
                     product={{
                       id: related.id || related.ProductId,
@@ -1082,17 +1435,32 @@ const ProductDetails = () => {
         {thankOpen && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">
-              <h2 className="text-xl font-semibold text-green-600">Payment Successful</h2>
-              <p className="text-gray-700">Your order has been placed.</p>
-              <p className="text-sm font-mono text-gray-600">🧾 Order Number: <strong>{thankOrderNo}</strong></p>
+              <h2 className="text-xl font-semibold text-green-600">
+                Payment Successful
+              </h2>
+              <p className="text-gray-700">
+                Your order has been placed.
+              </p>
+              <p className="text-sm font-mono text-gray-600">
+                🧾 Order Number:{" "}
+                <strong>{thankOrderNo}</strong>
+              </p>
               <p className="text-xs text-gray-600">
-                {emailNoted ? "A confirmation email has been sent." : "We’ll email your receipt shortly."}
+                {emailNoted
+                  ? "A confirmation email has been sent."
+                  : "We’ll email your receipt shortly."}
               </p>
               <div className="flex gap-3 justify-center">
-                <Link to="/myorder" className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
+                <Link
+                  to="/myorder"
+                  className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+                >
                   View Orders
                 </Link>
-                <button onClick={() => setThankOpen(false)} className="px-4 py-2 rounded border">
+                <button
+                  onClick={() => setThankOpen(false)}
+                  className="px-4 py-2 rounded border"
+                >
                   Close
                 </button>
               </div>

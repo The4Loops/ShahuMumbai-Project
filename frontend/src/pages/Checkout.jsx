@@ -6,6 +6,8 @@ import Layout from "../layout/Layout";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
 import api from "../supabase/axios";
+import { jwtDecode } from "jwt-decode";          // 🔹 NEW
+import { trackDB } from "../analytics-db";       // 🔹 NEW
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
 
@@ -40,7 +42,7 @@ function Checkout() {
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", address: "" });
   const [paymentMethod, setPaymentMethod] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false); // (kept) original success modal (unused now)
-  const [token, setToken] = useState("");
+  const [token, setToken] = useState("");                // transaction token (legacy modal)
   const [cart, setCart] = useState([]);
   const [loadingCart, setLoadingCart] = useState(true);
   const [errBanner, setErrBanner] = useState("");
@@ -51,8 +53,21 @@ function Checkout() {
   const [thankOrderNo, setThankOrderNo] = useState("");
   const [emailNoted, setEmailNoted] = useState(false);
 
-  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+  const baseUrl =
+    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const pageUrl = `${baseUrl}/checkout`;
+
+  // 🔹 decode logged-in user (for DB tracking)
+  const authToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
+  let decodedUser = "";
+  if (authToken) {
+    try {
+      decodedUser = jwtDecode(authToken);
+    } catch {
+      decodedUser = "";
+    }
+  }
+  const userId = decodedUser?.id || null;
 
   // ---- totals using DiscountPrice as final price when present ----
   const totals = useMemo(() => {
@@ -67,11 +82,13 @@ function Checkout() {
 
   useEffect(() => {
     (async () => {
-      if (!API) setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
+      if (!API) {
+        setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
+      }
       try {
         setLoadingCart(true);
         const response = await api.get(`${API}/api/cartById`);
-        const data = response.data; 
+        const data = response.data;
         setCart(Array.isArray(data) ? data : []);
         setCurrency(data?.[0]?.product?.currency || "INR");
       } catch (e) {
@@ -103,25 +120,58 @@ function Checkout() {
     setErrBanner("");
 
     // Analytics: intent (use finalUnitPrice)
+    let gaItems = [];
+    let totalValue = 0;
     try {
-      const gaItems = (cart || []).map((l) => ({
+      gaItems = (cart || []).map((l) => ({
         id: l?.product?.id,
         title: l?.product?.name,
-        category: l?.product?.categories?.[0]?.name || l?.product?.categories?.name || "Checkout",
+        category:
+          l?.product?.categories?.[0]?.name ||
+          l?.product?.categories?.name ||
+          "Checkout",
         price: finalUnitPrice(l?.product),
         quantity: l?.quantity || 1,
         currency: "INR",
       }));
+      totalValue = gaItems.reduce((s, i) => s + i.price * i.quantity, 0);
+
       Ecom.addShippingInfo(gaItems, "Standard");
       const pm = (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_");
       Ecom.addPaymentInfo(gaItems, pm);
-    } catch {}
+
+      // 🔹 DB analytics: begin_checkout
+      trackDB(
+        "begin_checkout",
+        {
+          payment_method: pm,
+          items_count: gaItems.length,
+          value: totalValue,
+          currency: "INR",
+          source: "checkout_page",
+        },
+        userId
+      );
+    } catch {
+      // fail silently for analytics
+    }
 
     const newToken = generateToken();
     setToken(newToken);
 
     if (!API) {
       alert("API base URL is not configured (REACT_APP_API_BASE_URL).");
+      // 🔹 DB: env config failure
+      trackDB(
+        "checkout_failed",
+        {
+          stage: "env",
+          reason: "missing_API_base_url",
+          value: totalValue,
+          currency: "INR",
+        },
+        userId
+      );
       return;
     }
 
@@ -133,6 +183,17 @@ function Checkout() {
     } catch (e) {
       console.error("Failed to reload cart:", e);
       alert("Could not load your cart. Please refresh and try again.");
+      // 🔹 DB: load_cart failure
+      trackDB(
+        "checkout_failed",
+        {
+          stage: "load_cart",
+          reason: String(e?.message || e),
+          value: totalValue,
+          currency: "INR",
+        },
+        userId
+      );
       return;
     }
 
@@ -140,11 +201,19 @@ function Checkout() {
     const invalid = [];
     const validLines = serverCart.filter((ci) => {
       const p = ci?.product;
-      const active = p?.is_active === 1 || p?.is_active === "Y" || p?.is_active === true || p?.is_active === undefined;
+      const active =
+        p?.is_active === 1 ||
+        p?.is_active === "Y" ||
+        p?.is_active === true ||
+        p?.is_active === undefined;
       const qty = Number(ci?.quantity || 1);
       const okStock = p?.stock == null ? true : Number(p.stock) >= qty;
       if (!active || !okStock) {
-        invalid.push({ id: p?.id, name: p?.name, reason: !active ? "inactive" : "insufficient stock" });
+        invalid.push({
+          id: p?.id,
+          name: p?.name,
+          reason: !active ? "inactive" : "insufficient stock",
+        });
         return false;
       }
       return true;
@@ -153,8 +222,24 @@ function Checkout() {
     if (!validLines.length) {
       alert(
         invalid.length
-          ? `Your cart has items that cannot be purchased:\n${invalid.map((i) => `• ${i.name} (${i.reason})`).join("\n")}`
+          ? `Your cart has items that cannot be purchased:\n${invalid
+              .map((i) => `• ${i.name} (${i.reason})`)
+              .join("\n")}`
           : "Your cart is empty."
+      );
+      // 🔹 DB: no valid items
+      trackDB(
+        "checkout_failed",
+        {
+          stage: "no_valid_items",
+          invalid_items: invalid.map((i) => ({
+            id: i.id,
+            name: i.name,
+            reason: i.reason,
+          })),
+          currency: "INR",
+        },
+        userId
       );
       return;
     }
@@ -174,61 +259,137 @@ function Checkout() {
 
     if (!items.length) {
       alert("No purchasable items in cart. Please update your cart.");
+      // 🔹 DB: no purchasable items
+      trackDB(
+        "checkout_failed",
+        {
+          stage: "no_purchasable_items",
+          currency: "INR",
+        },
+        userId
+      );
       return;
     }
 
     // 1) Create order (INR)
     let orderNumber;
-    const data=JSON.stringify({
-          customer: {
-            name: formData.name,
-            email: formData.email,
-            phone: formData.phone,
-            address: formData.address,
-            anon_id: "web|guest",
-          },
-          items,
-          currency: "INR", // 🔒 force INR
-          payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
-          shipping_total: 0,
-          tax_total: 0,
-          discount_total: 0,
-          status: "pending",
-          payment_status: "unpaid",
-          meta: { transaction_token: newToken, source: "checkout" },
-        })
+    const data = JSON.stringify({
+      customer: {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        address: formData.address,
+        anon_id: "web|guest",
+      },
+      items,
+      currency: "INR", // 🔒 force INR
+      payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
+      shipping_total: 0,
+      tax_total: 0,
+      discount_total: 0,
+      status: "pending",
+      payment_status: "unpaid",
+      meta: { transaction_token: newToken, source: "checkout" },
+    });
+
     try {
-      const resp = await api.post(`${API}/api/checkout/order`,data);
+      const resp = await api.post(`${API}/api/checkout/order`, data);
       const text = resp.data;
 
       if (!text?.ok) {
         console.error("Checkout failed", text);
-        if (text?.missing?.length) alert(`Order create failed: missing product IDs ${text.missing.join(", ")}`);
-        else if (text?.error === "product_inactive") alert("One of your cart items is inactive. Please remove it and try again.");
-        else alert("Something went wrong creating your order. Please try again.");
+        if (text?.missing?.length)
+          alert(
+            `Order create failed: missing product IDs ${text.missing.join(
+              ", "
+            )}`
+          );
+        else if (text?.error === "product_inactive")
+          alert(
+            "One of your cart items is inactive. Please remove it and try again."
+          );
+        else
+          alert(
+            "Something went wrong creating your order. Please try again."
+          );
+
+        // 🔹 DB: order_create failure
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "order_create",
+            reason: text?.error || "order_not_ok",
+            missing: text?.missing || [],
+            currency: "INR",
+          },
+          userId
+        );
         return;
       }
       orderNumber = text.order_number;
     } catch (err) {
       console.error("Order create network error:", err);
       alert("Network error during checkout (order create).");
+
+      // 🔹 DB: order_create network error
+      trackDB(
+        "checkout_failed",
+        {
+          stage: "order_create_network",
+          reason: String(err?.message || err),
+          currency: "INR",
+        },
+        userId
+      );
       return;
     }
 
     // 2) Create Razorpay order
+    let rz;
     try {
-      const response = await api.post(`${API}/api/payments/create-order`, {order_number: orderNumber },);
+      const response = await api.post(`${API}/api/payments/create-order`, {
+        order_number: orderNumber,
+      });
 
-      const rz = response.data;
+      rz = response.data;
 
       if (!rz?.rzp?.order_id) {
         console.error("Razorpay order creation failed", rz);
-        alert(`Unable to start payment: ${rz?.message || rz?.error || "Unknown error"}`);
+        alert(
+          `Unable to start payment: ${
+            rz?.message || rz?.error || "Unknown error"
+          }`
+        );
+
+        // 🔹 DB: create_razorpay failure
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "create_razorpay",
+            reason: rz?.message || rz?.error || "no_rzp_order_id",
+            currency: "INR",
+          },
+          userId
+        );
         return;
       }
 
       const loaded = await loadRazorpay();
-      if (!loaded) return alert("Razorpay failed to load. Check your network/CSP.");
+      if (!loaded) {
+        alert("Razorpay failed to load. Check your network/CSP.");
+
+        // 🔹 DB: razorpay script load failure
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "razorpay_load",
+            reason: "script_load_failed",
+            currency: "INR",
+          },
+          userId
+        );
+        return;
+      }
 
       // 3) Open Razorpay in modal (no redirects)
       const options = {
@@ -238,33 +399,73 @@ function Checkout() {
         currency: rz.rzp.currency,
         name: "Shahu",
         description: `Payment for ${orderNumber}`,
-        prefill: { name: formData.name, email: formData.email, contact: formData.phone },
+        prefill: {
+          name: formData.name,
+          email: formData.email,
+          contact: formData.phone,
+        },
         theme: { color: "#173F5F" },
         redirect: false, // 👈 keep modal, handle result here
         handler: async (response) => {
           try {
-            const v = await api.post(`${API}/api/payments/verify`,response);
+            const v = await api.post(
+              `${API}/api/payments/verify`,
+              response
+            );
             const vr = v.data;
 
             if (v.status === 200 && vr?.ok) {
               // GA purchase (use finalUnitPrice)
               try {
-                const gaItems = validLines.map((ci) => ({
+                const gaItemsVerify = validLines.map((ci) => ({
                   id: ci?.product?.id,
                   title: ci?.product?.name,
-                  category: ci?.product?.categories?.[0]?.name || ci?.product?.categories?.name || "Checkout",
+                  category:
+                    ci?.product?.categories?.[0]?.name ||
+                    ci?.product?.categories?.name ||
+                    "Checkout",
                   price: finalUnitPrice(ci?.product),
                   quantity: ci?.quantity || 1,
                   currency: "INR",
                 }));
+                const valueVerify = gaItemsVerify.reduce(
+                  (s, i) => s + i.price * i.quantity,
+                  0
+                );
+
+                const txId = vr.order_number || orderNumber || newToken;
+
                 Ecom.purchase({
-                  transactionId: vr.order_number || orderNumber || newToken,
-                  items: gaItems,
-                  value: gaItems.reduce((s, i) => s + i.price * i.quantity, 0),
+                  transactionId: txId,
+                  items: gaItemsVerify,
+                  value: valueVerify,
                   tax: 0,
                   shipping: 0,
                 });
-              } catch {}
+
+                // 🔹 DB: purchase
+                trackDB(
+                  "purchase",
+                  {
+                    transaction_id: txId,
+                    items: gaItemsVerify.map((i) => ({
+                      id: i.id,
+                      title: i.title,
+                      price: i.price,
+                      quantity: i.quantity,
+                    })),
+                    items_count: gaItemsVerify.length,
+                    value: valueVerify,
+                    currency: "INR",
+                    payment_id: response.razorpay_payment_id,
+                    payment_order_id: response.razorpay_order_id,
+                    source: "checkout_page",
+                  },
+                  userId
+                );
+              } catch {
+                // ignore analytics failure
+              }
 
               // 🎉 Thank-you (no redirect)
               setThankOrderNo(vr.order_number || orderNumber);
@@ -272,20 +473,72 @@ function Checkout() {
               setThankOpen(true);
             } else {
               // Show inline banner on failure (no redirect to /order/failed)
-              setErrBanner(vr?.message || "Payment verification failed. Your card was not charged.");
+              setErrBanner(
+                vr?.message ||
+                  "Payment verification failed. Your card was not charged."
+              );
+
+              // 🔹 DB: verify failed
+              trackDB(
+                "checkout_failed",
+                {
+                  stage: "verify",
+                  reason: vr?.message || vr?.error || "verify_failed",
+                  currency: "INR",
+                },
+                userId
+              );
             }
           } catch (e) {
             console.error("Verify error:", e);
-            setErrBanner("Payment verification failed due to a network error. Please try again.");
+            setErrBanner(
+              "Payment verification failed due to a network error. Please try again."
+            );
+
+            // 🔹 DB: verify exception
+            trackDB(
+              "checkout_failed",
+              {
+                stage: "verify_exception",
+                reason: String(e?.message || e),
+                currency: "INR",
+              },
+              userId
+            );
           }
         },
-        modal: { ondismiss: () => console.log("Razorpay modal closed") },
+        modal: {
+          ondismiss: () => {
+            console.log("Razorpay modal closed");
+            // 🔹 DB: user dismissed payment modal without completing
+            trackDB(
+              "checkout_failed",
+              {
+                stage: "razorpay_dismiss",
+                reason: "user_closed_modal",
+                currency: "INR",
+              },
+              userId
+            );
+          },
+        },
       };
 
       new window.Razorpay(options).open();
     } catch (err) {
       console.error("Payment start error:", err);
       alert("Network error during payment start.");
+
+      // 🔹 DB: payment_start failure
+      trackDB(
+        "checkout_failed",
+        {
+          stage: "payment_start",
+          reason: String(err?.message || err),
+          currency: "INR",
+        },
+        userId
+      );
       return;
     }
   };
@@ -301,13 +554,18 @@ function Checkout() {
     <Layout>
       <Helmet>
         <title>Checkout — Shahu Mumbai</title>
-        <meta name="description" content="Complete your purchase securely on Shahu Mumbai." />
+        <meta
+          name="description"
+          content="Complete your purchase securely on Shahu Mumbai."
+        />
         <link rel="canonical" href={pageUrl} />
         <meta name="robots" content="noindex,nofollow,noarchive" />
       </Helmet>
 
       {errBanner && (
-        <div className="max-w-3xl mx-auto mt-4 p-3 text-sm rounded bg-yellow-100 text-yellow-800">{errBanner}</div>
+        <div className="max-w-3xl mx-auto mt-4 p-3 text-sm rounded bg-yellow-100 text-yellow-800">
+          {errBanner}
+        </div>
       )}
 
       <div className="max-w-3xl mx-auto p-6 space-y-6">
@@ -373,7 +631,7 @@ function Checkout() {
                   paymentMethod === method ? "bg-gray-200 font-bold" : ""
                 }`}
               >
-                {({ "Credit Card": <FaCreditCard />, "Debit Card": <FaCreditCard />, UPI: <FaMobileAlt />, "Net Banking": <FaUniversity /> })[method]}
+                {paymentIcons[method]}
                 {method}
               </button>
             ))}
@@ -382,7 +640,11 @@ function Checkout() {
           <div className="mt-4 bg-gray-50 p-4 rounded text-sm space-y-2">
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>{currency === "INR" ? fmtINR(totals.total) : totals.total.toFixed(2)}</span>
+              <span>
+                {currency === "INR"
+                  ? fmtINR(totals.total)
+                  : totals.total.toFixed(2)}
+              </span>
             </div>
             <div className="text-green-600 text-sm mt-2">
               Your payment is secured by Razorpay with 256-bit SSL encryption
@@ -391,10 +653,14 @@ function Checkout() {
               onClick={handleSubmit}
               disabled={!isValid() || loadingCart}
               className={`w-full mt-4 text-white py-2 rounded transition ${
-                !isValid() || loadingCart ? "bg-gray-400 cursor-not-allowed" : "bg-black hover:bg-gray-900"
+                !isValid() || loadingCart
+                  ? "bg-gray-400 cursor-not-allowed"
+                  : "bg-black hover:bg-gray-900"
               }`}
             >
-              {loadingCart ? "Loading your cart..." : `💳 Pay ${fmtINR(totals.total)} Securely`}
+              {loadingCart
+                ? "Loading your cart..."
+                : `💳 Pay ${fmtINR(totals.total)} Securely`}
             </button>
           </div>
         </div>
@@ -403,12 +669,17 @@ function Checkout() {
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">
-              <h2 className="text-xl font-semibold text-green-600">Payment Successful</h2>
+              <h2 className="text-xl font-semibold text-green-600">
+                Payment Successful
+              </h2>
               <p className="text-gray-700">Thank you for your purchase!</p>
               <p className="text-sm font-mono text-gray-600">
                 🧾 Transaction Token: <strong>{token}</strong>
               </p>
-              <button onClick={() => setIsModalOpen(false)} className="mt-4 bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="mt-4 bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+              >
                 Close
               </button>
             </div>
@@ -419,19 +690,29 @@ function Checkout() {
         {thankOpen && (
           <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">
-              <h2 className="text-xl font-semibold text-green-600">Payment Successful</h2>
+              <h2 className="text-xl font-semibold text-green-600">
+                Payment Successful
+              </h2>
               <p className="text-gray-700">Your order has been placed.</p>
               <p className="text-sm font-mono text-gray-600">
                 🧾 Order Number: <strong>{thankOrderNo}</strong>
               </p>
               <p className="text-xs text-gray-600">
-                {emailNoted ? "A confirmation email has been sent." : "We’ll email your receipt shortly."}
+                {emailNoted
+                  ? "A confirmation email has been sent."
+                  : "We’ll email your receipt shortly."}
               </p>
               <div className="flex gap-3 justify-center">
-                <a href="/myorder" className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800">
+                <a
+                  href="/myorder"
+                  className="bg-black text-white px-4 py-2 rounded hover:bg-gray-800"
+                >
                   View Orders
                 </a>
-                <button onClick={() => setThankOpen(false)} className="px-4 py-2 rounded border">
+                <button
+                  onClick={() => setThankOpen(false)}
+                  className="px-4 py-2 rounded border"
+                >
                   Close
                 </button>
               </div>
