@@ -168,7 +168,11 @@ const ProductDetails = () => {
   const token = localStorage.getItem("token");
   let decoded = "";
   if (token) {
-    try { decoded = jwtDecode(token); } catch { decoded = ""; }
+    try {
+      decoded = jwtDecode(token);
+    } catch {
+      decoded = "";
+    }
   }
   const userid = decoded?.id;
   const fullName = decoded?.fullname || "Anonymous";
@@ -366,6 +370,7 @@ const ProductDetails = () => {
     try {
       setBuyNowSubmitting(true);
       const salePrice = getSalePrice(product);
+      const quantity = Number(qty || 1);
       const items = [
         {
           product_id: product.ProductId,
@@ -397,6 +402,10 @@ const ProductDetails = () => {
           discount_total: 0,
           status: "pending",
           payment_status: "unpaid",
+          meta: {
+            transaction_token: transactionToken,
+            source: "product_details_buy_now",
+          },
           meta: {
             transaction_token: transactionToken,
             source: "product_details_buy_now",
@@ -489,6 +498,9 @@ const ProductDetails = () => {
         <Helmet>
           <title>Error - Shahu Mumbai</title>
         </Helmet>
+        <Helmet>
+          <title>Error - Shahu Mumbai</title>
+        </Helmet>
         <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5]">
           <p className="p-6 text-center text-red-500">{error}</p>
         </div>
@@ -548,8 +560,12 @@ const ProductDetails = () => {
         /* ────── COMING SOON ────── */
         <div className="min-h-screen flex items-center justify-center bg-[#F1E7E5] font-serif">
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-[#6B4226] mb-4">Coming Soon</h1>
-            <p className="text-lg text-[#3E2C23]">{product.Name} will be available soon!</p>
+            <h1 className="text-4xl font-bold text-[#6B4226] mb-4">
+              Coming Soon
+            </h1>
+            <p className="text-lg text-[#3E2C23]">
+              {product.Name} will be available soon!
+            </p>
             <p className="text-sm text-[#3E2C23] mt-2">
               Launching on:{" "}
               {new Date(product.LaunchingDate).toLocaleString("en-IN", {
