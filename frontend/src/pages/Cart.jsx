@@ -1,3 +1,4 @@
+// src/pages/Cart.jsx
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { FaTrashAlt } from "react-icons/fa";
@@ -9,6 +10,7 @@ import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
 import { useCurrency } from "../supabase/CurrencyContext";
+import { useLoading } from "../context/LoadingContext";   // <-- NEW
 
 const categoryColors = {
   Accessories: "bg-yellow-50",
@@ -16,7 +18,32 @@ const categoryColors = {
   Jewelry: "bg-indigo-50",
 };
 
-// Format price with currency
+/* ------------------------------------------------------------------ */
+/*                     SKELETON ITEM (shown while loading)            */
+/* ------------------------------------------------------------------ */
+const CartItemSkeleton = () => (
+  <div className="bg-white p-4 sm:p-6 rounded-lg shadow flex flex-col sm:flex-row justify-between items-start gap-4 animate-pulse">
+    <div className="flex gap-4">
+      <div className="w-24 h-24 bg-gray-200 rounded-lg" />
+      <div className="space-y-2">
+        <div className="h-3 bg-gray-200 rounded w-20" />
+        <div className="h-5 bg-gray-200 rounded w-40" />
+        <div className="h-4 bg-gray-200 rounded w-32" />
+        <div className="flex items-center gap-2">
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+          <div className="h-4 bg-gray-200 rounded w-8" />
+          <div className="h-8 w-8 bg-gray-200 rounded" />
+        </div>
+      </div>
+    </div>
+    <div className="flex flex-col items-end gap-2">
+      <div className="h-5 bg-gray-200 rounded w-20" />
+      <div className="h-5 w-5 bg-gray-200 rounded-full" />
+    </div>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
 const formatPrice = (value, currencyCode) => {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -24,18 +51,22 @@ const formatPrice = (value, currencyCode) => {
   }).format(value);
 };
 
+/* ------------------------------------------------------------------ */
 function Cart() {
+  const { setLoading } = useLoading();                 // <-- NEW
   const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [cartItems, setCartItems] = useState([]);
   const [promoCode, setPromoCode] = useState("");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLocalLoading] = useState(true);   // local flag
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCartData = async () => {
       if (currencyLoading) return;
+
+      setLoading(true);                // global spinner ON
+      setLocalLoading(true);
       try {
-        setLoading(true);
         const api = apiWithCurrency(currency);
         const response = await api.get("/api/cartById");
         const formattedItems = response.data.map((item) => ({
@@ -57,38 +88,35 @@ function Cart() {
         }));
         setCartItems(formattedItems);
 
-        // Notify navbar an absolute count (authoritative)
         window.dispatchEvent(
           new CustomEvent("cart:updated", { detail: { absolute: formattedItems.length } })
         );
 
-        // GA4: view_cart
-        try {
-          if (formattedItems.length) {
-            Ecom.viewCart(
-              formattedItems.map((i) => ({
-                id: i.id,
-                title: i.title,
-                category: i.category,
-                price: i.price,
-                quantity: i.quantity,
-                currency: i.currency,
-              })),
-              formattedItems.reduce((a, i) => a + i.price * i.quantity, 0),
-              currency
-            );
-          }
-        } catch {}
+        if (formattedItems.length) {
+          Ecom.viewCart(
+            formattedItems.map((i) => ({
+              id: i.id,
+              title: i.title,
+              category: i.category,
+              price: i.price,
+              quantity: i.quantity,
+              currency: i.currency,
+            })),
+            formattedItems.reduce((a, i) => a + i.price * i.quantity, 0),
+            currency
+          );
+        }
       } catch (error) {
         toast.dismiss();
         toast.error("Failed to load cart. Please try again.");
       } finally {
-        setLoading(false);
+        setLoading(false);            // global spinner OFF
+        setLocalLoading(false);
       }
     };
 
     fetchCartData();
-  }, [currency, currencyLoading]);
+  }, [currency, currencyLoading, setLoading]);
 
   const handleQuantityChange = async (id, delta) => {
     try {
@@ -102,12 +130,10 @@ function Cart() {
         items.map((it) => (it.id === id ? { ...it, quantity: newQuantity } : it))
       );
 
-      // GA + toast
       Ecom.addToCart({ ...item, quantity: newQuantity, id, currency: item.currency });
       toast.dismiss();
       toast.success("Quantity updated!");
 
-      // Badge does not change in item count (still 1 line item)
       window.dispatchEvent(new CustomEvent("cart:updated", { detail: { delta: 0 } }));
     } catch (error) {
       toast.dismiss();
@@ -125,7 +151,6 @@ function Cart() {
       toast.dismiss();
       toast.success("Item removed from cart!");
 
-      // Notify navbar: one line item less
       window.dispatchEvent(new CustomEvent("cart:updated", { detail: { delta: -1 } }));
     } catch (error) {
       toast.dismiss();
@@ -134,9 +159,8 @@ function Cart() {
   };
 
   const subtotal = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  // Convert tax to the selected currency (assuming tax is in USD originally)
-  const exchangeRate = currency === "INR" ? 83.25 : 1; // Hardcoded for simplicity; ideally fetch from Currencies table
-  const tax = 36.08 * exchangeRate; // Adjust tax based on currency
+  const exchangeRate = currency === "INR" ? 83.25 : 1;
+  const tax = 36.08 * exchangeRate;
   const total = subtotal + tax;
 
   const baseUrl =
@@ -147,10 +171,7 @@ function Cart() {
     "@context": "https://schema.org",
     "@type": "Order",
     orderStatus: "https://schema.org/OrderProcessing",
-    merchant: {
-      "@type": "Organization",
-      name: "Shahu Mumbai",
-    },
+    merchant: { "@type": "Organization", name: "Shahu Mumbai" },
     potentialAction: {
       "@type": "Action",
       name: "Proceed to Checkout",
@@ -173,10 +194,9 @@ function Cart() {
     })),
   };
 
-  if (currencyLoading) {
-    return null; // Wait for currency to load
-  }
+  if (currencyLoading) return null;
 
+  /* ------------------------------------------------------------------ */
   return (
     <Layout>
       <Helmet>
@@ -193,14 +213,31 @@ function Cart() {
         <script type="application/ld+json">{JSON.stringify(cartJsonLd)}</script>
       </Helmet>
 
-      <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto bg-[#f9f5f0] min-h-screen">
-        <h2 className="text-3xl font-bold mb-6 text-center">🛒 Shopping Cart</h2>
+      <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto bg-[#F1E7E5] min-h-screen">
+        <h2 className="text-3xl font-bold mb-6 text-center">Shopping Cart</h2>
 
+        {/* ---------- LOADING SKELETON ---------- */}
         {loading ? (
-          <div className="text-center text-gray-500">Loading cart...</div>
+          <div className="flex flex-col lg:flex-row gap-8">
+            <div className="flex-1 space-y-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <CartItemSkeleton key={i} />
+              ))}
+            </div>
+            <div className="w-full lg:w-1/3 bg-gray-50 p-6 rounded-xl shadow-lg animate-pulse">
+              <div className="h-7 bg-gray-200 rounded w-32 mb-4" />
+              <div className="space-y-3">
+                <div className="h-4 bg-gray-200 rounded w-full" />
+                <div className="h-4 bg-gray-200 rounded w-full" />
+                <div className="h-4 bg-gray-200 rounded w-full" />
+              </div>
+              <div className="h-10 bg-gray-200 rounded mt-6 w-full" />
+            </div>
+          </div>
         ) : cartItems.length === 0 ? (
           <div className="text-center text-gray-500">Your cart is empty</div>
         ) : (
+          /* ---------- REAL CONTENT ---------- */
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Cart Items */}
             <div className="flex-1 space-y-6">
@@ -220,7 +257,7 @@ function Cart() {
                       <p className="text-xs uppercase text-gray-500 mb-1">{item.category}</p>
                       <h3 className="font-semibold text-lg">{item.title}</h3>
                       <div className="flex items-center gap-2 mt-1 text-sm">
-                        <span className="text-red-500 font-semibold">{formatPrice(item.price, item.currency)}</span>
+                        <span className="text-red-0 font-semibold">{formatPrice(item.price, item.currency)}</span>
                         {item.oldPrice && <span className="line-through text-gray-400">{formatPrice(item.oldPrice, item.currency)}</span>}
                         {item.discount && (
                           <span className="text-white bg-pink-500 px-2 py-0.5 text-xs rounded-full">{item.discount}%</span>
@@ -262,7 +299,6 @@ function Cart() {
             >
               <h4 className="text-xl font-bold mb-4">Order Summary</h4>
 
-              {/* Promo Code */}
               <div className="mb-4">
                 <label htmlFor="promo" className="block text-sm font-medium text-gray-600 mb-1">
                   Promo Code
@@ -289,7 +325,6 @@ function Cart() {
                 </div>
               </div>
 
-              {/* Price Summary */}
               <div className="space-y-2 text-sm text-gray-700">
                 <div className="flex justify-between">
                   <span>Subtotal</span>

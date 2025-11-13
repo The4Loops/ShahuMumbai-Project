@@ -5,15 +5,69 @@ import { FaEye, FaClock, FaTag, FaStar, FaReply } from "react-icons/fa";
 import { toast } from "react-toastify";
 import api from "../supabase/axios";
 import Layout from "../layout/Layout";
-import {jwtDecode} from 'jwt-decode';
+import { jwtDecode } from "jwt-decode";
+import { useLoading } from "../context/LoadingContext";   // <-- NEW
 
+/* ------------------------------------------------------------------ */
+/*                     SKELETON UI (shown while loading)             */
+/* ------------------------------------------------------------------ */
+const BlogViewSkeleton = () => (
+  <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10 space-y-6 animate-pulse">
+    {/* Cover image */}
+    <div className="h-48 sm:h-64 bg-gray-200 rounded-xl" />
+
+    {/* Title */}
+    <div className="h-8 bg-gray-200 rounded w-4/5" />
+
+    {/* Meta */}
+    <div className="flex flex-wrap gap-3 text-sm">
+      <div className="h-5 bg-gray-200 rounded w-20" />
+      <div className="h-5 bg-gray-200 rounded w-24" />
+      <div className="h-5 bg-gray-200 rounded w-20" />
+    </div>
+
+    {/* Tags */}
+    <div className="flex flex-wrap gap-2">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="h-6 bg-gray-200 rounded-full w-16" />
+      ))}
+    </div>
+
+    {/* Content */}
+    <div className="space-y-3">
+      <div className="h-4 bg-gray-200 rounded w-full" />
+      <div className="h-4 bg-gray-200 rounded w-11/12" />
+      <div className="h-4 bg-gray-200 rounded w-10/12" />
+      <div className="h-4 bg-gray-200 rounded w-full" />
+    </div>
+
+    {/* Reviews header */}
+    <div className="h-7 bg-gray-200 rounded w-32" />
+    <div className="space-y-4">
+      {Array.from({ length: 2 }).map((_, i) => (
+        <div key={i} className="border p-4 rounded bg-gray-50">
+          <div className="h-5 bg-gray-200 rounded w-32 mb-2" />
+          <div className="flex gap-1">
+            {Array.from({ length: 5 }).map((_, s) => (
+              <div key={s} className="h-5 w-5 bg-gray-200 rounded-full" />
+            ))}
+          </div>
+          <div className="h-4 bg-gray-200 rounded w-full mt-2" />
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
 const BlogsView = () => {
+  const { setLoading } = useLoading();                 // <-- NEW
   const { id } = useParams();
   const { state } = useLocation();
   const optimisticBlog = state?.blog;
 
   const [blog, setBlog] = useState(optimisticBlog || null);
-  const [loading, setLoading] = useState(!optimisticBlog);
+  const [loading, setLocalLoading] = useState(!optimisticBlog); // <-- local flag
   const [error, setError] = useState(null);
 
   // --- Reviews state ---
@@ -24,6 +78,7 @@ const BlogsView = () => {
   const [user, setUser] = useState(null);
   const [selectedStars, setSelectedStars] = useState(5);
 
+  /* ----------------------- USER INIT ----------------------- */
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (token) {
@@ -40,14 +95,15 @@ const BlogsView = () => {
     }
   }, []);
 
-  // fetch the blog by ID
+  /* ----------------------- FETCH BLOG ----------------------- */
   useEffect(() => {
     window.scrollTo(0, 0);
     let cancelled = false;
 
     const fetchBlog = async () => {
+      setLoading(true);                // global spinner ON
+      setLocalLoading(true);
       try {
-        setLoading(true);
         const { data } = await api.get(`/api/admin/blogs/${id}`);
         if (!cancelled) {
           setBlog(data);
@@ -60,7 +116,10 @@ const BlogsView = () => {
           toast.error(msg);
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled) {
+          setLoading(false);          // global spinner OFF
+          setLocalLoading(false);
+        }
       }
     };
 
@@ -69,14 +128,15 @@ const BlogsView = () => {
     } else {
       setReviews(optimisticBlog.reviews || []);
       setLoading(false);
+      setLocalLoading(false);
     }
 
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, optimisticBlog, setLoading]);
 
-  // increment views
+  /* ----------------------- INCREMENT VIEWS ----------------------- */
   useEffect(() => {
     if (!blog?.BlogId) return;
     const user_id = user?.id;
@@ -85,7 +145,7 @@ const BlogsView = () => {
     }
   }, [blog?.BlogId, user?.id]);
 
-  // Fetch updated reviews
+  /* ----------------------- FETCH UPDATED REVIEWS ----------------------- */
   const fetchReviews = async () => {
     try {
       const { data } = await api.get(`/api/admin/blogs/${id}`);
@@ -95,7 +155,7 @@ const BlogsView = () => {
     }
   };
 
-  // --- Reviews helpers ---
+  /* ----------------------- ADD REVIEW ----------------------- */
   const addReview = async () => {
     if (!newReview.trim() || !user?.id) {
       toast.error("Please log in to add a review");
@@ -118,6 +178,7 @@ const BlogsView = () => {
     }
   };
 
+  /* ----------------------- REPLY ----------------------- */
   const handleReply = async (parentId) => {
     if (!newReply.trim() || !user?.id) {
       toast.error("Please log in to reply");
@@ -139,13 +200,14 @@ const BlogsView = () => {
     }
   };
 
+  /* ----------------------- RENDER REPLIES ----------------------- */
   const renderReplies = (replies, level = 1) => (
     <div className="mt-2 space-y-2">
       {replies.map((reply) => (
         <div
           key={reply.BlogReviewId}
           className="border-l-2 pl-3 border-gray-300"
-          style={{ marginLeft: level * 12 }} // slightly smaller indent for mobile
+          style={{ marginLeft: level * 12 }}
         >
           <p className="text-sm">
             <span className="font-semibold">{reply.Name}:</span> {reply.Text}
@@ -182,15 +244,9 @@ const BlogsView = () => {
     </div>
   );
 
-  if (loading) {
-    return (
-      <Layout>
-        <div className="max-w-3xl mx-auto px-4 py-10 text-center text-gray-600">
-          Loading…
-        </div>
-      </Layout>
-    );
-  }
+  /* ------------------------------------------------------------------ */
+  /* ----------------------- RENDER ----------------------- */
+  /* ------------------------------------------------------------------ */
   if (error) {
     return (
       <Layout>
@@ -200,19 +256,34 @@ const BlogsView = () => {
       </Layout>
     );
   }
+
+  // Show skeleton while loading (global spinner is already on)
+  if (loading) {
+    return (
+      <Layout>
+        <div className="min-h-screen bg-[#F1E7E5]">
+          <BlogViewSkeleton />
+        </div>
+      </Layout>
+    );
+  }
+
   if (!blog) return null;
 
   const displayDate = blog.PublishAt || blog.CreatedAt;
 
   return (
     <Layout>
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-10">
+      <div className="min-h-screen bg-[#F1E7E5] max-w-3xl mx-auto px-4 py-6 sm:py-10">
         {/* Cover Image */}
         {blog.CoverImage && (
           <img
             src={blog.CoverImage}
             alt={blog.Title}
             className="w-full h-48 sm:h-64 object-contain rounded-xl shadow-md"
+            onError={(e) => {
+              e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+            }}
           />
         )}
 
@@ -233,7 +304,7 @@ const BlogsView = () => {
 
         {/* Tags */}
         <div className="mt-3 flex flex-wrap gap-2">
-          {blog.Tags.map((tag, i) => (
+          {blog.Tags?.map((tag, i) => (
             <span
               key={i}
               className="text-xs bg-gray-200 px-2 py-1 rounded flex items-center gap-1"
@@ -249,7 +320,7 @@ const BlogsView = () => {
           dangerouslySetInnerHTML={{ __html: blog.Content }}
         />
 
-        {/* Reviews */}
+        {/* ---------- REVIEWS ---------- */}
         <div className="mt-10">
           <h2 className="text-lg sm:text-xl font-semibold">Reviews</h2>
 
@@ -260,6 +331,7 @@ const BlogsView = () => {
                 className="border p-3 sm:p-4 rounded-md bg-gray-50"
               >
                 <p className="font-semibold">{review.Name}</p>
+
                 {review.Stars && (
                   <p className="text-yellow-500 flex text-sm sm:text-base">
                     {Array(review.Stars)
@@ -269,6 +341,7 @@ const BlogsView = () => {
                       ))}
                   </p>
                 )}
+
                 <p className="text-sm sm:text-base">{review.Text}</p>
 
                 <button
@@ -307,11 +380,14 @@ const BlogsView = () => {
               {[...Array(5)].map((_, i) => (
                 <FaStar
                   key={i}
-                  className={`cursor-pointer text-lg ${i < selectedStars ? 'text-yellow-500' : 'text-gray-300'}`}
+                  className={`cursor-pointer text-lg ${
+                    i < selectedStars ? "text-yellow-500" : "text-gray-300"
+                  }`}
                   onClick={() => setSelectedStars(i + 1)}
                 />
               ))}
             </div>
+
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"

@@ -1,14 +1,32 @@
+// src/pages/CollectionPage.jsx
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
 import api from "../supabase/axios";
+import { useLoading } from "../context/LoadingContext";   // <-- NEW
 
+/* ------------------------------------------------------------------ */
+/*                     SKELETON CARD (shown while loading)            */
+/* ------------------------------------------------------------------ */
+const CollectionCardSkeleton = () => (
+  <div className="rounded-xl shadow bg-[#FFF9F7] border border-[#E5D1C5] overflow-hidden animate-pulse">
+    <div className="h-48 bg-gray-200" />
+    <div className="p-4 text-center">
+      <div className="h-4 bg-gray-200 rounded w-20 mx-auto" />
+    </div>
+    <div className="p-3 text-center text-sm text-[#6D4C41] sm:hidden">
+      <div className="h-5 bg-gray-200 rounded w-32 mx-auto mb-1" />
+      <div className="h-4 bg-gray-200 rounded w-40 mx-auto" />
+    </div>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
 function CollectionCard({ category }) {
   const navigate = useNavigate();
 
   const handleCardClick = () => {
-    // Redirect to /products with category name as query param
     navigate(`/products?name=${encodeURIComponent(category.name)}`);
   };
 
@@ -41,20 +59,22 @@ function CollectionCard({ category }) {
   );
 }
 
+/* ------------------------------------------------------------------ */
 export default function CollectionPage() {
+  const { setLoading } = useLoading();                 // <-- NEW
   const { id } = useParams();
   const [categories, setCategories] = useState([]);
   const [collectionTitle, setCollectionTitle] = useState("Collection");
   const [collectionDescription, setCollectionDescription] = useState("Explore this collection");
-  const [loading, setLoading] = useState(true);
+  const [loading, setLocalLoading] = useState(true);   // local flag
   const [error, setError] = useState(null);
 
   useEffect(() => {
     const fetchCollection = async () => {
+      setLoading(true);                // global spinner ON
+      setLocalLoading(true);
       try {
-        setLoading(true);
         const response = await api.get(`/api/collections/${id}`);
-        // Transform API response to match CollectionCard expectations
         const transformedCategories = response.data.categoryids.map((cat) => ({
           id: cat.category_id,
           name: cat.name,
@@ -65,15 +85,16 @@ export default function CollectionPage() {
         setCategories(transformedCategories);
         setCollectionTitle(response.data.title);
         setCollectionDescription(response.data.description || "Explore this collection");
-        setLoading(false);
       } catch (err) {
         setError(err.message || "Failed to fetch collection");
-        setLoading(false);
+      } finally {
+        setLoading(false);            // global spinner OFF
+        setLocalLoading(false);
       }
     };
 
     fetchCollection();
-  }, [id]);
+  }, [id, setLoading]);
 
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
@@ -85,12 +106,7 @@ export default function CollectionPage() {
     itemListElement: [
       { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
       { "@type": "ListItem", position: 2, name: "Collections", item: `${baseUrl}/collections` },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: collectionTitle,
-        item: pageUrl,
-      },
+      { "@type": "ListItem", position: 3, name: collectionTitle, item: pageUrl },
     ],
   };
 
@@ -114,6 +130,7 @@ export default function CollectionPage() {
     })),
   };
 
+  /* ------------------------------------------------------------------ */
   return (
     <Layout>
       <Helmet>
@@ -142,11 +159,16 @@ export default function CollectionPage() {
 
         <div className="max-w-7xl mx-auto px-4 pb-12">
           {loading ? (
-            <p className="text-center text-[#6D4C41]">Loading...</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <CollectionCardSkeleton key={i} />
+              ))}
+            </div>
           ) : error ? (
             <p className="text-center text-red-500">{error}</p>
           ) : categories.length === 0 ? (
             <p className="text-center text-[#6D4C41]">No categories found.</p>
+
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
               {categories.map((cat) => (

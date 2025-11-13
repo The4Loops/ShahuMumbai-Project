@@ -1,19 +1,38 @@
+// src/components/Collections.jsx
 import React, { useState, useEffect } from "react";
-import api from "../supabase/axios"; 
+import api from "../supabase/axios";
+import { useLoading } from "../context/LoadingContext";   // <-- NEW
 
 import img1 from "../assets/images/product_images/DummyHandbag1.jpeg";
 import img2 from "../assets/images/product_images/DummyHandbag2.jpeg";
 import img3 from "../assets/images/product_images/DummyHandbag3.jpeg";
 
+/* ------------------------------------------------------------------ */
+/*                     SKELETON CARD (shown while loading)            */
+/* ------------------------------------------------------------------ */
+const CollectionSkeleton = () => (
+  <div className="relative group rounded-2xl overflow-hidden shadow-lg animate-pulse">
+    <div className="w-full h-72 bg-gray-200" />
+    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/20 to-transparent" />
+    <div className="absolute bottom-6 left-6 text-left text-white">
+      <div className="h-4 bg-gray-200 rounded w-24 mb-1" />
+      <div className="h-7 bg-gray-200 rounded w-40 mb-2" />
+      <div className="h-4 bg-gray-200 rounded w-48 mb-4" />
+      <div className="h-9 bg-gray-200 rounded-full w-28" />
+    </div>
+  </div>
+);
+
+/* ------------------------------------------------------------------ */
 function Collections() {
+  const { setLoading } = useLoading();                 // <-- NEW
   const [currentPage, setCurrentPage] = useState(1);
   const [collections, setCollections] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLocalLoading] = useState(true);   // local flag
   const [error, setError] = useState(null);
 
   const itemsPerPage = 3;
 
-  // Detect if Published
   const isPublishedFlag = (v) => {
     if (typeof v === "boolean") return v;
     if (typeof v === "number") return v === 1;
@@ -31,10 +50,10 @@ function Collections() {
 
   useEffect(() => {
     const fetchCollections = async () => {
+      setLoading(true);                // global spinner ON
+      setLocalLoading(true);
       try {
-        setLoading(true);
         setError(null);
-
         const response = await api.get("/api/collections");
         const data = response.data;
 
@@ -79,35 +98,20 @@ function Collections() {
         setError("Failed to load collections");
         setCollections([]);
       } finally {
-        setLoading(false);
+        setLoading(false);            // global spinner OFF
+        setLocalLoading(false);
       }
     };
 
     fetchCollections();
-  }, []);
-
-  if (loading) {
-    return (
-      <section className="relative bg-[#F1E7E5] py-16 px-6 text-center">
-        <p className="text-[#4A2C2A] text-lg">Loading collections...</p>
-      </section>
-    );
-  }
-
-  if (error && collections.length === 0) {
-    return (
-      <section className="relative bg-[#F1E7E5] py-16 px-6 text-center">
-        <p className="text-red-600 text-lg font-medium">{error}</p>
-      </section>
-    );
-  }
+  }, [setLoading]);
 
   const publishedData = collections.filter((c) => c.status === "Published");
-
   const totalPages = Math.ceil(publishedData.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const paginated = publishedData.slice(startIndex, startIndex + itemsPerPage);
 
+  /* ------------------------------------------------------------------ */
   return (
     <section className="relative bg-[#F1E7E5] py-16 px-6">
       <div className="max-w-7xl mx-auto text-center">
@@ -119,7 +123,19 @@ function Collections() {
           Explore our carefully curated collections, each telling a unique story of style and heritage.
         </p>
 
-        {paginated.length > 0 ? (
+        {/* ---------- LOADING SKELETON ---------- */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {Array.from({ length: itemsPerPage }).map((_, i) => (
+              <CollectionSkeleton key={i} />
+            ))}
+          </div>
+        ) : error && collections.length === 0 ? (
+          <div className="py-12 text-center">
+            <p className="text-red-600 text-lg font-medium">{error}</p>
+          </div>
+        ) : paginated.length > 0 ? (
+          /* ---------- REAL CARDS ---------- */
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             {paginated.map((col) => (
               <div
@@ -144,27 +160,28 @@ function Collections() {
                   <p className="text-sm opacity-90 mb-4 max-w-xs">{col.desc}</p>
 
                   <a
-                    href={`/collections/${encodeURIComponent(col.slug)}`}
+                    href={`/collections/${encodeURIComponent(col.id)}`}
                     className="inline-flex items-center rounded-full bg-white/20 backdrop-blur-sm px-4 py-2 text-sm font-medium hover:bg-white/30 transition"
                   >
-                    Explore →
+                    Explore
                   </a>
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          // ✅ No Collections Message
+          /* ---------- NO COLLECTIONS ---------- */
           <div className="py-12 text-center">
             <h3 className="text-2xl font-semibold text-[#4A2C2A]">
               No Collections Available
             </h3>
             <p className="mt-2 text-[#4A2C2A]/70 text-lg">
-              More beautiful collections are on the way. Stay tuned ✨
+              More beautiful collections are on the way. Stay tuned
             </p>
           </div>
         )}
 
+        {/* ---------- PAGINATION ---------- */}
         {totalPages > 1 && (
           <div className="flex justify-center gap-2 mt-10">
             <button

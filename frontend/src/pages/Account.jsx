@@ -5,6 +5,7 @@ import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
+import { useLoading } from "../context/LoadingContext"; 
 
 const TextInput = ({
   type = "text",
@@ -44,6 +45,7 @@ const AuthForm = () => {
     password: "",
     confirmPassword: "",
   });
+  const { setLoading } = useLoading(); 
   const [errors, setErrors] = useState({});
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
@@ -57,6 +59,16 @@ const AuthForm = () => {
   const [resetErrors, setResetErrors] = useState({});
   const [resetOtpSent, setResetOtpSent] = useState(false);
   const navigate = useNavigate();
+
+  useEffect(() => {
+      setLoading(true);
+  
+      const timer = setTimeout(() => {
+        setLoading(false);
+      }, 1000);
+  
+      return () => clearTimeout(timer);
+    }, [setLoading]);
 
   const resetForm = () => {
     setFormData({ fullName: "", email: "", password: "", confirmPassword: "" });
@@ -130,6 +142,7 @@ const AuthForm = () => {
   };
 
   const handleSubmit = async (e) => {
+    setLoading(true);
     e.preventDefault();
     if (!validate()) return;
 
@@ -197,10 +210,12 @@ const AuthForm = () => {
       toast.error(error.response?.data?.error || error.message || "An error occurred.");
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
   const handleGoogleSSO = () => {
+    setLoading(true);
     if (!process.env.REACT_APP_GOOGLE_CLIENT_ID) {
       toast.error("Google login is not configured. Please contact support.");
       return;
@@ -209,9 +224,11 @@ const AuthForm = () => {
     const redirectUri = `${window.location.origin}/auth/callback`;
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.REACT_APP_GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=id_token&scope=openid%20profile%20email&nonce=${Math.random().toString(36).substring(2)}`;
     window.location.href = authUrl;
+    setLoading(false);
   };
 
   const handleForgotPasswordSubmit = async (e) => {
+    setLoading(true);
     e.preventDefault();
     if (!validateReset()) return;
 
@@ -252,6 +269,7 @@ const AuthForm = () => {
       }
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 

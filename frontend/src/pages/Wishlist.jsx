@@ -8,6 +8,7 @@ import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import { Helmet } from "react-helmet-async";
 import { useCurrency } from "../supabase/CurrencyContext";
+import { useLoading } from "../context/LoadingContext";
 
 // Animation variants
 const fadeUpVariant = {
@@ -30,7 +31,7 @@ const formatPrice = (value, currencyCode) => {
 const Wishlist = () => {
   const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [wishlistItems, setWishlistItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useLoading();
   const [error, setError] = useState(null);
   const [cartSubmitting, setCartSubmitting] = useState(false);
   const [removeSubmitting, setRemoveSubmitting] = useState(false);
@@ -67,10 +68,11 @@ const Wishlist = () => {
       }
     };
     fetchWishlist();
-  }, [token, userId, currency, currencyLoading]);
+  }, [token, userId, currency, currencyLoading,setLoading]);
 
   const handleAddToCart = async (item) => {
     if (item.products.stock <= 0 || cartSubmitting) return;
+    setLoading(true);
     try {
       setCartSubmitting(true);
       const api = apiWithCurrency(currency);
@@ -96,10 +98,12 @@ const Wishlist = () => {
       toast.error(err.response?.data?.error || "Failed to add to cart");
     } finally {
       setCartSubmitting(false);
+      setLoading(false);
     }
   };
 
   const handleRemoveItem = async (itemId, item) => {
+    setLoading(true);
     if (removeSubmitting) return;
     try {
       setRemoveSubmitting(true);
@@ -121,10 +125,12 @@ const Wishlist = () => {
       toast.error(err.response?.data?.error || "Failed to remove item");
     } finally {
       setRemoveSubmitting(false);
+      setLoading(false);
     }
   };
 
   const handleClearWishlist = async () => {
+    setLoading(true);
     if (clearSubmitting) return;
     try {
       setClearSubmitting(true);
@@ -149,6 +155,7 @@ const Wishlist = () => {
       toast.error(err.response?.data?.error || "Failed to clear wishlist");
     } finally {
       setClearSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -186,7 +193,7 @@ const Wishlist = () => {
     })),
   };
 
-  if (currencyLoading || loading) return <p className="p-6 text-center text-gray-800">Loading...</p>;
+  if (currencyLoading) return null;
   if (error) return <p className="p-6 text-center text-red-500">{error}</p>;
 
   return (

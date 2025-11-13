@@ -7,6 +7,7 @@ import api from "../supabase/axios";
 import Layout from "../layout/Layout";
 import { toast } from "react-toastify";
 import { Helmet } from "react-helmet-async";
+import { useLoading } from "../context/LoadingContext";
 
 // Moved outside to avoid useEffect dependency warning
 const emptyProfile = {
@@ -48,6 +49,7 @@ const Toggle = ({ enabled, onChange, disabled }) => (
 );
 
 function Profile() {
+  const { setLoading } = useLoading();
   const [profile, setProfile] = useState(emptyProfile);
   const [saved, setSaved] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -62,7 +64,7 @@ function Profile() {
         navigate("/");
         return;
       }
-
+      setLoading(true);
       try {
         const response = await api.get("/api/users/profile", {
           headers: { Authorization: `Bearer ${token}` },
@@ -105,11 +107,13 @@ function Profile() {
       } catch (err) {
         console.error("Failed to fetch profile:", err);
         setError("Failed to load profile");
+      }finally{
+        setLoading(false);
       }
     };
 
     fetchProfile();
-  }, [navigate]);
+  }, [navigate,setLoading]);
 
   const handleChange = (e) => {
     setProfile({ ...profile, [e.target.name]: e.target.value });
@@ -119,6 +123,7 @@ function Profile() {
     const file = e.target.files[0];
     if (!file) return;
 
+    setLoading(true);
     try {
       const formData = new FormData();
       formData.append("image", file);
@@ -132,11 +137,14 @@ function Profile() {
     } catch (err) {
       console.error("Image upload failed:", err);
       setError("Failed to upload image");
+    }finally{
+      setLoading(false);
     }
   };
 
   const handleToggleEdit = async () => {
     if (isEditing) {
+      setLoading(true);
       try {
         const response = await api.put(
           "/api/edit-profile",
@@ -197,13 +205,15 @@ function Profile() {
         toast.success("Edit profile successfully");
       } catch (err) {
         console.error("Profile update failed:", err);
+      }finally{
+        setLoading(false);  
       }
     }
     setIsEditing(!isEditing);
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
     navigate("/");
   };
 

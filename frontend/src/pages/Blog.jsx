@@ -1,3 +1,4 @@
+// src/pages/Blog.jsx
 import React, { useState, useEffect } from "react";
 import {
   FaSearch,
@@ -18,15 +19,43 @@ import api from "../supabase/axios";
 import Layout from "../layout/Layout";
 import { Link } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
+import { useLoading } from "../context/LoadingContext";   // <-- NEW
 
+/* ------------------------------------------------------------------ */
+/*                     SKELETON CARD (shown while loading)           */
+/* ------------------------------------------------------------------ */
+const BlogSkeleton = () => (
+  <motion.div
+    initial={{ opacity: 0, scale: 0.97 }}
+    animate={{ opacity: 1, scale: 1 }}
+    transition={{ duration: 0.5 }}
+    className="bg-white rounded-lg shadow overflow-hidden mb-8 animate-pulse"
+  >
+    <div className="h-60 bg-gray-200" />
+    <div className="p-6 space-y-4">
+      <div className="h-7 bg-gray-200 rounded w-3/4" />
+      <div className="flex gap-2">
+        <div className="h-5 bg-gray-200 rounded w-20" />
+        <div className="h-5 bg-gray-200 rounded w-20" />
+        <div className="h-5 bg-gray-200 rounded w-20" />
+      </div>
+      <div className="h-4 bg-gray-200 rounded w-full" />
+      <div className="h-4 bg-gray-200 rounded w-5/6" />
+      <div className="h-10 bg-gray-200 rounded w-32" />
+    </div>
+  </motion.div>
+);
+
+/* ------------------------------------------------------------------ */
 const Blog = () => {
+  const { setLoading } = useLoading();               // <-- NEW
   const [blogs, setBlogs] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("Newest First");
   const [userId, setUserId] = useState(null);
-  const [likedBlogs, setLikedBlogs] = useState([]);
   const [fullName, setFullName] = useState(null);
+  const [loading, setLocalLoading] = useState(true); // <-- NEW (local flag)
 
   const categories = [
     "Announcements",
@@ -35,17 +64,13 @@ const Blog = () => {
     "Behind the Scenes",
   ];
 
-  // Initialize user
+  /* ----------------------- USER INIT ----------------------- */
   useEffect(() => {
     const token = localStorage.getItem("token");
-
     if (token) {
       try {
         const decoded = jwtDecode(token);
-        const name =
-          decoded.fullname ||
-          decoded.email ||
-          "Anonymous";
+        const name = decoded.fullname || decoded.email || "Anonymous";
         setFullName(name);
         setUserId(decoded.id);
       } catch (err) {
@@ -57,28 +82,34 @@ const Blog = () => {
     }
   }, []);
 
-  // Fetch blogs and likes
+  /* ----------------------- FETCH BLOGS ----------------------- */
   useEffect(() => {
     const fetchBlogsAndLikes = async () => {
+      setLoading(true);               // <-- global spinner ON
+      setLocalLoading(true);
       try {
         const blogsResponse = await api.get("/api/blogs");
         setBlogs(blogsResponse.data);
       } catch (error) {
         toast.dismiss();
-        toast.error("Failed to load blogs or likes. Please try again.");
+        toast.error("Failed to load blogs. Please try again.");
+      } finally {
+        setLoading(false);            // <-- global spinner OFF
+        setLocalLoading(false);
       }
     };
     fetchBlogsAndLikes();
-  }, [userId]);
+  }, [userId, setLoading]);
 
+  /* ----------------------- FILTER / SORT ----------------------- */
   const filteredBlogs = blogs
     .filter(
       (blog) =>
-        (blog.Title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          blog.Tags.some((tag) =>
+        (blog.Title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (blog.Tags || []).some((tag) =>
             tag.toLowerCase().includes(searchTerm.toLowerCase())
           ) ||
-          blog.Excerpt.toLowerCase().includes(searchTerm.toLowerCase())) &&
+          blog.Excerpt?.toLowerCase().includes(searchTerm.toLowerCase())) &&
         (categoryFilter ? blog.Category === categoryFilter : true)
     )
     .sort((a, b) =>
@@ -87,6 +118,7 @@ const Blog = () => {
         : new Date(a.PublishAt) - new Date(b.PublishAt)
     );
 
+  /* ----------------------- LIKE HANDLER ----------------------- */
   const handleLike = async (blogId) => {
     if (!userId) {
       toast.dismiss();
@@ -97,8 +129,8 @@ const Blog = () => {
       const response = await api.post(`/api/blogs/${blogId}/like`, {
         user_id: userId,
       });
-      setBlogs((prevBlogs) =>
-        prevBlogs.map((blog) =>
+      setBlogs((prev) =>
+        prev.map((blog) =>
           blog.BlogId === blogId ? { ...blog, Likes: response.data.Likes } : blog
         )
       );
@@ -115,16 +147,25 @@ const Blog = () => {
     }
   };
 
+  /* ----------------------- SHARE URLS ----------------------- */
   const getShareUrls = (blog) => {
     const url = `${window.location.origin}/blogs/${blog.BlogId}`;
     return {
-      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(url)}&text=${encodeURIComponent(blog.title)}`,
-      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
-      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(url)}&title=${encodeURIComponent(blog.title)}&summary=${encodeURIComponent(blog.excerpt)}`,
+      twitter: `https://twitter.com/intent/tweet?url=${encodeURIComponent(
+        url
+      )}&text=${encodeURIComponent(blog.Title)}`,
+      facebook: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
+        url
+      )}`,
+      linkedin: `https://www.linkedin.com/shareArticle?mini=true&url=${encodeURIComponent(
+        url
+      )}&title=${encodeURIComponent(blog.Title)}&summary=${encodeURIComponent(
+        blog.Excerpt
+      )}`,
     };
   };
 
-  // SEO data
+  /* ----------------------- SEO ----------------------- */
   const baseUrl =
     typeof window !== "undefined"
       ? window.location.origin
@@ -164,10 +205,11 @@ const Blog = () => {
     })),
   };
 
+  /* ------------------------------------------------------------------ */
   return (
     <Layout>
       <Helmet>
-        {/* Core SEO */}
+        {/* ----- Core SEO ----- */}
         <title>Stories & Insights — Shahu Mumbai Blog</title>
         <meta
           name="description"
@@ -179,12 +221,12 @@ const Blog = () => {
           content="Shahu Mumbai blog, sustainable fashion India, artisan craftsmanship, heritage fashion, ethical luxury, handcrafted sarees, Mumbai fashion house"
         />
 
-        {/* Canonical + hreflang */}
+        {/* ----- Canonical ----- */}
         <link rel="canonical" href={pageUrl} />
         <link rel="alternate" hrefLang="en-IN" href={pageUrl} />
         <link rel="alternate" hrefLang="x-default" href={pageUrl} />
 
-        {/* Open Graph */}
+        {/* ----- Open Graph ----- */}
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
@@ -195,42 +237,28 @@ const Blog = () => {
         />
         <meta property="og:url" content={pageUrl} />
         <meta property="og:image" content={`${baseUrl}/og/blog.jpg`} />
-        <meta property="og:image:alt" content="Shahu Mumbai Blog — heritage fashion & artisan stories" />
-
-        {/* Twitter
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:site" content="@yourhandle" />
-        <meta name="twitter:title" content="Stories & Insights — Shahu Mumbai Blog" />
         <meta
-          name="twitter:description"
-          content="Discover heritage fashion, sustainable luxury, and artisan stories from Shahu Mumbai."
+          property="og:image:alt"
+          content="Shahu Mumbai Blog — heritage fashion & artisan stories"
         />
-        <meta name="twitter:image" content={`${baseUrl}/og/blog.jpg`} /> */}
 
-        {/* Breadcrumbs for Blog listing */}
+        {/* ----- Structured Data ----- */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
-            "itemListElement": [
-              { "@type": "ListItem", "position": 1, "name": "Home", "item": `${baseUrl}/` },
-              { "@type": "ListItem", "position": 2, "name": "Blog", "item": pageUrl }
-            ]
+            itemListElement: [
+              { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
+              { "@type": "ListItem", position: 2, name: "Blog", item: pageUrl },
+            ],
           })}
         </script>
-
-        {/* Your existing structured data (kept, slightly hardened via slice(0,10) upstream) */}
         <script type="application/ld+json">{JSON.stringify(blogListJsonLd)}</script>
         <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
-
-        {/* Optional: if you later add paginated routes like /blog?page=2, consider:
-        <link rel="prev" href={`${pageUrl}?page=${currentPage-1}`} />
-        <link rel="next" href={`${pageUrl}?page=${currentPage+1}`} />
-        */}
       </Helmet>
 
-
       <div className="max-w-6xl mx-auto px-4 py-8 font-sans bg-[#EDE1DF]">
+        {/* ----- Header ----- */}
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -246,7 +274,7 @@ const Blog = () => {
           </p>
         </motion.div>
 
-        {/* Filters */}
+        {/* ----- Filters ----- */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -263,6 +291,7 @@ const Blog = () => {
               className="flex-1 outline-none text-sm text-gray-700 bg-transparent"
             />
           </div>
+
           <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 border border-gray-200 w-full md:w-auto">
             <FaFilter className="text-gray-400 mr-2" />
             <select
@@ -271,13 +300,14 @@ const Blog = () => {
               className="bg-transparent outline-none text-sm text-gray-700 w-full"
             >
               <option value="">All Categories</option>
-              {["Announcements", "Guides", "Releases", "Behind the Scenes"].map((cat) => (
+              {categories.map((cat) => (
                 <option key={cat} value={cat}>
                   {cat}
                 </option>
               ))}
             </select>
           </div>
+
           <div className="flex items-center bg-gray-50 rounded-lg px-3 py-2 border border-gray-200 w-full md:w-auto">
             <FaClock className="text-gray-400 mr-2" />
             <select
@@ -291,13 +321,20 @@ const Blog = () => {
           </div>
         </motion.div>
 
-        {/* Blog Cards */}
-        {filteredBlogs.length === 0 ? (
+        {/* ----- LOADING SKELETON ----- */}
+        {loading ? (
+          <div className="space-y-8">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <BlogSkeleton key={i} />
+            ))}
+          </div>
+        ) : filteredBlogs.length === 0 ? (
           <p className="text-gray-600 text-center">No blogs found.</p>
         ) : (
+          /* ----- REAL BLOG CARDS ----- */
           filteredBlogs.map((blog) => {
             const shareUrls = getShareUrls(blog);
-            const isLiked = likedBlogs.includes(blog.BlogId);
+            const isLiked = false; // you can keep a liked‑array if you want
 
             return (
               <motion.div
@@ -314,22 +351,30 @@ const Blog = () => {
                       src={blog.CoverImage}
                       alt={blog.Title}
                       className="w-full h-full object-contain"
+                      onError={(e) => {
+                        e.currentTarget.src = `${process.env.PUBLIC_URL}/assets/images/placeholder.png`;
+                      }}
                     />
                   ) : (
-                    <div className="h-full bg-gradient-to-r from-[#8d6e63] to-[#bcaaa4]"></div>
+                    <div className="h-full bg-gradient-to-r from-[#8d6e63] to-[#bcaaa4]" />
                   )}
                 </div>
+
                 <div className="p-6">
                   <h2 className="text-2xl font-semibold mb-2 text-[#5d4037]">
                     {blog.Title}
                   </h2>
+
                   <div className="flex flex-wrap items-center text-sm text-gray-500 gap-2 mb-4">
                     <span>{blog.Category}</span>
                     <span>•</span>
-                    <span>{new Date(blog.CreatedAt).toLocaleDateString()}</span>
+                    <span>
+                      {new Date(blog.CreatedAt).toLocaleDateString()}
+                    </span>
                     <span>•</span>
                     <span>8 min read</span>
                   </div>
+
                   <div className="flex flex-wrap gap-2 mb-4">
                     {(blog.Tags || []).map((tag, i) => (
                       <span
@@ -340,7 +385,9 @@ const Blog = () => {
                       </span>
                     ))}
                   </div>
+
                   <p className="text-gray-700 mb-4">{blog.Excerpt}</p>
+
                   <Link
                     to={`/blogs/${blog.BlogId}`}
                     state={{ blog }}
@@ -349,11 +396,12 @@ const Blog = () => {
                     Read More
                   </Link>
 
-                  {/* Blog footer */}
+                  {/* Footer */}
                   <div className="flex items-center gap-6 mt-4 text-gray-500 text-sm">
                     <div className="flex items-center gap-1">
                       <FaEye /> {blog.Views || 0}
                     </div>
+
                     <div
                       className="flex items-center gap-1 cursor-pointer"
                       onClick={() => handleLike(blog.BlogId)}
@@ -365,14 +413,27 @@ const Blog = () => {
                       )}
                       {blog.Likes || 0}
                     </div>
+
                     <div className="flex items-center gap-2">
-                      <a href={shareUrls.twitter} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={shareUrls.twitter}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <FaTwitter className="text-[#1DA1F2] hover:opacity-80" />
                       </a>
-                      <a href={shareUrls.facebook} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={shareUrls.facebook}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <FaFacebook className="text-[#3b5998] hover:opacity-80" />
                       </a>
-                      <a href={shareUrls.linkedin} target="_blank" rel="noopener noreferrer">
+                      <a
+                        href={shareUrls.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
                         <FaLinkedin className="text-[#0077b5] hover:opacity-80" />
                       </a>
                     </div>

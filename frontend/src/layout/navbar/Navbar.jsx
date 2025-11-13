@@ -212,7 +212,7 @@ export default function Navbar() {
   };
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem("token");
     navigate("/");
     setMobileMenuOpen(false);
     // after logout, fetch guest cart count (it may be different now)

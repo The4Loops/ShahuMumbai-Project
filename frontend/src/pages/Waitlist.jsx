@@ -4,6 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { apiWithCurrency } from "../supabase/axios";
 import { useCurrency } from "../supabase/CurrencyContext";
 import { toast } from "react-toastify";
+import { useLoading } from "../context/LoadingContext";
 
 // Badge styling
 const getStatusBadgeStyle = (status) => {
@@ -23,7 +24,18 @@ const Waitlist = () => {
   const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const [products, setProducts] = useState([]);
   const [toasts, setToasts] = useState([]);
+  const { setLoading } = useLoading();
   const prevRef = useRef([]);
+
+  useEffect(() => {
+    setLoading(true);
+
+    const timer = setTimeout(() => {
+      setLoading(false);
+    }, 2000);
+
+    return () => clearTimeout(timer);
+  }, [setLoading]);
 
   // Use a saved email so user doesn't retype
   const email =
@@ -32,6 +44,7 @@ const Waitlist = () => {
   const fetchWaitlist = async () => {
     if (!email || currencyLoading) return;
 
+    setLoading(true);
     try {
       const api = apiWithCurrency(currency);
       const res = await api.get(`/api/waitlist?email=${encodeURIComponent(email)}`);
@@ -70,6 +83,8 @@ const Waitlist = () => {
     } catch (e) {
       toast.dismiss();
       toast.error("Failed to load waitlist. Please try again.");
+    }finally {
+      setLoading(false);
     }
   };
 
