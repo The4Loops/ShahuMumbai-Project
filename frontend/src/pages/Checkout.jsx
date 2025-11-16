@@ -8,7 +8,7 @@ import { Helmet } from "react-helmet-async";
 import api from "../supabase/axios";
 import { jwtDecode } from "jwt-decode";
 import { trackDB } from "../analytics-db";
-import { useLocation } from "react-router-dom";   // ⬅️ NEW
+import { useLocation } from "react-router-dom";
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
 
@@ -42,7 +42,7 @@ async function loadRazorpay() {
 function Checkout() {
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", address: "" });
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false); // legacy modal (kept)
   const [token, setToken] = useState("");
   const [cart, setCart] = useState([]);
   const [loadingCart, setLoadingCart] = useState(true);
@@ -102,7 +102,7 @@ function Checkout() {
         setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
       }
 
-      // ⬅️ Waitlist deposit: build synthetic 1-item cart with 50% price
+      // ✅ Waitlist deposit: build synthetic 1-item cart with 50% price
       if (isWaitlistDeposit && waitlistProduct) {
         const unitPrice = Number(
           (waitlistProduct.depositAmount ?? waitlistProduct.fullPrice ?? 0).toFixed(2)
@@ -125,7 +125,7 @@ function Checkout() {
         return;
       }
 
-      // Normal cart flow (unchanged)
+      // Normal cart flow
       try {
         setLoadingCart(true);
         const response = await api.get(`${API}/api/cartById`);
@@ -143,6 +143,7 @@ function Checkout() {
 
   const generateToken = () =>
     `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+
   const handleChange = (e) =>
     setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
 
@@ -216,11 +217,12 @@ function Checkout() {
       return;
     }
 
-    // Build lines + items
+    // Build lines + items (for analytics + verify)
     let validLines = [];
     let items = [];
 
     if (isWaitlistDeposit && waitlistProduct) {
+      // ✅ Waitlist deposit: we already built a synthetic cart above
       const unit = Number(
         (waitlistProduct.depositAmount ?? waitlistProduct.fullPrice ?? 0).toFixed(2)
       );
@@ -339,87 +341,138 @@ function Checkout() {
       return;
     }
 
-    // 1) Create order (always INR)
+    // -------------------------------------------------------------------
+    // 1) CREATE ORDER
+    //    - Normal flow: /api/checkout/order (existing)
+    //    - Waitlist deposit: /api/waitlist/deposit-order (NEW)
+    // -------------------------------------------------------------------
     let orderNumber;
-    const baseMeta = {
-      transaction_token: newToken,
-      source: isWaitlistDeposit ? "waitlist_checkout" : "checkout",
-    };
 
-    const meta = isWaitlistDeposit
-      ? {
-          ...baseMeta,
-          type: "WAITLIST_DEPOSIT",
-          waitlist_email: waitlistEmail || formData.email || null,
-          full_price: waitlistProduct?.fullPrice ?? null,
-          deposit_fraction: 0.5,
+    if (isWaitlistDeposit && waitlistProduct) {
+      // ✅ Waitlist deposit uses dedicated API
+      try {
+        const wlResp = await api.post(
+          `${API}/api/waitlist/deposit-order`,
+          {
+            productId: waitlistProduct.id,
+            email: formData.email, // pass email so backend can fill Orders.Email
+          },
+          authToken
+            ? {
+                headers: {
+                  Authorization: `Bearer ${authToken}`,
+                },
+              }
+            : {}
+        );
+
+        const wlData = wlResp.data;
+        if (!wlData?.ok || !wlData?.order_number) {
+          console.error("Waitlist deposit order failed", wlData);
+          alert("Could not create waitlist deposit order. Please try again.");
+          trackDB(
+            "checkout_failed",
+            {
+              stage: "waitlist_order_create",
+              reason: wlData?.error || "order_not_ok",
+              currency: "INR",
+            },
+            userId
+          );
+          return;
         }
-      : baseMeta;
 
-    const data = JSON.stringify({
-      customer: {
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        address: formData.address,
-        anon_id: "web|guest",
-      },
-      items,
-      currency: "INR",
-      payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
-      shipping_total: 0,
-      tax_total: 0,
-      discount_total: 0,
-      status: "pending",
-      payment_status: "unpaid",
-      meta,
-    });
-
-    try {
-      const resp = await api.post(`${API}/api/checkout/order`, data);
-      const text = resp.data;
-
-      if (!text?.ok) {
-        console.error("Checkout failed", text);
-        if (text?.missing?.length)
-          alert(
-            `Order create failed: missing product IDs ${text.missing.join(", ")}`
-          );
-        else if (text?.error === "product_inactive")
-          alert(
-            "One of your cart items is inactive. Please remove it and try again."
-          );
-        else alert("Something went wrong creating your order. Please try again.");
-
+        orderNumber = wlData.order_number;
+      } catch (err) {
+        console.error("Waitlist deposit order network error:", err);
+        alert("Network error while creating waitlist deposit order. Please try again.");
         trackDB(
           "checkout_failed",
           {
-            stage: "order_create",
-            reason: text?.error || "order_not_ok",
-            missing: text?.missing || [],
+            stage: "waitlist_order_create_network",
+            reason: String(err?.message || err),
             currency: "INR",
           },
           userId
         );
         return;
       }
-      orderNumber = text.order_number;
-    } catch (err) {
-      console.error("Order create network error:", err);
-      alert("Network error during checkout (order create).");
-      trackDB(
-        "checkout_failed",
-        {
-          stage: "order_create_network",
-          reason: String(err?.message || err),
-          currency: "INR",
+    } else {
+      // 🛒 Normal cart order: existing /api/checkout/order
+      const baseMeta = {
+        transaction_token: newToken,
+        source: "checkout",
+      };
+
+      const meta = baseMeta;
+
+      const data = JSON.stringify({
+        customer: {
+          name: formData.name,
+          email: formData.email,
+          phone: formData.phone,
+          address: formData.address,
+          anon_id: "web|guest",
         },
-        userId
-      );
-      return;
+        items,
+        currency: "INR",
+        payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
+        shipping_total: 0,
+        tax_total: 0,
+        discount_total: 0,
+        status: "pending",
+        payment_status: "unpaid",
+        meta,
+      });
+
+      try {
+        const resp = await api.post(`${API}/api/checkout/order`, data);
+        const text = resp.data;
+
+        if (!text?.ok) {
+          console.error("Checkout failed", text);
+          if (text?.missing?.length)
+            alert(
+              `Order create failed: missing product IDs ${text.missing.join(", ")}`
+            );
+          else if (text?.error === "product_inactive")
+            alert(
+              "One of your cart items is inactive. Please remove it and try again."
+            );
+          else alert("Something went wrong creating your order. Please try again.");
+
+          trackDB(
+            "checkout_failed",
+            {
+              stage: "order_create",
+              reason: text?.error || "order_not_ok",
+              missing: text?.missing || [],
+              currency: "INR",
+            },
+            userId
+          );
+          return;
+        }
+        orderNumber = text.order_number;
+      } catch (err) {
+        console.error("Order create network error:", err);
+        alert("Network error during checkout (order create).");
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "order_create_network",
+            reason: String(err?.message || err),
+            currency: "INR",
+          },
+          userId
+        );
+        return;
+      }
     }
 
+    // -------------------------------------------------------------------
     // 2) Create Razorpay order
+    // -------------------------------------------------------------------
     let rz;
     try {
       const response = await api.post(`${API}/api/payments/create-order`, {
@@ -431,9 +484,7 @@ function Checkout() {
       if (!rz?.rzp?.order_id) {
         console.error("Razorpay order creation failed", rz);
         alert(
-          `Unable to start payment: ${
-            rz?.message || rz?.error || "Unknown error"
-          }`
+          `Unable to start payment: ${rz?.message || rz?.error || "Unknown error"}`
         );
         trackDB(
           "checkout_failed",
@@ -462,7 +513,9 @@ function Checkout() {
         return;
       }
 
+      // -----------------------------------------------------------------
       // 3) Open Razorpay modal
+      // -----------------------------------------------------------------
       const options = {
         key: rz.key,
         order_id: rz.rzp.order_id,
@@ -724,7 +777,7 @@ function Checkout() {
           </div>
         </div>
 
-        {/* legacy success modal */}
+        {/* legacy success modal (kept for now) */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">

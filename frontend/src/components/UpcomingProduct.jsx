@@ -1,12 +1,12 @@
 // UpcomingCarousel.jsx
 import React, { useState, useEffect } from "react";
 import Slider from "react-slick";
-import "slick-carousel/slick/slick.css";               // ← ONLY this one
-// NO slick-theme.css → no font loading
+import "slick-carousel/slick/slick.css"; // ← ONLY this one
 import { toast } from "react-toastify";
 import { apiWithCurrency } from "../supabase/axios";
 import placeholder from "../assets/products/coat.jpg";
 import { useCurrency } from "../supabase/CurrencyContext";
+import { useNavigate } from "react-router-dom"; // 🔹 NEW
 
 // react-icons
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
@@ -33,6 +33,8 @@ function UpcomingCarousel() {
   // Modal state
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
+
+  const navigate = useNavigate(); // 🔹 for redirecting to /checkout
 
   useEffect(() => {
     const fetchUpcomingProducts = async () => {
@@ -62,50 +64,62 @@ function UpcomingCarousel() {
     setShowModal(true);
   };
 
-  // Razorpay Payment Integration
-  const confirmPayment = async () => {
+  // 🔹 NEW: hand over to Checkout as a "waitlist deposit" instead of calling /api/payment/*
+  const confirmPayment = () => {
     if (!selectedProduct) return;
 
-    try {
-      const amountInCents = Math.round((selectedProduct.Price / 2) * 100);
-      const { data } = await apiWithCurrency(currency).post("/api/payment/create-order", {
-        amount: amountInCents,
-        currency: selectedProduct.currency || currency,
-      });
+    // Normalize / map product for Checkout
+    const mappedProduct = {
+      id: selectedProduct.ProductId ?? selectedProduct.id,
+      name: selectedProduct.Name ?? selectedProduct.name,
+      fullPrice: Number(selectedProduct.Price || 0),
+      depositAmount: Number(selectedProduct.Price || 0) / 2,
+    };
 
-      const options = {
-        key: "rzp_test_1234567890",
-        amount: data.amount,
-        currency: data.currency,
-        name: "Vintage Store",
-        description: `50% Payment for ${selectedProduct.Name}`,
-        order_id: data.id,
-        handler: function (response) {
-          toast.success("Payment Successful");
-          setWaitlist((prev) => [...prev, selectedProduct.ProductId]);
-          setShowModal(false);
-          setSelectedProduct(null);
-
-          apiWithCurrency(currency).post("/api/payment/verify", {
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_signature: response.razorpay_signature,
-            productId: selectedProduct.ProductId,
-          });
-        },
-        prefill: {
-          name: "John Doe",
-          email: "john@example.com",
-          contact: "9876543210",
-        },
-        theme: { color: "#E3BDB4" },
-      };
-
-      const rzp = new window.Razorpay(options);
-      rzp.open();
-    } catch (err) {
-      toast.error("Payment failed, try again");
+    if (!mappedProduct.id || !mappedProduct.fullPrice) {
+      toast.error("Unable to start waitlist checkout for this product.");
+      return;
     }
+
+    // Optional: prefill email from localStorage (same as Waitlist page)
+    const waitlistEmail =
+      (typeof window !== "undefined" && localStorage.getItem("waitlistEmail")) || "";
+
+    // Keep a local "in waitlist" marker so the button text changes
+    setWaitlist((prev) =>
+      prev.includes(mappedProduct.id) ? prev : [...prev, mappedProduct.id]
+    );
+
+    // Optional: store in localStorage for resilience on refresh
+    try {
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "waitlistCheckout",
+          JSON.stringify({
+            fromWaitlist: true,
+            mode: "waitlistDeposit",
+            product: mappedProduct,
+            waitlistEmail: waitlistEmail || null,
+          })
+        );
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    // 🔹 Navigate to Checkout with state – Checkout.jsx already knows how to handle this
+    navigate("/checkout", {
+      state: {
+        fromWaitlist: true,
+        mode: "waitlistDeposit",
+        product: mappedProduct,
+        waitlistEmail: waitlistEmail || null,
+      },
+    });
+
+    // Close modal
+    setShowModal(false);
+    setSelectedProduct(null);
   };
 
   const getHeroImage = (product) => {
@@ -215,12 +229,15 @@ function UpcomingCarousel() {
         </Slider>
       )}
 
-      {/* Payment Modal */}
+      {/* Waitlist / Deposit Modal (no direct Razorpay here anymore) */}
       {showModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-[#FAF3F0] border border-[#D9C5BC] p-6 rounded-2xl shadow-2xl w-96 relative animate-fadeIn">
             <button
-              onClick={() => setShowModal(false)}
+              onClick={() => {
+                setShowModal(false);
+                setSelectedProduct(null);
+              }}
               className="absolute top-3 right-3 text-[#4B2C20] hover:text-[#2c1810] transition"
             >
               X
@@ -238,11 +255,18 @@ function UpcomingCarousel() {
               <p className="mb-2 text-[#4B2C20]">
                 Price:{" "}
                 <span className="font-semibold">
-                  {formatPrice(selectedProduct.Price, selectedProduct.currency || currency)}
+                  {formatPrice(
+                    selectedProduct.Price,
+                    selectedProduct.currency || currency
+                  )}
                 </span>
               </p>
               <p className="text-green-800 font-bold text-lg">
-                Pay 50% Now: {formatPrice(selectedProduct.Price / 2, selectedProduct.currency || currency)}
+                Pay 50% Now:{" "}
+                {formatPrice(
+                  selectedProduct.Price / 2,
+                  selectedProduct.currency || currency
+                )}
               </p>
             </div>
 
@@ -254,7 +278,10 @@ function UpcomingCarousel() {
                 Pay & Join
               </button>
               <button
-                onClick={() => setShowModal(false)}
+                onClick={() => {
+                  setShowModal(false);
+                  setSelectedProduct(null);
+                }}
                 className="bg-[#4B2C20] text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-[#2c1810] hover:shadow-lg transition"
               >
                 Cancel

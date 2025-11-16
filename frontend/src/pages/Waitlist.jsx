@@ -22,7 +22,7 @@ const getStatusBadgeStyle = (status) => {
 };
 
 const Waitlist = () => {
-  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
+  const { currency = "INR", loading: currencyLoading = true } = useCurrency() || {};
   const [products, setProducts] = useState([]);
   const [toasts, setToasts] = useState([]);
   const { setLoading } = useLoading();
@@ -104,36 +104,73 @@ const Waitlist = () => {
     }
   };
 
-  const handlePayAndJoin = (product) => {
+  const handlePayAndJoin = async (product) => {
     if (!authToken) {
       toast.error("Please log in to pay and join the waitlist.");
       navigate("/login");
       return;
     }
 
-    setPayingId(product.id);
+    // normalize product id/name from waitlist API
+    const productId =
+      product.ProductId ??
+      product.productId ??
+      product.ProductID ??
+      product.id;
 
-    try {
-      const payload = {
-        productId: product.id,
-        name: product.name,
-        imageUrl: product.imageUrl,
-        status: product.status,
-        fromWaitlist: true,
-        // You can optionally add depositFraction: 0.5 here
-      };
-      if (typeof window !== "undefined") {
-        localStorage.setItem("waitlistCheckout", JSON.stringify(payload));
-      }
-    } catch {
-      // ignore storage errors
+    const productName =
+      product.Name ??
+      product.ProductName ??
+      product.name ??
+      "Product";
+
+    if (!productId) {
+      toast.error("Unable to identify product for checkout.");
+      return;
     }
 
-    navigate("/checkout", {
-      state: { fromWaitlist: true },
-    });
+    setPayingId(productId);
 
-    setPayingId(null);
+    try {
+      // 🔹 SAME pattern as handleAddToCart in ProductDetails
+      const api = apiWithCurrency("INR"); // cart is in INR
+      await api.post("/api/cart", {
+        product_id: productId,
+        quantity: 1,
+      });
+
+      toast.success(`${productName} added to cart!`);
+
+      // keep cart counter in sync
+      window.dispatchEvent(
+        new CustomEvent("cart:updated", { detail: { delta: 1 } })
+      );
+
+      // optional: mark this as a waitlist checkout
+      try {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(
+            "waitlistCheckout",
+            JSON.stringify({
+              fromWaitlist: true,
+              productId,
+              productName,
+              depositFraction: 0.5, // informational only
+            })
+          );
+        }
+      } catch {
+        // ignore storage errors
+      }
+
+      // behave like clicking "Proceed to Checkout" from Cart
+      navigate("/checkout");
+    } catch (e) {
+      console.error("waitlist -> add to cart failed:", e);
+      toast.error(e?.response?.data?.error || "Failed to add to cart.");
+    } finally {
+      setPayingId(null);
+    }
   };
 
   const origin =
@@ -222,9 +259,15 @@ const Waitlist = () => {
             const depositPaid = product.depositPaid;
             const needsFinalPayment = product.needsFinalPayment;
 
+            const normalizedId =
+              product.ProductId ??
+              product.productId ??
+              product.ProductID ??
+              product.id;
+
             return (
               <div
-                key={product.id}
+                key={normalizedId ?? product.id}
                 className={`bg-white rounded-2xl shadow-lg overflow-hidden border hover:shadow-xl transition relative ${
                   product.flash ? "animate-flash" : ""
                 }`}
@@ -282,14 +325,16 @@ const Waitlist = () => {
                   {!depositPaid && product.status !== "Available" && (
                     <button
                       onClick={() => handlePayAndJoin(product)}
-                      disabled={payingId === product.id}
+                      disabled={payingId === normalizedId}
                       className={`w-full mt-2 text-sm font-semibold rounded-md px-3 py-2 border ${
-                        payingId === product.id
+                        payingId === normalizedId
                           ? "bg-gray-200 text-gray-500 cursor-not-allowed"
                           : "bg-black text-white hover:bg-gray-900"
                       }`}
                     >
-                      {payingId === product.id ? "Opening checkout..." : "Pay & Join (50% deposit)"}
+                      {payingId === normalizedId
+                        ? "Opening checkout..."
+                        : "Pay & Join (50% deposit)"}
                     </button>
                   )}
 

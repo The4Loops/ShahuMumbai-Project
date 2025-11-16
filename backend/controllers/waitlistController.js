@@ -333,31 +333,62 @@ exports.removeFromWaitlist = async (req, res) => {
 
 exports.createWaitlistDepositOrder = async (req, res) => {
   try {
-    const auth = req.headers.authorization || '';
-    const token = auth.split(' ')[1];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
+    // --- 1) Require auth (must be logged in) ---
+    const authHeader = req.headers.authorization || "";
+    const token = authHeader.startsWith("Bearer ")
+      ? authHeader.slice(7)
+      : null;
+
+    if (!token) {
+      return res.status(401).json({ error: "Unauthorized: missing token" });
+    }
 
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);
-    } catch {
-      return res.status(401).json({ error: 'Invalid token' });
+    } catch (err) {
+      console.error("JWT verify failed in createWaitlistDepositOrder:", err.message);
+      return res.status(401).json({ error: "Invalid token" });
     }
 
-    const userId = decoded.id || decoded.userId || null;
-    const userEmail =
+    // --- 2) Extract user id + email from token ---
+    const rawUserId = decoded.id ?? decoded.userId ?? null;
+    if (rawUserId == null) {
+      return res
+        .status(401)
+        .json({ error: "Invalid token: user id not found in payload" });
+    }
+
+    // Force to string and match createOrder's NVARCHAR(1000)
+    const userId = String(rawUserId);
+
+    const tokenEmail =
       decoded.email ||
       decoded.userEmail ||
       decoded.sub ||
-      null;
+      "";
 
-    const { productId } = req.body;
-    if (!productId) return res.status(400).json({ error: 'productId is required' });
+    const bodyEmail = (req.body?.email || "").trim().toLowerCase();
+    const finalEmail = (tokenEmail || bodyEmail || "").trim().toLowerCase();
+
+    if (!finalEmail) {
+      return res
+        .status(400)
+        .json({ error: "Email is required for waitlist deposit" });
+    }
+
+    // --- 3) productId from body ---
+    const { productId } = req.body || {};
+    if (!productId) {
+      return res.status(400).json({ error: "productId is required" });
+    }
 
     const pool = await sql.connect(sqlConfig);
 
-    const productResult = await pool.request()
-      .input('ProductId', sql.Int, productId)
+    // --- 4) Fetch product ---
+    const productResult = await pool
+      .request()
+      .input("ProductId", sql.Int, productId)
       .query(`
         SELECT TOP 1
           ProductId,
@@ -368,78 +399,136 @@ exports.createWaitlistDepositOrder = async (req, res) => {
       `);
 
     if (!productResult.recordset.length) {
-      return res.status(404).json({ error: 'Product not found or inactive' });
+      return res.status(404).json({ error: "Product not found or inactive" });
     }
 
     const p = productResult.recordset[0];
     const finalPrice = Number(p.FinalPrice || 0);
+
     if (!finalPrice || Number.isNaN(finalPrice)) {
-      return res.status(400).json({ error: 'Invalid product price' });
+      return res.status(400).json({ error: "Invalid product price" });
     }
 
     const depositAmount = Number((finalPrice * 0.5).toFixed(2));
-    const orderNumber = `WL-${Date.now()}-${p.ProductId}`;
 
-    const meta = JSON.stringify({
-      type: 'WAITLIST_DEPOSIT',
+    // --- 5) Build totals like checkoutController (but simpler) ---
+    const subtotal = depositAmount;
+    const discount = 0;
+    const tax = 0;
+    const shipping = 0;
+    const total = depositAmount;
+
+    const metaJson = JSON.stringify({
+      type: "WAITLIST_DEPOSIT",
       productId: p.ProductId,
       productName: p.Name,
       depositFraction: 0.5,
-      currency: 'INR',
+      currency: "INR",
       userId,
-      userEmail,
+      userEmail: finalEmail,
     });
 
-    await pool.request()
-      .input('OrderNumber', sql.NVarChar, orderNumber)
-      .input('UserId', sql.NVarChar, userId)
-      .input('Email', sql.NVarChar, userEmail)
-      .input('Amount', sql.Decimal(10, 2), depositAmount)
-      .input('Currency', sql.NVarChar, 'INR')
-      .input('Status', sql.NVarChar, 'pending')
-      .input('PaymentStatus', sql.NVarChar, 'unpaid')
-      .input('Meta', sql.NVarChar(sql.MAX), meta)
-      .input('CreatedAt', sql.DateTime2, new Date())
-      .input('UpdatedAt', sql.DateTime2, new Date())
-      .query(`
-        INSERT INTO dbo.Orders (
-          OrderNumber,
-          UserId,
-          Email,
-          Amount,
-          Currency,
-          Status,
-          PaymentStatus,
-          Meta,
-          CreatedAt,
-          UpdatedAt
-        )
-        VALUES (
-          @OrderNumber,
-          @UserId,
-          @Email,
-          @Amount,
-          @Currency,
-          @Status,
-          @PaymentStatus,
-          @Meta,
-          @CreatedAt,
-          @UpdatedAt
-        );
+    const now = new Date();
+
+    // --- 6) Insert Orders + OrderItems in a transaction ---
+    const tx = new sql.Transaction(pool);
+    await tx.begin();
+
+    try {
+      // Match checkoutController.createOrder column list exactly
+      const orderReq = new sql.Request(tx);
+      orderReq
+        .input("UserId", sql.NVarChar(1000), userId)
+        .input("CustName", sql.NVarChar(255), "") // we can keep this empty or later accept name in body
+        .input("CustEmail", sql.NVarChar(255), finalEmail)
+        .input("CustPhoneNo", sql.NVarChar(255), "")   // optional
+        .input("CustAddress", sql.NVarChar(255), "")   // optional
+        .input("Status", sql.NVarChar(20), "pending")
+        .input("PayStatus", sql.NVarChar(20), "unpaid")
+        .input("Currency", sql.NVarChar(8), "INR")
+        .input("Subtotal", sql.Decimal(18, 2), subtotal)
+        .input("Discount", sql.Decimal(18, 2), discount)
+        .input("Tax", sql.Decimal(18, 2), tax)
+        .input("Shipping", sql.Decimal(18, 2), shipping)
+        .input("Total", sql.Decimal(18, 2), total)
+        .input("Meta", sql.NVarChar(sql.MAX), metaJson)
+        .input("PlacedAt", sql.DateTime2, now);
+
+      const orderIns = await orderReq.query(`
+        INSERT INTO dbo.Orders
+          (UserId, CustomerName, CustomerEmail, CustomerPhoneNo, CustomerAddress,
+           Status, PaymentStatus, Currency,
+           Subtotal, DiscountTotal, TaxTotal, ShippingTotal, Total, Meta, PlacedAt)
+        OUTPUT INSERTED.OrderId, INSERTED.OrderNumber
+        VALUES
+          (@UserId, @CustName, @CustEmail, @CustPhoneNo, @CustAddress,
+           @Status, @PayStatus, @Currency,
+           @Subtotal, @Discount, @Tax, @Shipping, @Total, @Meta, @PlacedAt)
       `);
 
-    res.json({
-      ok: true,
-      order_number: orderNumber,
-      amount: depositAmount,
-      currency: 'INR',
-      product: {
-        id: p.ProductId,
-        name: p.Name,
-      },
-    });
+      const orderRow = orderIns.recordset?.[0];
+      if (!orderRow) throw new Error("order_insert_failed");
+
+      const orderId = orderRow.OrderId;
+      const orderNumber = orderRow.OrderNumber;
+
+      // Insert a single OrderItems row representing the deposit
+      const itemReq = new sql.Request(tx);
+      await itemReq
+        .input("OrderId", sql.Int, orderId)
+        .input("ProductId", sql.Int, p.ProductId)
+        .input("Title", sql.NVarChar(255), p.Name)
+        .input("UnitPrice", sql.Decimal(18, 2), depositAmount)
+        .input("Qty", sql.Int, 1)
+        .input("LineTotal", sql.Decimal(18, 2), depositAmount)
+        .input(
+          "Meta",
+          sql.NVarChar(sql.MAX),
+          JSON.stringify({ waitlistDeposit: true })
+        )
+        .query(`
+          INSERT INTO dbo.OrderItems
+            (OrderId, ProductId, ProductTitle, UnitPrice, Qty, LineTotal, Meta)
+          VALUES
+            (@OrderId, @ProductId, @Title, @UnitPrice, @Qty, @LineTotal, @Meta)
+        `);
+
+      await tx.commit();
+
+      // --- 7) Response to frontend (used by /api/payments/create-order) ---
+      return res.json({
+        ok: true,
+        order_number: orderNumber,
+        amount: depositAmount,
+        currency: "INR",
+        product: {
+          id: p.ProductId,
+          name: p.Name,
+        },
+      });
+    } catch (inner) {
+      try {
+        await tx.rollback();
+      } catch (rbErr) {
+        console.error("Rollback error in createWaitlistDepositOrder:", rbErr);
+      }
+      console.error("createWaitlistDepositOrder tx error:", inner);
+      return res.status(500).json({
+        error: "Internal server error",
+        detail: inner?.message,
+      });
+    }
   } catch (err) {
-    console.error('createWaitlistDepositOrder error:', err);
-    res.status(500).json({ error: 'Internal server error' });
+    console.error("createWaitlistDepositOrder outer error:", err);
+    const dbMsg =
+      err?.originalError?.info?.message ||
+      err?.originalError?.message ||
+      err?.message;
+
+    return res.status(500).json({
+      error: "Internal server error",
+      detail: dbMsg,
+    });
   }
 };
+
