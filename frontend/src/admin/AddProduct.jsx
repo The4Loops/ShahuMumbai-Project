@@ -5,6 +5,8 @@ import { toast } from "react-toastify";
 import Select from "react-select";
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
+import { useLoading } from "../context/LoadingContext";
+import { set } from "date-fns";
 
 const PRODUCT_GET_URL = (id) => `/api/products/${id}`;
 const PRODUCT_CREATE_URL = `/api/products`;
@@ -100,16 +102,15 @@ const AddProduct = ({ editId = null, onSaved }) => {
   const [selectedImages, setSelectedImages] = useState([]);
   const [previews, setPreviews] = useState([]);
   const [categories, setCategories] = useState([]);
-  const [loadingCats, setLoadingCats] = useState(true);
+  const { setLoading } = useLoading();
   const [collections, setCollections] = useState([]);
-  const [loadingCollections, setLoadingCollections] = useState(true);
   const [existingImages, setExistingImages] = useState([]);
 
   // Load categories
   useEffect(() => {
     (async () => {
       try {
-        setLoadingCats(true);
+        setLoading(true);
         const { data } = await api.get("/api/category");
         setCategories(data || []);
       } catch (err) {
@@ -117,7 +118,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
           err?.response?.data?.message || "Failed to fetch categories"
         );
       } finally {
-        setLoadingCats(false);
+        setLoading(false);
       }
     })();
   }, []);
@@ -126,7 +127,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
   useEffect(() => {
     (async () => {
       try {
-        setLoadingCollections(true);
+        setLoading(true);
         const { data } = await api.get("/api/collections");
         setCollections(Array.isArray(data) ? data : data?.collections || []);
       } catch (err) {
@@ -134,13 +135,14 @@ const AddProduct = ({ editId = null, onSaved }) => {
           err?.response?.data?.message || "Failed to fetch collections"
         );
       } finally {
-        setLoadingCollections(false);
+        setLoading(false);
       }
     })();
   }, []);
 
   // If editing: fetch product and prefill
   useEffect(() => {
+    setLoading(true);
     if (!editId) return;
     (async () => {
       try {
@@ -172,6 +174,8 @@ const AddProduct = ({ editId = null, onSaved }) => {
         setHeroImageIndex(heroIdx >= 0 ? heroIdx : null);
       } catch (err) {
         toast.error(err?.response?.data?.message || "Failed to load product");
+      }finally{
+        setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -193,6 +197,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
   const collection_id = watch("collection_id");
 
   const onSubmit = async (form) => {
+    setLoading(true);
     setIsSubmitting(true);
     toast.dismiss();
 
@@ -237,6 +242,8 @@ const AddProduct = ({ editId = null, onSaved }) => {
           const msg =
             e?.response?.data?.message || e?.message || "Image upload failed";
           throw new Error(msg);
+        }finally{
+          setLoading(false);
         }
 
         // hero index must account for existing images length when editing
@@ -324,6 +331,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
       );
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
@@ -499,8 +507,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
               setValue("categoryid", opt ? opt.value : "");
               trigger("categoryid");
             }}
-            placeholder={loadingCats ? "Loading…" : "Select Category"}
-            isLoading={loadingCats}
+            placeholder={"Select Category"}
             isClearable
             styles={customSelectStyles}
             classNamePrefix="react-select"
@@ -526,8 +533,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
               setValue("collection_id", opt ? opt.value : null);
               trigger("collection_id");
             }}
-            placeholder={loadingCollections ? "Loading…" : "Select Collection"}
-            isLoading={loadingCollections}
+            placeholder={"Select Collection"}
             isClearable
             styles={customSelectStyles}
             classNamePrefix="react-select"

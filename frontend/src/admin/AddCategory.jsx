@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import api from '../supabase/axios';
 import { useForm } from 'react-hook-form';
 import { toast } from 'react-toastify';
+import { useLoading } from "../context/LoadingContext";
+import { set } from 'date-fns';
 
 const slugify = (text) =>
   text
@@ -24,6 +26,7 @@ const AddCategory = ({ editId = null, onSaved }) => {
     defaultValues: { name: '', slug: '', image: null },
   });
 
+  const { setLoading } = useLoading();
   const [slugTouched, setSlugTouched] = useState(false);
   const [existingImage, setExistingImage] = useState(''); // current image when editing
   const nameValue = watch('name');
@@ -36,10 +39,14 @@ const AddCategory = ({ editId = null, onSaved }) => {
 
   // If editing: fetch category & prefill
   useEffect(() => {
+    setLoading(true);
     if (!editId) {
       reset({ name: '', slug: '', image: null });
       setExistingImage('');
       setSlugTouched(false);
+      setTimeout(() => {
+        setLoading(false);
+      }, 2000);
       return;
     }
 
@@ -56,11 +63,14 @@ const AddCategory = ({ editId = null, onSaved }) => {
         setSlugTouched(true); // user can still override; prevents auto-regeneration
       } catch (err) {
         toast.error(err?.response?.data?.message || 'Failed to load category');
+      }finally{
+        setLoading(false);
       }
     })();
   }, [editId, reset]);
 
   const onSubmit = async (data) => {
+    setLoading(true);
     toast.dismiss();
     try {
       let imageUrl = existingImage;
@@ -116,6 +126,8 @@ const AddCategory = ({ editId = null, onSaved }) => {
       }
     } catch (err) {
       toast.error(err?.response?.data?.message || 'Failed to save category');
+    }finally{
+      setLoading(false);
     }
   };
 

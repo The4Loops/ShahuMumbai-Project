@@ -9,6 +9,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import api from "../supabase/axios";
+import { useLoading } from "../context/LoadingContext";
 
 const ThemedTooltip = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
@@ -25,7 +26,7 @@ const ThemedTooltip = ({ active, payload, label }) => {
 const SalesReport = () => {
   const [summary, setSummary] = useState([]);
   const [topProducts, setTopProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useLoading();
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -54,7 +55,6 @@ const SalesReport = () => {
       <div className="bg-white rounded-xl border border-[#E6DCD2] shadow-sm p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-bold text-[#6B4226]">Sales Overview</h2>
-          {loading && <span className="text-sm text-gray-500">Loading…</span>}
           {err && <span className="text-sm text-red-600">{err}</span>}
         </div>
         <ResponsiveContainer width="100%" height={300}>
@@ -82,7 +82,7 @@ const SalesReport = () => {
       <div>
         <h2 className="text-xl font-bold text-[#6B4226] mb-6">Top Selling Products</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {topProducts.length === 0 && !loading && !err && (
+          {topProducts.length === 0 && !err && (
             <div className="text-sm text-gray-500">No data</div>
           )}
           {topProducts.map((product) => (

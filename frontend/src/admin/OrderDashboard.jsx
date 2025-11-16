@@ -2,7 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import api from "../supabase/axios.js";
 import { toast } from "react-toastify";
-
+import { useLoading } from "../context/LoadingContext";
+import { set } from "date-fns";
 const STATUS = ["All", "Pending", "Shipped", "Delivered"];
 const CARRIERS = ["Other", "FedEx", "UPS", "USPS", "DHL", "BlueDart", "Delhivery"];
 
@@ -59,13 +60,12 @@ function isCanceled(e) {
 
 export default function OrderDashboard() {
   const [active, setActive] = useState("orders");
-
+  const { setLoading } = useLoading();
   // === ORDERS ===
   const [filter, setFilter] = useState("All");
   const [query, setQuery] = useState("");
   const [orders, setOrders] = useState([]);
   const [ordersTotal, setOrdersTotal] = useState(0);
-  const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersLimit] = useState(50);
   const [ordersOffset, setOrdersOffset] = useState(0);
 
@@ -73,7 +73,6 @@ export default function OrderDashboard() {
   const [wlQuery, setWlQuery] = useState("");
   const [waitlist, setWaitlist] = useState([]);
   const [wlTotal, setWlTotal] = useState(0);
-  const [wlLoading, setWlLoading] = useState(false);
   const [wlPageSize] = useState(50);
   const [wlPage, setWlPage] = useState(1);
 
@@ -102,11 +101,19 @@ export default function OrderDashboard() {
 
   // === SAVE TRACKING ===
   const saveTracking = async (orderNumber, trackingNumber, carrier) => {
-    const res = await api.put(`/api/orders/${encodeURIComponent(orderNumber)}/tracking`, {
+    setLoading(true);
+    let res;
+    try{
+      res = await api.put(`/api/orders/${encodeURIComponent(orderNumber)}/tracking`, {
       trackingNumber,
       carrier: carrier === "Other" ? null : carrier,
     });
     if (!res?.data?.ok) throw new Error(res?.data?.error || "Failed");
+    }catch(err){
+      toast.error(err?.response?.data?.message || 'Failed to save tracking');
+    }finally{
+      setLoading(false);
+    }
     return res.data.order;
   };
 
@@ -126,7 +133,7 @@ export default function OrderDashboard() {
     const url = `/api/orders/listOrders?${params.toString()}`;
 
     try {
-      setOrdersLoading(true);
+      setLoading(true);
       setLastOrdersURL(`${api.defaults.baseURL?.replace(/\/$/, "")}${url}`);
 
       const res = await api.get(url, { signal: controller.signal });
@@ -138,8 +145,6 @@ export default function OrderDashboard() {
 
       setOrders(mapped);
       setOrdersTotal(total);
-
-      toast.success(`Loaded ${mapped.length} orders`);
     } catch (e) {
       if (isCanceled(e)) return; // ✅ ignore cancellations
       console.error("[Orders] ERROR", e);
@@ -147,7 +152,7 @@ export default function OrderDashboard() {
       setOrders([]);
       setOrdersTotal(0);
     } finally {
-      setOrdersLoading(false);
+      setLoading(false);
     }
   };
 
@@ -167,7 +172,7 @@ export default function OrderDashboard() {
     const url = `/api/allWaitListData?${params.toString()}`;
 
     try {
-      setWlLoading(true);
+      setLoading(true);
       const res = await api.get(url, { signal: controller.signal });
       const { items = [], total = 0 } = res.data || {};
       setWaitlist(items);
@@ -179,7 +184,7 @@ export default function OrderDashboard() {
       setWaitlist([]);
       setWlTotal(0);
     } finally {
-      setWlLoading(false);
+      setLoading(false);
     }
   };
 
@@ -241,12 +246,12 @@ export default function OrderDashboard() {
             Waitlist
           </button>
         </div>
-        <button
+        {/* <button
           className="ml-auto px-2 py-1 border rounded text-[#6B4226]/80 text-xs"
           onClick={() => setDebugOpen((v) => !v)}
         >
           {debugOpen ? "Hide Debug" : "Show Debug"}
-        </button>
+        </button> */}
       </div>
 
       {/* DEBUG PANEL */}
@@ -270,7 +275,7 @@ export default function OrderDashboard() {
         </div>
       )}
 
-      <div className="mb-3 p-2 text-xs border rounded bg-[#FFF9F6] text-[#6B4226]">
+      {/* <div className="mb-3 p-2 text-xs border rounded bg-[#FFF9F6] text-[#6B4226]">
         <div><b>orders.length:</b> {orders.length}</div>
         {orders.length > 0 && (
           <>
@@ -280,7 +285,7 @@ export default function OrderDashboard() {
             <div><b>first.placed_at:</b> {String(orders[0].placed_at || "—")}</div>
           </>
         )}
-      </div>
+      </div> */}
       {/* === ORDERS === */}
       {active === "orders" && (
         <>
@@ -308,8 +313,6 @@ export default function OrderDashboard() {
               />
             </div>
           </div>
-
-          {ordersLoading && <div className="p-3 text-sm text-[#6B4226]/70">Loading…</div>}
 
           {/* Desktop Table */}
           {/* Desktop Table (md and up) */}
@@ -406,13 +409,6 @@ export default function OrderDashboard() {
           </tr>
         );
       })}
-      {!ordersLoading && orders.length === 0 && (
-        <tr>
-          <td colSpan={4} className="p-3 text-center text-sm text-[#6B4226]/70">
-            No orders found.
-          </td>
-        </tr>
-      )}
     </tbody>
   </table>
 </div>
@@ -484,8 +480,6 @@ export default function OrderDashboard() {
               className="rounded-md px-3 py-2 border border-[#E6DCD2] text-[#6B4226]"
             />
           </div>
-
-          {wlLoading && <div className="p-3 text-sm text-[#6B4226]/70">Loading…</div>}
 
           <div className="block overflow-x-auto rounded-lg border border-[#E6DCD2] bg-white">
             <table className="w-full table-auto">

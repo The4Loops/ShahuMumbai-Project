@@ -116,33 +116,11 @@ function HomePage() {
       </Helmet>
 
       <Hero />
-
-      {/* Upcoming products (with fallback message if none) */}
       {hasUpcoming === false ? (
-        // <section className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 my-10">
-        //   <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center shadow-sm">
-        //     <h2 className="text-xl sm:text-2xl font-semibold text-gray-800">
-        //       No upcoming products right now
-        //     </h2>
-        //     <p className="mt-2 text-gray-600">
-        //       We’re crafting the next drop. In the meantime, check out our released designs.
-        //     </p>
-        //     <div className="mt-4">
-        //       <Link
-        //         to="/products"
-        //         className="inline-block rounded-full bg-gray-900 px-5 py-2.5 text-white font-medium hover:bg-black transition"
-        //       >
-        //         Browse All Products
-        //       </Link>
-        //     </div>
-        //   </div>
-        // </section>
-        <></>
+        <div></div>
       ) : (
-        // If loading or API error (hasUpcoming === null), we still render the section normally
         <UpcomingProducts />
       )}
-
       <Featured />
       <Collections />
     </Layout>
