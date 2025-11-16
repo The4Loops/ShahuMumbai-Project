@@ -4,6 +4,8 @@ import { useForm, Controller } from 'react-hook-form';
 import { toast } from 'react-toastify';
 import { useParams, useNavigate } from 'react-router-dom';
 import Select from 'react-select';
+import { useLoading } from "../context/LoadingContext";
+import { set } from 'date-fns';
 
 const slugify = (s) =>
   s
@@ -19,8 +21,7 @@ const AddCollections = ({ editId = null, onSaved }) => {
   const routedId = params?.id || null;
   const effectiveId = editId ?? routedId;
   const isEdit = !!effectiveId;
-
-  // Only use navigate when we’re actually on a routed page
+  const { setLoading } = useLoading();
   const navigate = useNavigate();
 
   const {
@@ -71,6 +72,7 @@ const AddCollections = ({ editId = null, onSaved }) => {
   // Fetch categories
   useEffect(() => {
     const fetchCategories = async () => {
+      setLoading(true);
       try {
         const { data } = await api.get('/api/category');
         const categoriesData = Array.isArray(data) ? data : data?.categories || [];
@@ -80,15 +82,19 @@ const AddCollections = ({ editId = null, onSaved }) => {
         setCategoriesError(msg);
         toast.error(msg);
       }
+      finally{
+        setLoading(false);
+      }
     };
     fetchCategories();
-  }, []);
+  }, [setLoading]);
 
   // Load collection for edit
   useEffect(() => {
     if (!isEdit) return;
     (async () => {
       try {
+        setLoading(true);
         const { data } = await api.get(`/api/collections/${effectiveId}`);
         reset({
           title: data.title || '',
@@ -103,11 +109,14 @@ const AddCollections = ({ editId = null, onSaved }) => {
         setPreview(data.cover_image || null);
       } catch (e) {
         toast.error('Failed to load collection');
+      }finally{
+        setLoading(false);
       }
     })();
-  }, [isEdit, effectiveId, reset]);
+  }, [isEdit, effectiveId, reset,setLoading]);
 
   const onSubmit = async (form) => {
+    setLoading(true);
     setIsSubmitting(true);
     toast.dismiss();
     try {
@@ -176,6 +185,7 @@ const AddCollections = ({ editId = null, onSaved }) => {
       toast.error(err?.response?.data?.error || err.message || 'Failed to save collection');
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
 

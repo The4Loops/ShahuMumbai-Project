@@ -4,6 +4,9 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer,
   BarChart, Bar, Legend, ReferenceLine, Cell
 } from "recharts";
+import { useLoading } from "../context/LoadingContext";
+import { toast } from "react-toastify";
+import { set } from "date-fns";
 
 function Card({ title, value, sub }) {
   return (
@@ -41,7 +44,7 @@ export default function Analytics() {
     return d.toISOString().slice(0,10);
   });
   const [to, setTo] = useState(() => new Date().toISOString().slice(0,10));
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useLoading();
   const [kpis, setKpis] = useState({});
   const [top, setTop] = useState([]);
   const [daily, setDaily] = useState([]);
@@ -59,21 +62,37 @@ export default function Analytics() {
       const { data } = await api.get("/api/analytics/summary", { params: { from, to } });
       setKpis(data.kpis || {});
       setTop(data.topProducts || []);
-    } finally {
+    }catch (error) {
+      toast.error("Failed to load summary data");
+    }
+     finally {
       setLoading(false);
     }
   };
 
   const loadDaily = async () => {
-    const { data } = await api.get("/api/analytics/daily", { params: { from, to } });
-    setDaily(data.data || []);
+    setLoading(true);
+    try {
+      const { data } = await api.get("/api/analytics/daily", { params: { from, to } });
+      setDaily(data.data || []);
+    } catch (error) {
+      toast.error("Failed to load daily data");
+    }finally {
+      setLoading(false);
+    }
   };
 
   const loadEvents = async () => {
-    const { data } = await api.get("/api/analytics/events", {
-      params: { limit, name: nameFilter || undefined },
-    });
+    try {
+      const { data } = await api.get("/api/analytics/events", {
+        params: { limit, name: nameFilter || undefined },
+      });
     setEvents(data.events || []);
+    } catch (error) {
+      toast.error("Failed to load recent events"); 
+    }finally{
+      setLoading(false);
+    }
   };
 
   useEffect(() => { loadSummary(); loadDaily(); }, []);
@@ -211,9 +230,7 @@ export default function Analytics() {
       </div>
 
       {/* KPI cards */}
-      {loading ? (
-        <div className="text-gray-500">Loading summary…</div>
-      ) : (
+      {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <Card title="Total Events" value={kpis.total_events ?? 0} />
           <Card title="Unique Sessions" value={kpis.unique_sessions ?? 0} />
@@ -228,7 +245,7 @@ export default function Analytics() {
             sub="Conversion"
           />
         </div>
-      )}
+      }
 
       {/* Daily chart with colors */}
       <div className="rounded-xl border border-[#EAD8D8] bg-white p-4">

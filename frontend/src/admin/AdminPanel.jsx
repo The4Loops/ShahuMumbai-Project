@@ -19,6 +19,7 @@ import News from "./News";
 import AddCollections from "./AddCollections";
 import { FiGrid } from "react-icons/fi";
 import { AdminActionsContext } from "./AdminActionsContext";
+import { useLoading } from "../context/LoadingContext";
 
 import {
   FaBars,
@@ -212,9 +213,6 @@ const AdminPanel = () => {
                 >
                   <FaSearch />
                 </button>
-                <button className="p-2 border rounded-lg text-gray-600 hover:bg-gray-50" title="Notifications">
-                  <FaBell />
-                </button>
               </div>
             </div>
           </header>
@@ -343,12 +341,12 @@ const Sidebar = ({ open, favorites, grouped, activeId, onOpen, toggleFavorite, a
 
   return (
     <aside
-      className={`${asDrawer ? "" : "sticky top-24"} ${open ? "w-64" : "w-16"} transition-all duration-200`}
+      className={`${asDrawer ? "" : "sticky top-24"} ${open ? "w-64" : "w-18"} transition-all duration-200`}
     >
       <div className="bg-white border border-[#EAD8D8] rounded-2xl shadow p-3">
         {/* Favorites (small) */}
         <div className="mb-2">
-          <div className={`text-xs uppercase tracking-wide text-gray-400 ${open ? "px-1" : "text-center"}`}>
+          <div className={`text-xs uppercase tracking-wide text-gray-400 ${open ? "px-1" : "text-center text-[9px]"}`}>
             Favorites
           </div>
           <div className={`mt-2 flex ${open ? "flex-col gap-1" : "flex-col items-center gap-2"}`}>
@@ -447,7 +445,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
   const [topProducts, setTopProducts] = useState([]); // [{ id, name, sales }]
   const [recentOrders, setRecentOrders] = useState([]); // [{ id, customer, total, status }]
 
-  const [loading, setLoading] = useState(true);
+  const { setLoading } = useLoading();
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -518,9 +516,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
     <div className="space-y-6">
       {/* KPI Row */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {(loading && !kpiCards.length ? Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-2xl border border-[#EAD8D8] bg-white p-4 animate-pulse h-24" />
-        )) : kpiCards).map((k) =>
+        {(kpiCards).map((k) =>
           typeof k === "object" ? (
             <div key={k.label} className="rounded-2xl border border-[#EAD8D8] bg-white p-4">
               <div className="text-xs text-gray-500">{k.label}</div>
@@ -549,9 +545,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             </button>
           </div>
           <div className="h-56">
-            {loading && !sales.length ? (
-              <div className="h-full animate-pulse bg-gray-100 rounded-lg" />
-            ) : (
+            {
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={sales}>
                   <CartesianGrid strokeDasharray="3 3" />
@@ -561,7 +555,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
                   <Line type="monotone" dataKey="v" strokeWidth={2} dot={false} />
                 </LineChart>
               </ResponsiveContainer>
-            )}
+            }
           </div>
         </div>
 
@@ -577,11 +571,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
             </button>
           </div>
           <ul className="space-y-2 max-h-56 overflow-auto pr-1">
-            {loading && !topProducts.length ? (
-              Array.from({ length: 5 }).map((_, i) => (
-                <li key={i} className="h-10 rounded-lg border border-gray-200 animate-pulse" />
-              ))
-            ) : (
+            {
               topProducts.map((p, i) => (
                 <li key={p.id} className="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2">
                   <div className="flex items-center gap-3">
@@ -593,7 +583,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
                   <div className="text-sm text-gray-600">{p.sales}</div>
                 </li>
               ))
-            )}
+            }
           </ul>
         </div>
       </div>
@@ -613,9 +603,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
         {error && <div className="text-sm text-red-600 mb-2">{error}</div>}
 
         <div className="max-h-60 overflow-auto">
-          {loading && !recentOrders.length ? (
-            <div className="h-32 animate-pulse bg-gray-100 rounded-lg" />
-          ) : (
+          {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-500">
@@ -650,7 +638,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
                 ))}
               </tbody>
             </table>
-          )}
+          }
         </div>
       </div>
 
