@@ -1,3 +1,4 @@
+// src/pages/Waitlist.jsx
 import React, { useState, useEffect, useRef } from "react";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
@@ -5,8 +6,8 @@ import { apiWithCurrency } from "../supabase/axios";
 import { useCurrency } from "../supabase/CurrencyContext";
 import { toast } from "react-toastify";
 import { useLoading } from "../context/LoadingContext";
+import { useNavigate } from "react-router-dom";
 
-// Badge styling
 const getStatusBadgeStyle = (status) => {
   switch (status) {
     case "Available":
@@ -26,20 +27,22 @@ const Waitlist = () => {
   const [toasts, setToasts] = useState([]);
   const { setLoading } = useLoading();
   const prevRef = useRef([]);
+  const [payingId, setPayingId] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     setLoading(true);
-
     const timer = setTimeout(() => {
       setLoading(false);
     }, 2000);
-
     return () => clearTimeout(timer);
   }, [setLoading]);
 
-  // Use a saved email so user doesn't retype
   const email =
     (typeof window !== "undefined" && (localStorage.getItem("waitlistEmail") || "")) || "";
+
+  const authToken =
+    typeof window !== "undefined" ? localStorage.getItem("token") : null;
 
   const fetchWaitlist = async () => {
     if (!email || currencyLoading) return;
@@ -48,9 +51,8 @@ const Waitlist = () => {
     try {
       const api = apiWithCurrency(currency);
       const res = await api.get(`/api/waitlist?email=${encodeURIComponent(email)}`);
-      const data = res.data;
+      const data = res.data || [];
 
-      // Toast on status change since last snapshot
       const prevById = Object.fromEntries(prevRef.current.map((p) => [p.id, p]));
       data.forEach((p) => {
         const prev = prevById[p.id];
@@ -64,12 +66,10 @@ const Waitlist = () => {
         }
       });
 
-      // Remove flash class after animation
       setTimeout(() => {
         setProducts((curr) => curr.map((prod) => ({ ...prod, flash: false })));
       }, 800);
 
-      // Hide items that have been Available > 24h
       const filtered = data.filter((p) => {
         if (p.status === "Available" && p.availableSince) {
           const hours = (Date.now() - p.availableSince) / (1000 * 60 * 60);
@@ -79,21 +79,62 @@ const Waitlist = () => {
       });
 
       setProducts(filtered);
-      prevRef.current = data; // store raw list (pre-filter) for next diff
+      prevRef.current = data;
     } catch (e) {
       toast.dismiss();
       toast.error("Failed to load waitlist. Please try again.");
-    }finally {
+    } finally {
       setLoading(false);
     }
   };
 
-  // Initial + 5-min refresh
   useEffect(() => {
     fetchWaitlist();
-    const id = setInterval(fetchWaitlist, 300000); // 5 minutes
+    const id = setInterval(fetchWaitlist, 300000);
     return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [email, currency, currencyLoading]);
+
+  const handleSaveEmail = (e) => {
+    e.preventDefault();
+    const val = e.currentTarget.email.value.trim();
+    if (val) {
+      localStorage.setItem("waitlistEmail", val);
+      fetchWaitlist();
+    }
+  };
+
+  const handlePayAndJoin = (product) => {
+    if (!authToken) {
+      toast.error("Please log in to pay and join the waitlist.");
+      navigate("/login");
+      return;
+    }
+
+    setPayingId(product.id);
+
+    try {
+      const payload = {
+        productId: product.id,
+        name: product.name,
+        imageUrl: product.imageUrl,
+        status: product.status,
+        fromWaitlist: true,
+        // You can optionally add depositFraction: 0.5 here
+      };
+      if (typeof window !== "undefined") {
+        localStorage.setItem("waitlistCheckout", JSON.stringify(payload));
+      }
+    } catch {
+      // ignore storage errors
+    }
+
+    navigate("/checkout", {
+      state: { fromWaitlist: true },
+    });
+
+    setPayingId(null);
+  };
 
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
@@ -125,7 +166,7 @@ const Waitlist = () => {
   };
 
   if (currencyLoading) {
-    return null; // Wait for currency to load
+    return null;
   }
 
   return (
@@ -147,20 +188,10 @@ const Waitlist = () => {
       <div className="max-w-6xl mx-auto p-6 relative">
         <h1 className="text-3xl font-bold mb-8 text-center">My Waitlist</h1>
 
-        {/* Simple email capture if not set */}
         {!email && (
           <div className="max-w-md mx-auto mb-8 p-4 border rounded-lg">
             <p className="text-sm mb-2">Enter your email to load your waitlist:</p>
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                const val = e.currentTarget.email.value.trim();
-                if (val) {
-                  localStorage.setItem("waitlistEmail", val);
-                  fetchWaitlist();
-                }
-              }}
-            >
+            <form onSubmit={handleSaveEmail}>
               <div className="flex gap-2">
                 <input
                   name="email"
@@ -175,78 +206,104 @@ const Waitlist = () => {
           </div>
         )}
 
-        {/* Toast Notification Stack */}
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-50">
-          {toasts.map((toast) => (
+          {toasts.map((toastItem) => (
             <div
-              key={toast.id}
+              key={toastItem.id}
               className="bg-indigo-600 text-white px-6 py-3 rounded-lg shadow-lg animate-fadeInOut"
             >
-              {toast.message}
+              {toastItem.message}
             </div>
           ))}
         </div>
 
-        {/* Grid of product cards */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {products.map((product) => (
-            <div
-              key={product.id}
-              className={`bg-white rounded-2xl shadow-lg overflow-hidden border hover:shadow-xl transition relative ${
-                product.flash ? "animate-flash" : ""
-              }`}
-            >
-              {/* Status Badge */}
-              <span
-                className={`absolute top-3 right-3 text-xs font-semibold px-3 py-1 rounded-full border ${getStatusBadgeStyle(
-                  product.status
-                )}`}
+          {products.map((product) => {
+            const depositPaid = product.depositPaid;
+            const needsFinalPayment = product.needsFinalPayment;
+
+            return (
+              <div
+                key={product.id}
+                className={`bg-white rounded-2xl shadow-lg overflow-hidden border hover:shadow-xl transition relative ${
+                  product.flash ? "animate-flash" : ""
+                }`}
               >
-                {product.status}
-              </span>
+                <span
+                  className={`absolute top-3 right-3 text-xs font-semibold px-3 py-1 rounded-full border ${getStatusBadgeStyle(
+                    product.status
+                  )}`}
+                >
+                  {product.status}
+                </span>
 
-              {/* Image Placeholder */}
-              <div className="h-40 flex items-center justify-center bg-gray-200">
-                {product.imageUrl ? (
-                  <img
-                    src={product.imageUrl}
-                    alt={product.name}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <span className="text-gray-700 text-2xl font-bold">
-                    {product.name?.charAt(0)}
-                  </span>
-                )}
-              </div>
+                <div className="h-40 flex items-center justify-center bg-gray-200">
+                  {product.imageUrl ? (
+                    <img
+                      src={product.imageUrl}
+                      alt={product.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-gray-700 text-2xl font-bold">
+                      {product.name?.charAt(0)}
+                    </span>
+                  )}
+                </div>
 
-              {/* Card Body */}
-              <div className="p-4">
-                <h2 className="text-lg font-semibold text-gray-800">{product.name}</h2>
+                <div className="p-4 space-y-3">
+                  <h2 className="text-lg font-semibold text-gray-800">{product.name}</h2>
 
-                {product.status === "Available" ? (
-                  <p className="mt-2 text-sm text-gray-600">
-                    ✅ This product is available now — no waitlist needed.
-                  </p>
-                ) : (
-                  <div className="mt-3 p-3 bg-indigo-50 border rounded-md">
-                    <p className="text-sm text-gray-700">You are on the waitlist for:</p>
-                    <p className="font-bold text-indigo-700">{product.name}</p>
-                    <p className="text-xs text-gray-500">Status: {product.status}</p>
+                  {product.status === "Available" ? (
+                    <p className="mt-1 text-sm text-gray-700">
+                      ✅ This product is available now.
+                    </p>
+                  ) : (
+                    <div className="mt-1 p-3 bg-indigo-50 border rounded-md">
+                      <p className="text-sm text-gray-700">You are on the waitlist for:</p>
+                      <p className="font-bold text-indigo-700">{product.name}</p>
+                      <p className="text-xs text-gray-500">Status: {product.status}</p>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center gap-2 text-xs">
+                    {depositPaid && (
+                      <span className="inline-flex items-center rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-green-700">
+                        50% deposit paid
+                      </span>
+                    )}
+                    {needsFinalPayment && (
+                      <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-amber-700">
+                        Final 50% payment pending
+                      </span>
+                    )}
                   </div>
-                )}
 
-                <p className="mt-3 text-xs text-gray-400">
-                  ⏱ Last updated:{" "}
-                  {product.updated ? new Date(product.updated).toLocaleString() : "—"}
-                </p>
+                  {!depositPaid && product.status !== "Available" && (
+                    <button
+                      onClick={() => handlePayAndJoin(product)}
+                      disabled={payingId === product.id}
+                      className={`w-full mt-2 text-sm font-semibold rounded-md px-3 py-2 border ${
+                        payingId === product.id
+                          ? "bg-gray-200 text-gray-500 cursor-not-allowed"
+                          : "bg-black text-white hover:bg-gray-900"
+                      }`}
+                    >
+                      {payingId === product.id ? "Opening checkout..." : "Pay & Join (50% deposit)"}
+                    </button>
+                  )}
+
+                  <p className="mt-1 text-xs text-gray-400">
+                    ⏱ Last updated:{" "}
+                    {product.updated ? new Date(product.updated).toLocaleString() : "—"}
+                  </p>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
 
-      {/* Custom Animations */}
       <style>{`
         @keyframes flash {
           0% { background-color: #fef3c7; }

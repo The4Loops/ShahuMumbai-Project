@@ -8,7 +8,9 @@ function useSearch(rows, query, keys) {
   return useMemo(() => {
     const q = (query || "").toLowerCase().trim();
     if (!q) return rows;
-    return rows.filter((r) => keys.some((k) => String(r?.[k] ?? "").toLowerCase().includes(q)));
+    return rows.filter((r) =>
+      keys.some((k) => String(r?.[k] ?? "").toLowerCase().includes(q))
+    );
   }, [rows, query, keys]);
 }
 
@@ -80,7 +82,6 @@ export default function WaitlistTable() {
 
   return (
     <div className="p-4 space-y-4">
-      {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
         <div className="flex-1 min-w-[260px]">
           <label className="block text-sm font-medium text-gray-700 mb-1">Search</label>
@@ -93,7 +94,10 @@ export default function WaitlistTable() {
                 placeholder="email / product name / product id"
                 className="w-full focus:outline-none"
               />
-              <button type="submit" className="px-3 py-1 rounded bg-indigo-600 text-white text-sm">
+              <button
+                type="submit"
+                className="px-3 py-1 rounded bg-indigo-600 text-white text-sm"
+              >
                 Search
               </button>
             </div>
@@ -104,7 +108,6 @@ export default function WaitlistTable() {
       {loading && <div className="text-sm text-gray-500">Loading waitlist…</div>}
       {error && <div className="text-sm text-red-600">{error}</div>}
 
-      {/* Table */}
       <div className="overflow-x-auto border rounded-md">
         <table className="min-w-full text-sm">
           <thead className="bg-gray-50">
@@ -112,6 +115,8 @@ export default function WaitlistTable() {
               <th className="px-3 py-2 text-left">#</th>
               <th className="px-3 py-2 text-left">Product</th>
               <th className="px-3 py-2 text-left">User Email</th>
+              <th className="px-3 py-2 text-left">Status</th>
+              <th className="px-3 py-2 text-left">Deposit / Final</th>
               <th className="px-3 py-2 text-left">Created (UTC)</th>
               <th className="px-3 py-2 text-left">Notified</th>
               <th className="px-3 py-2 text-right">Actions</th>
@@ -120,58 +125,115 @@ export default function WaitlistTable() {
           <tbody>
             {filtered.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-3 py-6 text-center text-gray-500">No waitlist entries</td>
+                <td colSpan={8} className="px-3 py-6 text-center text-gray-500">
+                  No waitlist entries
+                </td>
               </tr>
             ) : (
-              filtered.map((r, idx) => (
-                <tr key={r.WaitlistId ?? idx} className="border-t">
-                  <td className="px-3 py-2">{(page - 1) * limit + idx + 1}</td>
-                  <td className="px-3 py-2">
-                    <div className="font-medium text-gray-800">{r.ProductName}</div>
-                    <div className="text-xs text-gray-500">#{r.ProductId}</div>
-                  </td>
-                  <td className="px-3 py-2">{r.UserEmail || <span className="text-gray-400">—</span>}</td>
-                  <td className="px-3 py-2">{r.CreatedUtc ? new Date(r.CreatedUtc).toLocaleString() : "—"}</td>
-                  <td className="px-3 py-2">
-                    {r.NotifiedUtc ? (
-                      <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs bg-green-50 border-green-300 text-green-700">
-                        Confirmed
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">—</span>
-                    )}
-                  </td>
-                  <td className="px-3 py-2">
-                    <div className="flex items-center gap-2 justify-end">
-                      {!r.NotifiedUtc && (
-                        <button
-                          onClick={() => onConfirm(r.WaitlistId)}
-                          className="p-2 rounded hover:bg-green-50 transition"
-                          title="Mark as Notified"
-                        >
-                          <CheckCircle size={18} className="text-green-600" />
-                        </button>
+              filtered.map((r, idx) => {
+                const depositPaid = r.DepositPaymentStatus === "paid";
+                const finalPaid = r.FinalPaymentStatus === "paid";
+                const needsFinal =
+                  r.Status === "Available" && depositPaid && !finalPaid;
+
+                return (
+                  <tr key={r.WaitlistId ?? idx} className="border-t">
+                    <td className="px-3 py-2">
+                      {(page - 1) * limit + idx + 1}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="font-medium text-gray-800">
+                        {r.ProductName}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        #{r.ProductId}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      {r.UserEmail || (
+                        <span className="text-gray-400">—</span>
                       )}
-                      <button
-                        onClick={() => setDeleteRow(r)}
-                        className="p-2 rounded hover:bg-red-50 transition"
-                        title="Delete entry"
-                      >
-                        <Trash2 size={18} className="text-red-600" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
+                    </td>
+                    <td className="px-3 py-2">
+                      <span className="inline-flex rounded-full border px-2 py-0.5 text-xs">
+                        {r.Status}
+                      </span>
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex flex-wrap gap-1">
+                          {depositPaid ? (
+                            <span className="inline-flex items-center rounded-full border border-green-300 bg-green-50 px-2 py-0.5 text-xs text-green-700">
+                              50% deposit paid
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-xs text-gray-600">
+                              Deposit pending
+                            </span>
+                          )}
+                          {finalPaid ? (
+                            <span className="inline-flex items-center rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs text-blue-700">
+                              Final paid
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center rounded-full border border-gray-300 bg-gray-50 px-2 py-0.5 text-xs text-gray-600">
+                              Final pending
+                            </span>
+                          )}
+                        </div>
+                        {needsFinal && (
+                          <span className="text-xs text-amber-700 bg-amber-50 border border-amber-200 inline-block px-2 py-0.5 rounded">
+                            Final 50% payment required (product available)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-2">
+                      {r.CreatedUtc
+                        ? new Date(r.CreatedUtc).toLocaleString()
+                        : "—"}
+                    </td>
+                    <td className="px-3 py-2">
+                      {r.NotifiedUtc ? (
+                        <span className="inline-flex items-center gap-1 rounded border px-2 py-0.5 text-xs bg-green-50 border-green-300 text-green-700">
+                          Confirmed
+                        </span>
+                      ) : (
+                        <span className="text-gray-400">—</span>
+                      )}
+                    </td>
+                    <td className="px-3 py-2">
+                      <div className="flex items-center gap-2 justify-end">
+                        {!r.NotifiedUtc && (
+                          <button
+                            onClick={() => onConfirm(r.WaitlistId)}
+                            className="p-2 rounded hover:bg-green-50 transition"
+                            title="Mark as Notified"
+                          >
+                            <CheckCircle size={18} className="text-green-600" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDeleteRow(r)}
+                          className="p-2 rounded hover:bg-red-50 transition"
+                          title="Delete entry"
+                        >
+                          <Trash2 size={18} className="text-red-600" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
             )}
           </tbody>
         </table>
       </div>
 
-      {/* Pagination */}
       <div className="flex items-center justify-between">
         <div className="text-sm text-gray-600">
-          Showing {rows.length ? offset + 1 : 0}–{Math.min(offset + rows.length, total)} of {total}
+          Showing {rows.length ? offset + 1 : 0}–
+          {Math.min(offset + rows.length, total)} of {total}
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -181,7 +243,9 @@ export default function WaitlistTable() {
           >
             Prev
           </button>
-          <span className="text-sm">Page {page} / {pages}</span>
+          <span className="text-sm">
+            Page {page} / {pages}
+          </span>
           <button
             disabled={offset + limit >= total}
             onClick={() => setOffset(offset + limit)}
@@ -191,30 +255,54 @@ export default function WaitlistTable() {
           </button>
           <select
             value={limit}
-            onChange={(e) => { setLimit(+e.target.value); setOffset(0); }}
+            onChange={(e) => {
+              setLimit(+e.target.value);
+              setOffset(0);
+            }}
             className="rounded border px-2 py-1"
           >
-            {[10, 20, 50, 100].map((n) => <option key={n} value={n}>{n}/page</option>)}
+            {[10, 20, 50, 100].map((n) => (
+              <option key={n} value={n}>
+                {n}/page
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* Delete modal */}
       <AnimatePresence>
         {deleteRow && (
-          <motion.div className="fixed inset-0 flex items-end md:items-center justify-center bg-black/50 z-50"
-            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-            <motion.div className="bg-white rounded-t-xl md:rounded-xl shadow-xl p-6 w-full md:w-[420px]"
-              initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 50, opacity: 0 }}>
-              <h3 className="text-lg font-semibold mb-2">Delete Waitlist Entry</h3>
+          <motion.div
+            className="fixed inset-0 flex items-end md:items-center justify-center bg-black/50 z-50"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="bg-white rounded-t-xl md:rounded-xl shadow-xl p-6 w-full md:w-[420px]"
+              initial={{ y: 50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 50, opacity: 0 }}
+            >
+              <h3 className="text-lg font-semibold mb-2">
+                Delete Waitlist Entry
+              </h3>
               <p className="text-gray-700 mb-4">
-                Delete <strong>{deleteRow.UserEmail || "Unknown"}</strong> for <strong>{deleteRow.ProductName}</strong>?
+                Delete{" "}
+                <strong>{deleteRow.UserEmail || "Unknown"}</strong> for{" "}
+                <strong>{deleteRow.ProductName}</strong>?
               </p>
               <div className="flex justify-end gap-2">
-                <button onClick={() => setDeleteRow(null)} className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition">
+                <button
+                  onClick={() => setDeleteRow(null)}
+                  className="px-4 py-2 rounded-md border border-gray-300 hover:bg-gray-100 transition"
+                >
                   Cancel
                 </button>
-                <button onClick={onDelete} className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition font-semibold">
+                <button
+                  onClick={onDelete}
+                  className="px-4 py-2 rounded-md bg-red-600 text-white hover:bg-red-700 transition font-semibold"
+                >
                   Delete
                 </button>
               </div>

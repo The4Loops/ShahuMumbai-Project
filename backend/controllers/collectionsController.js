@@ -421,14 +421,14 @@ exports.updateCollection = async (req, res) => {
       if (categoryids !== undefined) {
         await new sql.Request(tx)
           .input('Id', sql.Int, intId)
-          .query(`DELETE FROM dbo.collection_categories WHERE collection_id=@Id`);
+          .query(`DELETE FROM dbo.CollectionCategories WHERE CollectionId=@Id`);
 
         for (const cid of categoryids) {
           await new sql.Request(tx)
             .input('Coll', sql.Int, intId)
             .input('Cat', sql.Int, parseInt(cid))
             .query(`
-              INSERT INTO dbo.collection_categories (collection_id, category_id)
+              INSERT INTO dbo.CollectionCategories (CollectionId, CategoryId)
               VALUES (@Coll, @Cat)
             `);
         }
@@ -437,9 +437,9 @@ exports.updateCollection = async (req, res) => {
       const cats = await new sql.Request(tx)
         .input('Id', sql.Int, intId)
         .query(`
-          SELECT category_id
-          FROM dbo.collection_categories
-          WHERE collection_id=@Id
+          SELECT CategoryId
+          FROM dbo.CollectionCategories
+          WHERE CollectionId=@Id
         `);
 
       await tx.commit();
@@ -495,7 +495,7 @@ exports.deleteCollection = async (req, res) => {
     try {
       await new sql.Request(tx)
         .input('Id', sql.Int, intId)
-        .query(`DELETE FROM dbo.collection_categories WHERE collection_id=@Id`);
+        .query(`DELETE FROM dbo.CollectionCategories WHERE CollectionId=@Id`);
 
       const del = await new sql.Request(tx)
         .input('Id', sql.Int, intId)

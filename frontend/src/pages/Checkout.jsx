@@ -6,20 +6,21 @@ import Layout from "../layout/Layout";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
 import api from "../supabase/axios";
-import { jwtDecode } from "jwt-decode";          // 🔹 NEW
-import { trackDB } from "../analytics-db";       // 🔹 NEW
+import { jwtDecode } from "jwt-decode";
+import { trackDB } from "../analytics-db";
+import { useLocation } from "react-router-dom";   // ⬅️ NEW
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
 
 // ---- helpers ----
 const fmtINR = (n) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(Number(n || 0));
+  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
+    Number(n || 0)
+  );
 
 const finalUnitPrice = (p) => {
-  // support different casings from your API
   const rawPrice = p?.Price ?? p?.price ?? 0;
   const rawDiscount = p?.DiscountPrice ?? p?.discountprice;
-  // If DiscountPrice exists, it's the FINAL price. Otherwise use Price.
   return Number((rawDiscount != null && rawDiscount !== "" ? rawDiscount : rawPrice) || 0);
 };
 
@@ -41,14 +42,13 @@ async function loadRazorpay() {
 function Checkout() {
   const [formData, setFormData] = useState({ name: "", email: "", phone: "", address: "" });
   const [paymentMethod, setPaymentMethod] = useState("");
-  const [isModalOpen, setIsModalOpen] = useState(false); // (kept) original success modal (unused now)
-  const [token, setToken] = useState("");                // transaction token (legacy modal)
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [token, setToken] = useState("");
   const [cart, setCart] = useState([]);
   const [loadingCart, setLoadingCart] = useState(true);
   const [errBanner, setErrBanner] = useState("");
   const [currency, setCurrency] = useState("INR");
 
-  // 🎉 Thank-you modal
   const [thankOpen, setThankOpen] = useState(false);
   const [thankOrderNo, setThankOrderNo] = useState("");
   const [emailNoted, setEmailNoted] = useState(false);
@@ -56,6 +56,14 @@ function Checkout() {
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const pageUrl = `${baseUrl}/checkout`;
+
+  // 🔹 Waitlist deposit state (from Waitlist.jsx)
+  const location = useLocation();
+  const waitlistState = location.state;
+  const isWaitlistDeposit =
+    !!waitlistState?.fromWaitlist && waitlistState?.mode === "waitlistDeposit";
+  const waitlistProduct = isWaitlistDeposit ? waitlistState?.product : null;
+  const waitlistEmail = isWaitlistDeposit ? waitlistState?.waitlistEmail : null;
 
   // 🔹 decode logged-in user (for DB tracking)
   const authToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -69,7 +77,7 @@ function Checkout() {
   }
   const userId = decodedUser?.id || null;
 
-  // ---- totals using DiscountPrice as final price when present ----
+  // totals using DiscountPrice as final price when present
   const totals = useMemo(() => {
     const lines = cart || [];
     const subtotal = lines.reduce((sum, l) => {
@@ -80,11 +88,44 @@ function Checkout() {
     return { subtotal, tax: 0, shipping: 0, total: subtotal };
   }, [cart]);
 
+  // Prefill email when coming from waitlist
+  useEffect(() => {
+    if (isWaitlistDeposit && waitlistEmail && !formData.email) {
+      setFormData((prev) => ({ ...prev, email: waitlistEmail }));
+    }
+  }, [isWaitlistDeposit, waitlistEmail, formData.email]);
+
+  // Load cart or create synthetic waitlist cart
   useEffect(() => {
     (async () => {
       if (!API) {
         setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
       }
+
+      // ⬅️ Waitlist deposit: build synthetic 1-item cart with 50% price
+      if (isWaitlistDeposit && waitlistProduct) {
+        const unitPrice = Number(
+          (waitlistProduct.depositAmount ?? waitlistProduct.fullPrice ?? 0).toFixed(2)
+        );
+
+        setCart([
+          {
+            product: {
+              id: waitlistProduct.id,
+              name: waitlistProduct.name,
+              Price: unitPrice,
+              DiscountPrice: null,
+              currency: "INR",
+            },
+            quantity: 1,
+          },
+        ]);
+        setCurrency("INR");
+        setLoadingCart(false);
+        return;
+      }
+
+      // Normal cart flow (unchanged)
       try {
         setLoadingCart(true);
         const response = await api.get(`${API}/api/cartById`);
@@ -98,10 +139,12 @@ function Checkout() {
         setLoadingCart(false);
       }
     })();
-  }, []);
+  }, [isWaitlistDeposit, waitlistProduct]);
 
-  const generateToken = () => `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
-  const handleChange = (e) => setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
+  const generateToken = () =>
+    `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+  const handleChange = (e) =>
+    setFormData((p) => ({ ...p, [e.target.name]: e.target.value }));
 
   const isValid = () => {
     const { name, email, phone, address } = formData || {};
@@ -119,7 +162,7 @@ function Checkout() {
     if (!isValid()) return;
     setErrBanner("");
 
-    // Analytics: intent (use finalUnitPrice)
+    // Analytics: intent
     let gaItems = [];
     let totalValue = 0;
     try {
@@ -140,7 +183,6 @@ function Checkout() {
       const pm = (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_");
       Ecom.addPaymentInfo(gaItems, pm);
 
-      // 🔹 DB analytics: begin_checkout
       trackDB(
         "begin_checkout",
         {
@@ -148,12 +190,12 @@ function Checkout() {
           items_count: gaItems.length,
           value: totalValue,
           currency: "INR",
-          source: "checkout_page",
+          source: isWaitlistDeposit ? "waitlist_checkout" : "checkout_page",
         },
         userId
       );
     } catch {
-      // fail silently for analytics
+      // ignore analytics failure
     }
 
     const newToken = generateToken();
@@ -161,7 +203,6 @@ function Checkout() {
 
     if (!API) {
       alert("API base URL is not configured (REACT_APP_API_BASE_URL).");
-      // 🔹 DB: env config failure
       trackDB(
         "checkout_failed",
         {
@@ -175,91 +216,118 @@ function Checkout() {
       return;
     }
 
-    // 0) Reload cart (authoritative)
-    let serverCart = [];
-    try {
-      const response = await api.get(`${API}/api/cartById`);
-      serverCart = response.data || [];
-    } catch (e) {
-      console.error("Failed to reload cart:", e);
-      alert("Could not load your cart. Please refresh and try again.");
-      // 🔹 DB: load_cart failure
-      trackDB(
-        "checkout_failed",
-        {
-          stage: "load_cart",
-          reason: String(e?.message || e),
-          value: totalValue,
-          currency: "INR",
-        },
-        userId
-      );
-      return;
-    }
+    // Build lines + items
+    let validLines = [];
+    let items = [];
 
-    // Filter invalid
-    const invalid = [];
-    const validLines = serverCart.filter((ci) => {
-      const p = ci?.product;
-      const active =
-        p?.is_active === 1 ||
-        p?.is_active === "Y" ||
-        p?.is_active === true ||
-        p?.is_active === undefined;
-      const qty = Number(ci?.quantity || 1);
-      const okStock = p?.stock == null ? true : Number(p.stock) >= qty;
-      if (!active || !okStock) {
-        invalid.push({
-          id: p?.id,
-          name: p?.name,
-          reason: !active ? "inactive" : "insufficient stock",
-        });
-        return false;
+    if (isWaitlistDeposit && waitlistProduct) {
+      const unit = Number(
+        (waitlistProduct.depositAmount ?? waitlistProduct.fullPrice ?? 0).toFixed(2)
+      );
+      const qty = 1;
+
+      validLines = [
+        {
+          product: {
+            id: waitlistProduct.id,
+            name: waitlistProduct.name,
+            Price: unit,
+            DiscountPrice: null,
+          },
+          quantity: qty,
+        },
+      ];
+
+      items = [
+        {
+          product_id: waitlistProduct.id,
+          product_title: waitlistProduct.name,
+          unit_price: unit,
+          qty,
+        },
+      ];
+    } else {
+      // Normal cart checkout: reload authoritative cart from server
+      let serverCart = [];
+      try {
+        const response = await api.get(`${API}/api/cartById`);
+        serverCart = response.data || [];
+      } catch (e) {
+        console.error("Failed to reload cart:", e);
+        alert("Could not load your cart. Please refresh and try again.");
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "load_cart",
+            reason: String(e?.message || e),
+            value: totalValue,
+            currency: "INR",
+          },
+          userId
+        );
+        return;
       }
-      return true;
-    });
 
-    if (!validLines.length) {
-      alert(
-        invalid.length
-          ? `Your cart has items that cannot be purchased:\n${invalid
-              .map((i) => `• ${i.name} (${i.reason})`)
-              .join("\n")}`
-          : "Your cart is empty."
-      );
-      // 🔹 DB: no valid items
-      trackDB(
-        "checkout_failed",
-        {
-          stage: "no_valid_items",
-          invalid_items: invalid.map((i) => ({
-            id: i.id,
-            name: i.name,
-            reason: i.reason,
-          })),
-          currency: "INR",
-        },
-        userId
-      );
-      return;
+      const invalid = [];
+      validLines = serverCart.filter((ci) => {
+        const p = ci?.product;
+        const active =
+          p?.is_active === 1 ||
+          p?.is_active === "Y" ||
+          p?.is_active === true ||
+          p?.is_active === undefined;
+        const qty = Number(ci?.quantity || 1);
+        const okStock = p?.stock == null ? true : Number(p.stock) >= qty;
+        if (!active || !okStock) {
+          invalid.push({
+            id: p?.id,
+            name: p?.name,
+            reason: !active ? "inactive" : "insufficient stock",
+          });
+          return false;
+        }
+        return true;
+      });
+
+      if (!validLines.length) {
+        alert(
+          invalid.length
+            ? `Your cart has items that cannot be purchased:\n${invalid
+                .map((i) => `• ${i.name} (${i.reason})`)
+                .join("\n")}`
+            : "Your cart is empty."
+        );
+        trackDB(
+          "checkout_failed",
+          {
+            stage: "no_valid_items",
+            invalid_items: invalid.map((i) => ({
+              id: i.id,
+              name: i.name,
+              reason: i.reason,
+            })),
+            currency: "INR",
+          },
+          userId
+        );
+        return;
+      }
+
+      items = validLines
+        .map((ci) => {
+          const unit = finalUnitPrice(ci?.product);
+          return {
+            product_id: ci?.product?.id ?? ci?.product?.ProductId,
+            product_title: ci?.product?.name,
+            unit_price: Number(unit.toFixed(2)),
+            qty: Number(ci?.quantity || 1),
+          };
+        })
+        .filter((it) => Number.isInteger(it.product_id) && it.qty > 0);
     }
-
-    // Build items (use finalUnitPrice)
-    const items = validLines
-      .map((ci) => {
-        const unit = finalUnitPrice(ci?.product);
-        return {
-          product_id: ci?.product?.id ?? ci?.product?.ProductId,
-          product_title: ci?.product?.name,
-          unit_price: Number(unit.toFixed(2)), // hint; server still recalculates
-          qty: Number(ci?.quantity || 1),
-        };
-      })
-      .filter((it) => Number.isInteger(it.product_id) && it.qty > 0);
 
     if (!items.length) {
-      alert("No purchasable items in cart. Please update your cart.");
-      // 🔹 DB: no purchasable items
+      alert("No purchasable items. Please update your cart.");
       trackDB(
         "checkout_failed",
         {
@@ -271,8 +339,23 @@ function Checkout() {
       return;
     }
 
-    // 1) Create order (INR)
+    // 1) Create order (always INR)
     let orderNumber;
+    const baseMeta = {
+      transaction_token: newToken,
+      source: isWaitlistDeposit ? "waitlist_checkout" : "checkout",
+    };
+
+    const meta = isWaitlistDeposit
+      ? {
+          ...baseMeta,
+          type: "WAITLIST_DEPOSIT",
+          waitlist_email: waitlistEmail || formData.email || null,
+          full_price: waitlistProduct?.fullPrice ?? null,
+          deposit_fraction: 0.5,
+        }
+      : baseMeta;
+
     const data = JSON.stringify({
       customer: {
         name: formData.name,
@@ -282,14 +365,14 @@ function Checkout() {
         anon_id: "web|guest",
       },
       items,
-      currency: "INR", // 🔒 force INR
+      currency: "INR",
       payment_method: (paymentMethod || "Card").toLowerCase().replace(/\s+/g, "_"),
       shipping_total: 0,
       tax_total: 0,
       discount_total: 0,
       status: "pending",
       payment_status: "unpaid",
-      meta: { transaction_token: newToken, source: "checkout" },
+      meta,
     });
 
     try {
@@ -300,20 +383,14 @@ function Checkout() {
         console.error("Checkout failed", text);
         if (text?.missing?.length)
           alert(
-            `Order create failed: missing product IDs ${text.missing.join(
-              ", "
-            )}`
+            `Order create failed: missing product IDs ${text.missing.join(", ")}`
           );
         else if (text?.error === "product_inactive")
           alert(
             "One of your cart items is inactive. Please remove it and try again."
           );
-        else
-          alert(
-            "Something went wrong creating your order. Please try again."
-          );
+        else alert("Something went wrong creating your order. Please try again.");
 
-        // 🔹 DB: order_create failure
         trackDB(
           "checkout_failed",
           {
@@ -330,8 +407,6 @@ function Checkout() {
     } catch (err) {
       console.error("Order create network error:", err);
       alert("Network error during checkout (order create).");
-
-      // 🔹 DB: order_create network error
       trackDB(
         "checkout_failed",
         {
@@ -360,8 +435,6 @@ function Checkout() {
             rz?.message || rz?.error || "Unknown error"
           }`
         );
-
-        // 🔹 DB: create_razorpay failure
         trackDB(
           "checkout_failed",
           {
@@ -377,8 +450,6 @@ function Checkout() {
       const loaded = await loadRazorpay();
       if (!loaded) {
         alert("Razorpay failed to load. Check your network/CSP.");
-
-        // 🔹 DB: razorpay script load failure
         trackDB(
           "checkout_failed",
           {
@@ -391,7 +462,7 @@ function Checkout() {
         return;
       }
 
-      // 3) Open Razorpay in modal (no redirects)
+      // 3) Open Razorpay modal
       const options = {
         key: rz.key,
         order_id: rz.rzp.order_id,
@@ -405,17 +476,13 @@ function Checkout() {
           contact: formData.phone,
         },
         theme: { color: "#173F5F" },
-        redirect: false, // 👈 keep modal, handle result here
+        redirect: false,
         handler: async (response) => {
           try {
-            const v = await api.post(
-              `${API}/api/payments/verify`,
-              response
-            );
+            const v = await api.post(`${API}/api/payments/verify`, response);
             const vr = v.data;
 
             if (v.status === 200 && vr?.ok) {
-              // GA purchase (use finalUnitPrice)
               try {
                 const gaItemsVerify = validLines.map((ci) => ({
                   id: ci?.product?.id,
@@ -443,7 +510,6 @@ function Checkout() {
                   shipping: 0,
                 });
 
-                // 🔹 DB: purchase
                 trackDB(
                   "purchase",
                   {
@@ -459,7 +525,9 @@ function Checkout() {
                     currency: "INR",
                     payment_id: response.razorpay_payment_id,
                     payment_order_id: response.razorpay_order_id,
-                    source: "checkout_page",
+                    source: isWaitlistDeposit
+                      ? "waitlist_checkout"
+                      : "checkout_page",
                   },
                   userId
                 );
@@ -467,18 +535,14 @@ function Checkout() {
                 // ignore analytics failure
               }
 
-              // 🎉 Thank-you (no redirect)
               setThankOrderNo(vr.order_number || orderNumber);
               setEmailNoted(!!vr.email_sent);
               setThankOpen(true);
             } else {
-              // Show inline banner on failure (no redirect to /order/failed)
               setErrBanner(
                 vr?.message ||
                   "Payment verification failed. Your card was not charged."
               );
-
-              // 🔹 DB: verify failed
               trackDB(
                 "checkout_failed",
                 {
@@ -494,8 +558,6 @@ function Checkout() {
             setErrBanner(
               "Payment verification failed due to a network error. Please try again."
             );
-
-            // 🔹 DB: verify exception
             trackDB(
               "checkout_failed",
               {
@@ -510,7 +572,6 @@ function Checkout() {
         modal: {
           ondismiss: () => {
             console.log("Razorpay modal closed");
-            // 🔹 DB: user dismissed payment modal without completing
             trackDB(
               "checkout_failed",
               {
@@ -528,8 +589,6 @@ function Checkout() {
     } catch (err) {
       console.error("Payment start error:", err);
       alert("Network error during payment start.");
-
-      // 🔹 DB: payment_start failure
       trackDB(
         "checkout_failed",
         {
@@ -665,7 +724,7 @@ function Checkout() {
           </div>
         </div>
 
-        {/* (legacy) success modal */}
+        {/* legacy success modal */}
         {isModalOpen && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white rounded-xl p-6 max-w-sm w-full text-center space-y-4 shadow-xl">

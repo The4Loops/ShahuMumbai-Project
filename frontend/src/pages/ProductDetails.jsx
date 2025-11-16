@@ -1,6 +1,6 @@
 // src/pages/ProductDetails.jsx
 import React, { useEffect, useRef, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
@@ -75,24 +75,24 @@ const formatINR = (val) =>
   }).format(Number(val || 0));
 
 /* ────────────────────── Razorpay helpers ────────────────────── */
-const API = process.env.REACT_APP_API_BASE_URL || "";
+// const API = process.env.REACT_APP_API_BASE_URL || "";
 
-async function loadRazorpay() {
-  if (typeof window !== "undefined" && window.Razorpay) return true;
-  return new Promise((resolve) => {
-    try {
-      const s = document.createElement("script");
-      s.src = "https://checkout.razorpay.com/v1/checkout.js";
-      s.onload = () => resolve(true);
-      s.onerror = () => resolve(false);
-      document.body.appendChild(s);
-    } catch {
-      resolve(false);
-    }
-  });
-}
-const generateToken = () =>
-  `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
+// async function loadRazorpay() {
+//   if (typeof window !== "undefined" && window.Razorpay) return true;
+//   return new Promise((resolve) => {
+//     try {
+//       const s = document.createElement("script");
+//       s.src = "https://checkout.razorpay.com/v1/checkout.js";
+//       s.onload = () => resolve(true);
+//       s.onerror = () => resolve(false);
+//       document.body.appendChild(s);
+//     } catch {
+//       resolve(false);
+//     }
+//   });
+// }
+// const generateToken = () =>
+//   `TXN-${Math.random().toString(36).substring(2, 10).toUpperCase()}`;
 
 /* ────────────────────── UI components ────────────────────── */
 const NextArrow = ({ onClick }) => (
@@ -155,6 +155,7 @@ const ProductDetails = () => {
   const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
   const { setLoading } = useLoading();                 // only global loader
   const { id } = useParams();
+  const navigate = useNavigate();
 
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -356,124 +357,57 @@ const ProductDetails = () => {
 
   /* ────────────────────── BUY NOW (Razorpay) ────────────────────── */
   const handleBuyNow = async () => {
-    setLoading(true);
     if (!product) return;
+
     if (Number(product.Stock) === 0) {
       toast.error("This product is out of stock.");
       return;
     }
-    if (!API) {
-      toast.error("API base URL is not configured.");
-      return;
-    }
 
     try {
+      setLoading(true);
       setBuyNowSubmitting(true);
-      const salePrice = getSalePrice(product);
-      const quantity = Number(qty || 1);
-      const items = [
-        {
-          product_id: product.ProductId,
-          product_title: product.Name,
-          unit_price: Number(Number(salePrice).toFixed(2)),
-          qty: Number(qty || 1),
-        },
-      ];
 
-      const transactionToken = generateToken();
+      const api = apiWithCurrency("INR");
 
-      const orderResp = await fetch(`${API}/api/checkout/order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          customer: {
-            name: fullName || "Guest",
-            email: "",
-            phone: "",
-            address: "",
-            anon_id: "web|guest",
-          },
-          items,
-          currency: "INR",
-          payment_method: "buy_now",
-          shipping_total: 0,
-          tax_total: 0,
-          discount_total: 0,
-          status: "pending",
-          payment_status: "unpaid",
-          meta: {
-            transaction_token: transactionToken,
-            source: "product_details_buy_now",
-          },
-          meta: {
-            transaction_token: transactionToken,
-            source: "product_details_buy_now",
-          },
-        }),
+      // Option 1: Just add to cart (will accumulate if already in cart)
+      await api.post("/api/cart", {
+        product_id: product.ProductId,
+        quantity: qty,
       });
 
-      const orderJson = await orderResp.json();
-      if (!orderResp.ok || !orderJson?.ok || !orderJson?.order_number) {
-        toast.error("Unable to create order.");
-        return;
-      }
-      const orderNumber = orderJson.order_number;
-
-      const rpResp = await fetch(`${API}/api/payments/create-order`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ order_number: orderNumber }),
-      });
-      const rpJson = await rpResp.json();
-      if (!rpResp.ok || !rpJson?.rzp?.order_id) {
-        toast.error(rpJson?.message || "Razorpay order failed.");
-        return;
-      }
-
-      const loaded = await loadRazorpay();
-      if (!loaded) {
-        toast.error("Razorpay failed to load.");
-        return;
+      // Optional: fire a small tracking event
+      try {
+        Ecom.addPaymentInfo(
+          [
+            {
+              id: product.ProductId,
+              title: product.Name,
+              category: categoryName(product),
+              price: getSalePrice(product),
+              quantity: qty,
+              currency: "INR",
+            },
+          ],
+          "buy_now"
+        );
+      } catch {
+        // ignore analytics errors
       }
 
-      const options = {
-        key: rpJson.key,
-        order_id: rpJson.rzp.order_id,
-        amount: rpJson.rzp.amount,
-        currency: rpJson.rzp.currency,
-        name: "Shahu",
-        description: `Payment for ${orderNumber}`,
-        prefill: { name: fullName || "Guest" },
-        theme: { color: "#173F5F" },
-        redirect: false,
-        handler: async (response) => {
-          try {
-            const v = await fetch(`${API}/api/payments/verify`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              credentials: "include",
-              body: JSON.stringify(response),
-            });
-            const vr = await v.json();
-
-            if (v.ok && vr.ok) {
-              setThankOrderNo(vr.order_number || orderNumber);
-              setEmailNoted(!!vr.email_sent);
-              setThankOpen(true);
-            } else {
-              toast.error(vr?.message || "Payment verification failed");
-            }
-          } catch (e) {
-            toast.error("Payment verification failed");
-          }
+      // Go to checkout – Checkout will load cart and show correct total
+      navigate("/checkout", {
+        state: {
+          source: "buy_now",
+          productId: product.ProductId,
+          quantity: qty,
         },
-        modal: { ondismiss: () => console.log("Razorpay modal closed") },
-      };
-      new window.Razorpay(options).open();
+      });
     } catch (err) {
-      toast.error("Could not start payment.");
+      console.error("Buy Now error:", err);
+      toast.error(
+        err?.response?.data?.error || "Could not start checkout. Please try again."
+      );
     } finally {
       setBuyNowSubmitting(false);
       setLoading(false);
