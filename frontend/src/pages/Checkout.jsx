@@ -154,7 +154,6 @@ function Checkout() {
       /\S+@\S+\.\S+/.test(String(email || "")) &&
       /^\+?\d{10,14}$/.test(String(phone || "")) &&
       String(address || "").trim().length > 5 &&
-      !!paymentMethod &&
       cart?.length > 0
     );
   };
@@ -655,12 +654,12 @@ function Checkout() {
     }
   };
 
-  const paymentIcons = {
-    "Credit Card": <FaCreditCard />,
-    "Debit Card": <FaCreditCard />,
-    UPI: <FaMobileAlt />,
-    "Net Banking": <FaUniversity />,
-  };
+  // const paymentIcons = {
+  //   "Credit Card": <FaCreditCard />,
+  //   "Debit Card": <FaCreditCard />,
+  //   UPI: <FaMobileAlt />,
+  //   "Net Banking": <FaUniversity />,
+  // };
 
   return (
     <Layout>
@@ -734,7 +733,7 @@ function Checkout() {
             <FaLock className="text-green-600" /> Secure Payment
           </h3>
 
-          <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
+          {/* <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
             {["Credit Card", "Debit Card", "UPI", "Net Banking"].map((method) => (
               <button
                 key={method}
@@ -747,7 +746,7 @@ function Checkout() {
                 {method}
               </button>
             ))}
-          </div>
+          </div> */}
 
           <div className="mt-4 bg-gray-50 p-4 rounded text-sm space-y-2">
             <div className="flex justify-between font-bold text-lg">
