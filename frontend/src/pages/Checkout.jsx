@@ -1,6 +1,6 @@
 // src/pages/Checkout.jsx
 import React, { useEffect, useMemo, useState } from "react";
-import { FaLock, FaCreditCard, FaUniversity, FaMobileAlt } from "react-icons/fa";
+import { FaLock } from "react-icons/fa";
 import { MdEmail, MdPhone, MdPerson, MdHome } from "react-icons/md";
 import Layout from "../layout/Layout";
 import { Ecom } from "../analytics";
@@ -9,14 +9,16 @@ import api from "../supabase/axios";
 import { jwtDecode } from "jwt-decode";
 import { trackDB } from "../analytics-db";
 import { useLocation } from "react-router-dom";
+import { useCurrency } from "../supabase/CurrencyContext";
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
 
 // ---- helpers ----
 const fmtINR = (n) =>
-  new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR" }).format(
-    Number(n || 0)
-  );
+  new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+  }).format(Number(n || 0));
 
 const finalUnitPrice = (p) => {
   const rawPrice = p?.Price ?? p?.price ?? 0;
@@ -40,24 +42,35 @@ async function loadRazorpay() {
 }
 
 function Checkout() {
-  const [formData, setFormData] = useState({ name: "", email: "", phone: "", address: "" });
+  const [formData, setFormData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
   const [paymentMethod, setPaymentMethod] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false); // legacy modal (kept)
   const [token, setToken] = useState("");
   const [cart, setCart] = useState([]);
   const [loadingCart, setLoadingCart] = useState(true);
   const [errBanner, setErrBanner] = useState("");
-  const [currency, setCurrency] = useState("INR");
+  const [lineCurrency, setLineCurrency] = useState("INR");
 
   const [thankOpen, setThankOpen] = useState(false);
   const [thankOrderNo, setThankOrderNo] = useState("");
   const [emailNoted, setEmailNoted] = useState(false);
 
+  const {
+    currency: userCurrency = "INR",
+    baseCurrency = "INR",
+    convertFromINR,
+  } = useCurrency() || {};
+
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
   const pageUrl = `${baseUrl}/checkout`;
 
-  // 🔹 Waitlist deposit state (from Waitlist.jsx)
+  // Waitlist deposit state (from UpcomingCarousel / Waitlist)
   const location = useLocation();
   const waitlistState = location.state;
   const isWaitlistDeposit =
@@ -65,7 +78,7 @@ function Checkout() {
   const waitlistProduct = isWaitlistDeposit ? waitlistState?.product : null;
   const waitlistEmail = isWaitlistDeposit ? waitlistState?.waitlistEmail : null;
 
-  // 🔹 decode logged-in user (for DB tracking)
+  // decode logged-in user (for DB tracking)
   const authToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
   let decodedUser = "";
   if (authToken) {
@@ -77,7 +90,7 @@ function Checkout() {
   }
   const userId = decodedUser?.id || null;
 
-  // totals using DiscountPrice as final price when present
+  // totals (INR)
   const totals = useMemo(() => {
     const lines = cart || [];
     const subtotal = lines.reduce((sum, l) => {
@@ -87,6 +100,15 @@ function Checkout() {
     }, 0);
     return { subtotal, tax: 0, shipping: 0, total: subtotal };
   }, [cart]);
+
+  // approximate display in user currency
+  const approximateTotalDisplay =
+    typeof convertFromINR === "function" && baseCurrency === "INR" && userCurrency !== "INR"
+      ? new Intl.NumberFormat("en-US", {
+          style: "currency",
+          currency: userCurrency,
+        }).format(convertFromINR(totals.total || 0))
+      : null;
 
   // Prefill email when coming from waitlist
   useEffect(() => {
@@ -102,7 +124,6 @@ function Checkout() {
         setErrBanner("REACT_APP_API_BASE_URL is not configured in your frontend env.");
       }
 
-      // ✅ Waitlist deposit: build synthetic 1-item cart with 50% price
       if (isWaitlistDeposit && waitlistProduct) {
         const unitPrice = Number(
           (waitlistProduct.depositAmount ?? waitlistProduct.fullPrice ?? 0).toFixed(2)
@@ -120,7 +141,7 @@ function Checkout() {
             quantity: 1,
           },
         ]);
-        setCurrency("INR");
+        setLineCurrency("INR");
         setLoadingCart(false);
         return;
       }
@@ -131,7 +152,7 @@ function Checkout() {
         const response = await api.get(`${API}/api/cartById`);
         const data = response.data;
         setCart(Array.isArray(data) ? data : []);
-        setCurrency(data?.[0]?.product?.currency || "INR");
+        setLineCurrency(data?.[0]?.product?.currency || "INR");
       } catch (e) {
         console.error("Checkout: load cart failed", e);
         setErrBanner("Could not load your cart. Please go back to Cart and try again.");
@@ -216,12 +237,10 @@ function Checkout() {
       return;
     }
 
-    // Build lines + items (for analytics + verify)
     let validLines = [];
     let items = [];
 
     if (isWaitlistDeposit && waitlistProduct) {
-      // ✅ Waitlist deposit: we already built a synthetic cart above
       const unit = Number(
         (waitlistProduct.depositAmount ?? waitlistProduct.fullPrice ?? 0).toFixed(2)
       );
@@ -342,19 +361,16 @@ function Checkout() {
 
     // -------------------------------------------------------------------
     // 1) CREATE ORDER
-    //    - Normal flow: /api/checkout/order (existing)
-    //    - Waitlist deposit: /api/waitlist/deposit-order (NEW)
     // -------------------------------------------------------------------
     let orderNumber;
 
     if (isWaitlistDeposit && waitlistProduct) {
-      // ✅ Waitlist deposit uses dedicated API
       try {
         const wlResp = await api.post(
           `${API}/api/waitlist/deposit-order`,
           {
             productId: waitlistProduct.id,
-            email: formData.email, // pass email so backend can fill Orders.Email
+            email: formData.email,
           },
           authToken
             ? {
@@ -397,13 +413,10 @@ function Checkout() {
         return;
       }
     } else {
-      // 🛒 Normal cart order: existing /api/checkout/order
       const baseMeta = {
         transaction_token: newToken,
         source: "checkout",
       };
-
-      const meta = baseMeta;
 
       const data = JSON.stringify({
         customer: {
@@ -421,7 +434,7 @@ function Checkout() {
         discount_total: 0,
         status: "pending",
         payment_status: "unpaid",
-        meta,
+        meta: baseMeta,
       });
 
       try {
@@ -512,9 +525,6 @@ function Checkout() {
         return;
       }
 
-      // -----------------------------------------------------------------
-      // 3) Open Razorpay modal
-      // -----------------------------------------------------------------
       const options = {
         key: rz.key,
         order_id: rz.rzp.order_id,
@@ -654,13 +664,6 @@ function Checkout() {
     }
   };
 
-  // const paymentIcons = {
-  //   "Credit Card": <FaCreditCard />,
-  //   "Debit Card": <FaCreditCard />,
-  //   UPI: <FaMobileAlt />,
-  //   "Net Banking": <FaUniversity />,
-  // };
-
   return (
     <Layout>
       <Helmet>
@@ -733,30 +736,20 @@ function Checkout() {
             <FaLock className="text-green-600" /> Secure Payment
           </h3>
 
-          {/* <div className="grid grid-cols-2 gap-2 text-sm text-gray-700">
-            {["Credit Card", "Debit Card", "UPI", "Net Banking"].map((method) => (
-              <button
-                key={method}
-                onClick={() => setPaymentMethod(method)}
-                className={`border rounded px-3 py-2 hover:bg-gray-50 flex items-center gap-2 ${
-                  paymentMethod === method ? "bg-gray-200 font-bold" : ""
-                }`}
-              >
-                {paymentIcons[method]}
-                {method}
-              </button>
-            ))}
-          </div> */}
-
           <div className="mt-4 bg-gray-50 p-4 rounded text-sm space-y-2">
             <div className="flex justify-between font-bold text-lg">
               <span>Total</span>
-              <span>
-                {currency === "INR"
-                  ? fmtINR(totals.total)
-                  : totals.total.toFixed(2)}
-              </span>
+              <span>{fmtINR(totals.total)}</span>
             </div>
+
+            {approximateTotalDisplay && (
+              <p className="text-xs text-gray-600">
+                Approx.{" "}
+                <span className="font-semibold">{approximateTotalDisplay}</span> in
+                your local currency. You will be charged {fmtINR(totals.total)} in INR.
+              </p>
+            )}
+
             <div className="text-green-600 text-sm mt-2">
               Your payment is secured by Razorpay with 256-bit SSL encryption
             </div>

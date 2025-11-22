@@ -1,14 +1,13 @@
 // UpcomingCarousel.jsx
 import React, { useState, useEffect } from "react";
 import Slider from "react-slick";
-import "slick-carousel/slick/slick.css"; // ← ONLY this one
+import "slick-carousel/slick/slick.css";
 import { toast } from "react-toastify";
 import { apiWithCurrency } from "../supabase/axios";
 import placeholder from "../assets/products/coat.jpg";
 import { useCurrency } from "../supabase/CurrencyContext";
-import { useNavigate } from "react-router-dom"; // 🔹 NEW
+import { useNavigate } from "react-router-dom";
 
-// react-icons
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 
 const formatDateTime = (dateStr) => {
@@ -24,7 +23,13 @@ const formatDateTime = (dateStr) => {
 };
 
 function UpcomingCarousel() {
-  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
+  const {
+    currency = "USD",
+    loading: currencyLoading = true,
+    convertFromINR,
+    baseCurrency = "INR",
+  } = useCurrency() || {};
+
   const [products, setProducts] = useState([]);
   const [waitlist, setWaitlist] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,7 +39,7 @@ function UpcomingCarousel() {
   const [showModal, setShowModal] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  const navigate = useNavigate(); // 🔹 for redirecting to /checkout
+  const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUpcomingProducts = async () => {
@@ -64,16 +69,18 @@ function UpcomingCarousel() {
     setShowModal(true);
   };
 
-  // 🔹 NEW: hand over to Checkout as a "waitlist deposit" instead of calling /api/payment/*
+  // Hand over to Checkout as a "waitlist deposit" – prices remain in INR for backend
   const confirmPayment = () => {
     if (!selectedProduct) return;
 
-    // Normalize / map product for Checkout
+    const basePriceINR = Number(selectedProduct.Price || 0);
+    const depositINR = basePriceINR / 2;
+
     const mappedProduct = {
       id: selectedProduct.ProductId ?? selectedProduct.id,
       name: selectedProduct.Name ?? selectedProduct.name,
-      fullPrice: Number(selectedProduct.Price || 0),
-      depositAmount: Number(selectedProduct.Price || 0) / 2,
+      fullPrice: basePriceINR, // INR for Razorpay/backend
+      depositAmount: depositINR, // INR
     };
 
     if (!mappedProduct.id || !mappedProduct.fullPrice) {
@@ -81,16 +88,17 @@ function UpcomingCarousel() {
       return;
     }
 
-    // Optional: prefill email from localStorage (same as Waitlist page)
     const waitlistEmail =
-      (typeof window !== "undefined" && localStorage.getItem("waitlistEmail")) || "";
+      (typeof window !== "undefined" &&
+        localStorage.getItem("waitlistEmail")) ||
+      "";
 
-    // Keep a local "in waitlist" marker so the button text changes
+    // Local "in waitlist" marker
     setWaitlist((prev) =>
       prev.includes(mappedProduct.id) ? prev : [...prev, mappedProduct.id]
     );
 
-    // Optional: store in localStorage for resilience on refresh
+    // Optional: persist payload
     try {
       if (typeof window !== "undefined") {
         localStorage.setItem(
@@ -107,7 +115,7 @@ function UpcomingCarousel() {
       // ignore storage errors
     }
 
-    // 🔹 Navigate to Checkout with state – Checkout.jsx already knows how to handle this
+    // Navigate to Checkout – Checkout.jsx handles this mode
     navigate("/checkout", {
       state: {
         fromWaitlist: true,
@@ -117,7 +125,6 @@ function UpcomingCarousel() {
       },
     });
 
-    // Close modal
     setShowModal(false);
     setSelectedProduct(null);
   };
@@ -131,10 +138,11 @@ function UpcomingCarousel() {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currencyCode || "USD",
-    }).format(value);
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0));
   };
 
-  // ---- Custom Arrows with react-icons ----
+  // Custom Arrows
   const PrevArrow = ({ onClick }) => (
     <button
       onClick={onClick}
@@ -172,7 +180,6 @@ function UpcomingCarousel() {
     ],
   };
 
-  // Skeleton for loading state
   const SkeletonSlide = () => (
     <div className="px-3">
       <div className="relative bg-white rounded-xl shadow-md overflow-hidden animate-pulse">
@@ -209,7 +216,9 @@ function UpcomingCarousel() {
                 />
 
                 <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white opacity-0 group-hover:opacity-100 transition">
-                  <h3 className="text-lg font-semibold mb-2">{product.Name}</h3>
+                  <h3 className="text-lg font-semibold mb-2">
+                    {product.Name}
+                  </h3>
                   <p className="mb-3 text-sm">
                     Launching on: {formatDateTime(product.LaunchingDate)}
                   </p>
@@ -229,7 +238,7 @@ function UpcomingCarousel() {
         </Slider>
       )}
 
-      {/* Waitlist / Deposit Modal (no direct Razorpay here anymore) */}
+      {/* Waitlist / Deposit Modal */}
       {showModal && selectedProduct && (
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-[#FAF3F0] border border-[#D9C5BC] p-6 rounded-2xl shadow-2xl w-96 relative animate-fadeIn">
@@ -247,46 +256,78 @@ function UpcomingCarousel() {
               Confirm Your Spot
             </h2>
 
-            <div className="bg-white border border-[#E3BDB4] rounded-xl p-4 mb-4 shadow-sm">
-              <p className="mb-2 text-[#4B2C20]">
-                Product:{" "}
-                <span className="font-semibold">{selectedProduct.Name}</span>
-              </p>
-              <p className="mb-2 text-[#4B2C20]">
-                Price:{" "}
-                <span className="font-semibold">
-                  {formatPrice(
-                    selectedProduct.Price,
-                    selectedProduct.currency || currency
-                  )}
-                </span>
-              </p>
-              <p className="text-green-800 font-bold text-lg">
-                Pay 50% Now:{" "}
-                {formatPrice(
-                  selectedProduct.Price / 2,
-                  selectedProduct.currency || currency
-                )}
-              </p>
-            </div>
+            {(() => {
+              const basePriceINR = Number(selectedProduct.Price || 0);
+              const depositINR = basePriceINR / 2;
 
-            <div className="flex justify-center gap-3">
-              <button
-                onClick={confirmPayment}
-                className="bg-[#E3BDB4] text-[#4B2C20] px-5 py-2 rounded-lg font-medium shadow-md hover:bg-[#d3a99f] hover:shadow-lg transition"
-              >
-                Pay & Join
-              </button>
-              <button
-                onClick={() => {
-                  setShowModal(false);
-                  setSelectedProduct(null);
-                }}
-                className="bg-[#4B2C20] text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-[#2c1810] hover:shadow-lg transition"
-              >
-                Cancel
-              </button>
-            </div>
+              const displayPrice = convertFromINR
+                ? convertFromINR(basePriceINR)
+                : basePriceINR;
+
+              const displayDeposit = convertFromINR
+                ? convertFromINR(depositINR)
+                : depositINR;
+
+              const showBaseNote =
+                currency &&
+                baseCurrency &&
+                currency !== baseCurrency &&
+                basePriceINR > 0;
+
+              return (
+                <>
+                  <div className="bg-white border border-[#E3BDB4] rounded-xl p-4 mb-4 shadow-sm">
+                    <p className="mb-2 text-[#4B2C20]">
+                      Product:{" "}
+                      <span className="font-semibold">
+                        {selectedProduct.Name}
+                      </span>
+                    </p>
+                    <p className="mb-2 text-[#4B2C20]">
+                      Price:{" "}
+                      <span className="font-semibold">
+                        {formatPrice(
+                          displayPrice,
+                          currency || baseCurrency
+                        )}
+                      </span>
+                    </p>
+                    <p className="text-green-800 font-bold text-lg">
+                      Pay 50% Now:{" "}
+                      {formatPrice(
+                        displayDeposit,
+                        currency || baseCurrency
+                      )}
+                    </p>
+                    {showBaseNote && (
+                      <p className="mt-2 text-xs text-[#4B2C20]/70">
+                        Approx.{" "}
+                        {formatPrice(basePriceINR, baseCurrency)} (charged
+                        in {baseCurrency})
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex justify-center gap-3">
+                    <button
+                      onClick={confirmPayment}
+                      className="bg-[#E3BDB4] text-[#4B2C20] px-5 py-2 rounded-lg font-medium shadow-md hover:bg-[#d3a99f] hover:shadow-lg transition"
+                    >
+                      Pay & Join
+                    </button>
+                    <button
+                      onClick={() => {
+                        setShowModal(false);
+                        setSelectedProduct(null);
+                      }}
+                      className="bg-[#4B2C20] text-white px-5 py-2 rounded-lg font-medium shadow-md hover:bg-[#2c1810] hover:shadow-lg transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}

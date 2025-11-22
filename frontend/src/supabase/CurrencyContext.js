@@ -1,4 +1,4 @@
-// src/context/CurrencyContext.js
+// src/supabase/CurrencyContext.js
 import { createContext, useContext, useState, useEffect } from "react";
 import axios from "axios";
 
@@ -13,13 +13,26 @@ const countryToCurrency = {
   AU: "AUD",
 };
 
+const BASE_CURRENCY = "INR";
+
 export const CurrencyProvider = ({ children }) => {
   const [currency, setCurrency] = useState("USD");
+
+  // public loading flag used around the app
   const [loading, setLoading] = useState(true);
 
+  // internal detection + FX loading
+  const [detecting, setDetecting] = useState(true);
+  const [fxLoading, setFxLoading] = useState(false);
+
+  const [rates, setRates] = useState({ [BASE_CURRENCY]: 1 });
+  const [lastFetched, setLastFetched] = useState(null);
+
+  // --- Detect currency from IP or localStorage ---
   useEffect(() => {
     const detectCurrency = async () => {
       try {
+        setDetecting(true);
         const response = await axios.get("https://ipapi.co/json/");
         const countryCode = response.data.country_code;
         const detectedCurrency = countryToCurrency[countryCode] || "USD";
@@ -29,21 +42,93 @@ export const CurrencyProvider = ({ children }) => {
         console.error("Failed to detect country:", error);
         setCurrency("USD");
       } finally {
-        setLoading(false);
+        setDetecting(false);
       }
     };
 
     const storedCurrency = localStorage.getItem("currency");
     if (storedCurrency) {
       setCurrency(storedCurrency);
-      setLoading(false);
+      setDetecting(false);
     } else {
       detectCurrency();
     }
   }, []);
 
+  // --- Fetch FX rate from INR -> selected currency ---
+  useEffect(() => {
+    if (detecting) return;
+
+    // If user currency is base INR, no FX needed
+    if (!currency || currency === BASE_CURRENCY) {
+      setFxLoading(false);
+      return;
+    }
+
+    const now = Date.now();
+    // cache for 60 minutes
+    if (lastFetched && now - lastFetched < 60 * 60 * 1000 && rates[currency]) {
+      setFxLoading(false);
+      return;
+    }
+
+    const fetchRate = async () => {
+      try {
+        setFxLoading(true);
+        const res = await axios.get("https://api.exchangerate.host/latest", {
+          params: {
+            base: BASE_CURRENCY,
+            symbols: currency,
+          },
+        });
+
+        const rate = res?.data?.rates?.[currency];
+        if (rate) {
+          setRates((prev) => ({
+            ...prev,
+            [currency]: rate,
+          }));
+          setLastFetched(Date.now());
+        }
+      } catch (err) {
+        console.error("Failed to fetch FX rate:", err);
+      } finally {
+        setFxLoading(false);
+      }
+    };
+
+    fetchRate();
+  }, [currency, detecting, lastFetched, rates]);
+
+  // --- Helper: convert from INR to active currency ---
+  const convertFromINR = (amountInINR) => {
+    const n = Number(amountInINR || 0);
+    if (!Number.isFinite(n)) return 0;
+
+    if (!currency || currency === BASE_CURRENCY) return n;
+
+    const rate = rates[currency];
+    if (!rate) return n; // fallback: show INR amount
+
+    return n * rate;
+  };
+
+  // tie old `loading` flag to detection + fx
+  useEffect(() => {
+    setLoading(detecting || fxLoading);
+  }, [detecting, fxLoading]);
+
   return (
-    <CurrencyContext.Provider value={{ currency, setCurrency, loading }}>
+    <CurrencyContext.Provider
+      value={{
+        currency,
+        setCurrency,
+        loading, // same key you already use
+        baseCurrency: BASE_CURRENCY,
+        convertFromINR,
+        rates,
+      }}
+    >
       {children}
     </CurrencyContext.Provider>
   );

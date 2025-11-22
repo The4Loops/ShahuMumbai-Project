@@ -1,3 +1,4 @@
+// src/pages/Products.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { apiWithCurrency } from "../supabase/axios";
@@ -56,7 +57,13 @@ const useDebounced = (value, delay = 300) => {
 };
 
 const Products = () => {
-  const { currency = "USD", loading: currencyLoading = true } = useCurrency() || {};
+  const {
+    currency = "USD",
+    loading: currencyLoading = true,
+    convertFromINR,
+    baseCurrency = "INR",
+  } = useCurrency() || {};
+
   const [allProducts, setAllProducts] = useState([]);
   const { setLoading } = useLoading();
   const [loading, setLocalLoading] = useState(true);
@@ -101,17 +108,20 @@ const Products = () => {
       setLoading(true);
       setLocalLoading(true);
 
-      const minDelay = new Promise(resolve => setTimeout(resolve, 600));
+      const minDelay = new Promise((resolve) => setTimeout(resolve, 600));
 
       const api = apiWithCurrency(currency);
-      // Pass category name as query param if selectedCategories is not empty
-      const category = searchParams.get("name") || Array.from(selectedCategories)[0] || "";
+      const category =
+        searchParams.get("name") || Array.from(selectedCategories)[0] || "";
       const response = await api.get(`/api/products`, {
-        params: { category: category || undefined, search: debouncedSearch || undefined },
+        params: {
+          category: category || undefined,
+          search: debouncedSearch || undefined,
+        },
       });
 
       await minDelay;
-      
+
       const products = response.data || [];
 
       const mapped = products.map((p) => {
@@ -121,14 +131,18 @@ const Products = () => {
           ...imgs.filter((i) => !asBool(i?.is_hero)).map(pickImageUrl),
         ].filter(Boolean);
 
+        const basePriceINR = Number(p.Price || 0);
+
         return {
           id: p.ProductId,
           name: p.Name,
           description: p.Description || "No description available",
-          price: Number(p.Price || 0),
-          currency: p.currency || currency,
+          priceINR: basePriceINR,
+          price: basePriceINR, // still INR internally (for sort/search)
+          currency: p.currency || baseCurrency,
           category: categoryName(p),
           image: ordered[0] || "/assets/images/placeholder.png",
+          baseCurrency, // for the card to show INR note
         };
       });
 
@@ -143,10 +157,11 @@ const Products = () => {
     }
   };
 
- useEffect(() => {
+  useEffect(() => {
     if (!currencyLoading) {
       fetchProducts();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currency, currencyLoading, debouncedSearch, selectedCategories]);
 
   const categoryOptions = useMemo(() => {
@@ -186,14 +201,30 @@ const Products = () => {
   const start = (page - 1) * ITEMS_PER_PAGE;
   const paged = filtered.slice(start, start + ITEMS_PER_PAGE);
 
+  // Convert paged products from INR to active currency for display
+  const pagedWithDisplayPrice = useMemo(
+    () =>
+      paged.map((p) => ({
+        ...p,
+        displayPrice: convertFromINR
+          ? convertFromINR(p.priceINR ?? p.price)
+          : p.price,
+        displayCurrency: currency,
+      })),
+    [paged, convertFromINR, currency]
+  );
+
   const toggleCategory = (cat) => {
     setSelectedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(cat)) next.delete(cat);
       else next.add(cat);
-      // Update URL query params to reflect category selection
+
       if (next.size > 0) {
-        setSearchParams({ name: Array.from(next)[0], search: debouncedSearch || "" });
+        setSearchParams({
+          name: Array.from(next)[0],
+          search: debouncedSearch || "",
+        });
       } else {
         setSearchParams(debouncedSearch ? { search: debouncedSearch } : {});
       }
@@ -239,22 +270,31 @@ const Products = () => {
 
   // ---------- SEO ----------
   const baseUrl =
-    typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
+    typeof window !== "undefined"
+      ? window.location.origin
+      : "https://www.shahumumbai.com";
   const canonical = `${baseUrl}/products`;
-  const pageTitle = selectedCategories.size > 0
-    ? `${Array.from(selectedCategories)[0]} Products — Shahu Mumbai`
-    : "Discover Handpicked Styles — Shahu Mumbai";
-  const pageDesc = selectedCategories.size > 0
-    ? `Explore ${Array.from(selectedCategories)[0]} products at Shahu Mumbai. Filter, search, and sort to find your perfect piece.`
-    : "Explore curated fashion in earthy tones and timeless silhouettes. Filter by category, search, and sort to find your perfect piece at Shahu Mumbai.";
+  const pageTitle =
+    selectedCategories.size > 0
+      ? `${Array.from(selectedCategories)[0]} Products — Shahu Mumbai`
+      : "Discover Handpicked Styles — Shahu Mumbai";
+  const pageDesc =
+    selectedCategories.size > 0
+      ? `Explore ${Array.from(selectedCategories)[0]} products at Shahu Mumbai. Filter, search, and sort to find your perfect piece.`
+      : "Explore curated fashion in earthy tones and timeless silhouettes. Filter by category, search, and sort to find your perfect piece at Shahu Mumbai.";
 
   const itemListJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    name: selectedCategories.size > 0 ? `${Array.from(selectedCategories)[0]} Products` : "Products",
-    url: `${canonical}${debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""}`,
-    numberOfItems: paged.length,
-    itemListElement: paged.map((p, idx) => ({
+    name:
+      selectedCategories.size > 0
+        ? `${Array.from(selectedCategories)[0]} Products`
+        : "Products",
+    url: `${canonical}${
+      debouncedSearch ? `?search=${encodeURIComponent(debouncedSearch)}` : ""
+    }`,
+    numberOfItems: pagedWithDisplayPrice.length,
+    itemListElement: pagedWithDisplayPrice.map((p, idx) => ({
       "@type": "ListItem",
       position: start + idx + 1,
       item: {
@@ -267,15 +307,17 @@ const Products = () => {
         offers: {
           "@type": "Offer",
           url: `${baseUrl}/products/${p.id}`,
-          priceCurrency: p.currency || currency,
-          price: typeof p.price === "number" ? p.price.toFixed(2) : String(p.price),
+          priceCurrency: p.displayCurrency || currency,
+          price:
+            typeof p.displayPrice === "number"
+              ? p.displayPrice.toFixed(2)
+              : String(p.displayPrice),
           availability: "https://schema.org/InStock",
         },
       },
     })),
   };
 
-  // Animation variants for product cards (staggered entrance)
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -300,7 +342,6 @@ const Products = () => {
     },
   };
 
-  // Smooth resize observer for mobile responsiveness
   useEffect(() => {
     let resizeObserver;
     if (typeof ResizeObserver !== "undefined") {
@@ -330,7 +371,11 @@ const Products = () => {
         <meta name="description" content={pageDesc} />
         <meta
           name="robots"
-          content={paged.length === 0 ? "noindex,follow" : "index,follow,max-image-preview:large"}
+          content={
+            pagedWithDisplayPrice.length === 0
+              ? "noindex,follow"
+              : "index,follow,max-image-preview:large"
+          }
         />
         <meta
           name="keywords"
@@ -342,7 +387,9 @@ const Products = () => {
             "Indian fashion",
             "designer sarees",
             ...Array.from(selectedCategories || []),
-          ].filter(Boolean).join(", ")}
+          ]
+            .filter(Boolean)
+            .join(", ")}
         />
         <link rel="canonical" href={canonical} />
         <link rel="alternate" hrefLang="en-IN" href={canonical} />
@@ -354,14 +401,27 @@ const Products = () => {
         <meta property="og:description" content={pageDesc} />
         <meta property="og:url" content={canonical} />
         <meta property="og:image" content={`${baseUrl}/og/products.jpg`} />
-        <meta property="og:image:alt" content="Shahu Mumbai — product collection" />
+        <meta
+          property="og:image:alt"
+          content="Shahu Mumbai — product collection"
+        />
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
             itemListElement: [
-              { "@type": "ListItem", position: 1, name: "Home", item: `${baseUrl}/` },
-              { "@type": "ListItem", position: 2, name: "Products", item: canonical },
+              {
+                "@type": "ListItem",
+                position: 1,
+                name: "Home",
+                item: `${baseUrl}/`,
+              },
+              {
+                "@type": "ListItem",
+                position: 2,
+                name: "Products",
+                item: canonical,
+              },
             ],
           })}
         </script>
@@ -372,11 +432,17 @@ const Products = () => {
             name: pageTitle,
             url: canonical,
             description: pageDesc,
-            isPartOf: { "@type": "WebSite", name: "Shahu Mumbai", url: baseUrl },
+            isPartOf: {
+              "@type": "WebSite",
+              name: "Shahu Mumbai",
+              url: baseUrl,
+            },
             ...(debouncedSearch ? { query: debouncedSearch } : {}),
           })}
         </script>
-        <script type="application/ld+json">{JSON.stringify(itemListJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify(itemListJsonLd)}
+        </script>
       </Helmet>
 
       <div className="pt-[10px] pb-12 px-2 xs:px-4 bg-[#EDE1DF] min-h-screen font-serif products-container">
@@ -443,7 +509,9 @@ const Products = () => {
                 <FiFilter size={16} />
                 <span className="text-sm font-semibold">Filter & Sort</span>
                 <FiChevronDown
-                  className={`transition-transform duration-300 ${menuOpen ? "rotate-180" : ""}`}
+                  className={`transition-transform duration-300 ${
+                    menuOpen ? "rotate-180" : ""
+                  }`}
                 />
                 {activeCount > 0 && (
                   <motion.span
@@ -460,9 +528,17 @@ const Products = () => {
                 {menuOpen && (
                   <motion.div
                     ref={menuRef}
-                    initial={{ opacity: 0, y: isMobile ? 20 : -10, height: isMobile ? 0 : "auto" }}
+                    initial={{
+                      opacity: 0,
+                      y: isMobile ? 20 : -10,
+                      height: isMobile ? 0 : "auto",
+                    }}
                     animate={{ opacity: 1, y: 0, height: "auto" }}
-                    exit={{ opacity: 0, y: isMobile ? 20 : -10, height: isMobile ? 0 : "auto" }}
+                    exit={{
+                      opacity: 0,
+                      y: isMobile ? 20 : -10,
+                      height: isMobile ? 0 : "auto",
+                    }}
                     transition={{ duration: 0.3, ease: "easeInOut" }}
                     className={`${
                       isMobile
@@ -482,9 +558,11 @@ const Products = () => {
                             onChange={(e) => {
                               setSearch(e.target.value);
                               setSearchParams(
-                                e.target.value.trim() || selectedCategories.size > 0
+                                e.target.value.trim() ||
+                                  selectedCategories.size > 0
                                   ? {
-                                      name: Array.from(selectedCategories)[0] || "",
+                                      name:
+                                        Array.from(selectedCategories)[0] || "",
                                       search: e.target.value.trim(),
                                     }
                                   : {}
@@ -604,8 +682,8 @@ const Products = () => {
                   className="h-80 bg-[#fdf6e9] border border-[#9c6644]/30 rounded-lg animate-pulse w-full max-w-[300px] mx-auto"
                 />
               ))
-            ) : paged.length > 0 ? (
-              paged.map((product, index) => (
+            ) : pagedWithDisplayPrice.length > 0 ? (
+              pagedWithDisplayPrice.map((product, index) => (
                 <motion.div
                   key={product.id}
                   variants={itemVariants}
@@ -615,7 +693,10 @@ const Products = () => {
                   whileHover={{ y: -5, transition: { duration: 0.2 } }}
                   className="w-full"
                 >
-                  <ProductCard product={product} currency={currency} />
+                  <ProductCard
+                    product={product}
+                    currency={currency}
+                  />
                 </motion.div>
               ))
             ) : (

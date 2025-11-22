@@ -1,21 +1,49 @@
-import React from 'react';
-import { Link } from 'react-router-dom';
+// src/components/ProductCard.jsx
+import React from "react";
+import { Link } from "react-router-dom";
 
 const ProductCard = ({ product, currency }) => {
-  const { id, name, description, price, category, image, currency: productCurrency } = product;
+  const {
+    id,
+    name,
+    description = "",
+    price,
+    category,
+    image,
+    currency: productCurrency,
+    priceINR,
+    displayPrice,
+    displayCurrency,
+    baseCurrency = "INR",
+  } = product;
+
+  const activeCurrency =
+    displayCurrency || productCurrency || currency || "USD";
+
+  const effectivePrice =
+    typeof displayPrice === "number" && !Number.isNaN(displayPrice)
+      ? displayPrice
+      : price;
 
   const formatPrice = (value, currencyCode) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: currencyCode || "USD",
-    }).format(value);
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0));
   };
 
   const maxLength = 120;
   const truncatedDescription =
-    description.length > maxLength
-      ? description.slice(0, maxLength).trim() + '…'
+    description && description.length > maxLength
+      ? description.slice(0, maxLength).trim() + "…"
       : description;
+
+  const showBaseNote =
+    baseCurrency &&
+    activeCurrency &&
+    baseCurrency !== activeCurrency &&
+    (priceINR || price);
 
   return (
     <div className="bg-[#F9F5F0] border border-[#D4A5A5] rounded-xl shadow-[0_4px_10px_rgba(139,115,105,0.15)] p-5 relative overflow-hidden group transition-transform duration-300 hover:-translate-y-1">
@@ -32,12 +60,25 @@ const ProductCard = ({ product, currency }) => {
           </div>
         )}
         <div className="flex flex-col gap-2 font-serif">
-          <h3 className="text-2xl font-bold text-[#6B4226] tracking-wide">{name}</h3>
+          <h3 className="text-2xl font-bold text-[#6B4226] tracking-wide">
+            {name}
+          </h3>
           <p className="text-sm italic text-[#A3B18A]">{category}</p>
-          <p className="text-[1rem] text-[#3E2C23] leading-relaxed">{truncatedDescription}</p>
-          <p className="text-lg font-semibold text-[#6B4226] mt-1">
-            {formatPrice(price, productCurrency || currency)}
+          <p className="text-[1rem] text-[#3E2C23] leading-relaxed">
+            {truncatedDescription}
           </p>
+          <div className="mt-1 space-y-1">
+            <p className="text-lg font-semibold text-[#6B4226]">
+              {formatPrice(effectivePrice, activeCurrency)}
+            </p>
+            {showBaseNote && (
+              <p className="text-xs text-[#3E2C23]/70">
+                Approx.{" "}
+                {formatPrice(priceINR ?? price, baseCurrency)} (charged in{" "}
+                {baseCurrency})
+              </p>
+            )}
+          </div>
         </div>
         <div className="absolute bottom-0 left-0 w-full h-[3px] bg-[#DDB892] group-hover:bg-[#B77E65] transition-colors duration-300" />
       </Link>

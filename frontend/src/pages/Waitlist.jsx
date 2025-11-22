@@ -22,13 +22,33 @@ const getStatusBadgeStyle = (status) => {
 };
 
 const Waitlist = () => {
-  const { currency = "INR", loading: currencyLoading = true } = useCurrency() || {};
+  const {
+    currency = "INR",
+    baseCurrency = "INR",
+    convertFromINR,
+    loading: currencyLoading = true,
+  } = useCurrency() || {};
+
   const [products, setProducts] = useState([]);
   const [toasts, setToasts] = useState([]);
   const { setLoading } = useLoading();
   const prevRef = useRef([]);
   const [payingId, setPayingId] = useState(null);
   const navigate = useNavigate();
+
+  // Helper: format prices (base = INR) into user currency
+  const formatDisplayPrice = (amountInBase, displayCurrency) => {
+    const base = Number(amountInBase || 0);
+    const converted =
+      typeof convertFromINR === "function" && baseCurrency === "INR"
+        ? convertFromINR(base)
+        : base;
+
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: displayCurrency || currency || baseCurrency || "INR",
+    }).format(converted);
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -39,7 +59,9 @@ const Waitlist = () => {
   }, [setLoading]);
 
   const email =
-    (typeof window !== "undefined" && (localStorage.getItem("waitlistEmail") || "")) || "";
+    (typeof window !== "undefined" &&
+      (localStorage.getItem("waitlistEmail") || "")) ||
+    "";
 
   const authToken =
     typeof window !== "undefined" ? localStorage.getItem("token") : null;
@@ -58,7 +80,10 @@ const Waitlist = () => {
         const prev = prevById[p.id];
         if (prev && prev.status !== p.status) {
           const id = Date.now() + Math.random();
-          setToasts((old) => [...old, { id, message: `${p.name} is now ${p.status}!` }]);
+          setToasts((old) => [
+            ...old,
+            { id, message: `${p.name} is now ${p.status}!` },
+          ]);
           setTimeout(() => {
             setToasts((old) => old.filter((t) => t.id !== id));
           }, 1200);
@@ -104,7 +129,7 @@ const Waitlist = () => {
     }
   };
 
-  const handlePayAndJoin = async (product) => {
+  const handlePayAndJoin = (product) => {
     if (!authToken) {
       toast.error("Please log in to pay and join the waitlist.");
       navigate("/login");
@@ -129,47 +154,39 @@ const Waitlist = () => {
       return;
     }
 
+    // Amounts from backend (assume in INR / base currency)
+    const fullPriceInBase =
+      product.fullPriceInINR ??
+      product.fullPrice ??
+      product.priceInINR ??
+      product.price ??
+      0;
+
+    const depositAmountInBase =
+      product.depositAmountInINR ??
+      product.depositAmount ??
+      (fullPriceInBase ? fullPriceInBase * 0.5 : 0); // fallback 50%
+
     setPayingId(productId);
 
     try {
-      // 🔹 SAME pattern as handleAddToCart in ProductDetails
-      const api = apiWithCurrency("INR"); // cart is in INR
-      await api.post("/api/cart", {
-        product_id: productId,
-        quantity: 1,
+      // Navigate straight to checkout with a special waitlist state
+      navigate("/checkout", {
+        state: {
+          fromWaitlist: true,
+          mode: "waitlistDeposit",
+          product: {
+            id: productId,
+            name: productName,
+            depositAmount: Number(depositAmountInBase || 0),
+            fullPrice: Number(fullPriceInBase || 0),
+          },
+          waitlistEmail: email || "",
+        },
       });
-
-      toast.success(`${productName} added to cart!`);
-
-      // keep cart counter in sync
-      window.dispatchEvent(
-        new CustomEvent("cart:updated", { detail: { delta: 1 } })
-      );
-
-      // optional: mark this as a waitlist checkout
-      try {
-        if (typeof window !== "undefined") {
-          localStorage.setItem(
-            "waitlistCheckout",
-            JSON.stringify({
-              fromWaitlist: true,
-              productId,
-              productName,
-              depositFraction: 0.5, // informational only
-            })
-          );
-        }
-      } catch {
-        // ignore storage errors
-      }
-
-      // behave like clicking "Proceed to Checkout" from Cart
-      navigate("/checkout");
-    } catch (e) {
-      console.error("waitlist -> add to cart failed:", e);
-      toast.error(e?.response?.data?.error || "Failed to add to cart.");
     } finally {
-      setPayingId(null);
+      // we immediately navigate away, but reset just in case
+      setTimeout(() => setPayingId(null), 1000);
     }
   };
 
@@ -180,26 +197,35 @@ const Waitlist = () => {
   const waitlistJsonLd = {
     "@context": "https://schema.org",
     "@type": "ItemList",
-    itemListElement: products.map((product, index) => ({
-      "@type": "ListItem",
-      position: index + 1,
-      item: {
-        "@type": "Product",
-        name: product.name,
-        image: product.imageUrl,
-        sku: String(product.id),
-        offers: {
-          "@type": "Offer",
-          availability:
-            product.status === "Available"
-              ? "https://schema.org/InStock"
-              : product.status === "Out of Stock"
-              ? "https://schema.org/OutOfStock"
-              : "https://schema.org/PreOrder",
-          priceCurrency: product.currency || currency,
+    itemListElement: products.map((product, index) => {
+      const fullPriceInBase =
+        product.fullPriceInINR ??
+        product.fullPrice ??
+        product.priceInINR ??
+        product.price ??
+        0;
+      return {
+        "@type": "ListItem",
+        position: index + 1,
+        item: {
+          "@type": "Product",
+          name: product.name,
+          image: product.imageUrl,
+          sku: String(product.id),
+          offers: {
+            "@type": "Offer",
+            availability:
+              product.status === "Available"
+                ? "https://schema.org/InStock"
+                : product.status === "Out of Stock"
+                ? "https://schema.org/OutOfStock"
+                : "https://schema.org/PreOrder",
+            priceCurrency: "INR",
+            price: Number(fullPriceInBase || 0).toFixed(2),
+          },
         },
-      },
-    })),
+      };
+    }),
   };
 
   if (currencyLoading) {
@@ -217,9 +243,14 @@ const Waitlist = () => {
         <meta name="robots" content="noindex,follow" />
         <link rel="canonical" href={canonical} />
         <meta property="og:title" content="Waitlist | Shahu Mumbai" />
-        <meta property="og:description" content="Track availability of items you’re watching." />
+        <meta
+          property="og:description"
+          content="Track availability of items you’re watching."
+        />
         <meta property="og:url" content={canonical} />
-        <script type="application/ld+json">{JSON.stringify(waitlistJsonLd)}</script>
+        <script type="application/ld+json">
+          {JSON.stringify(waitlistJsonLd)}
+        </script>
       </Helmet>
 
       <div className="max-w-6xl mx-auto p-6 relative">
@@ -237,12 +268,15 @@ const Waitlist = () => {
                   placeholder="you@example.com"
                   required
                 />
-                <button className="px-4 py-2 rounded bg-indigo-600 text-white">Save</button>
+                <button className="px-4 py-2 rounded bg-indigo-600 text-white">
+                  Save
+                </button>
               </div>
             </form>
           </div>
         )}
 
+        {/* toast strip for status changes */}
         <div className="fixed top-5 left-1/2 transform -translate-x-1/2 flex flex-col gap-2 z-50">
           {toasts.map((toastItem) => (
             <div
@@ -264,6 +298,24 @@ const Waitlist = () => {
               product.productId ??
               product.ProductID ??
               product.id;
+
+            const productName =
+              product.Name ??
+              product.ProductName ??
+              product.name ??
+              "Product";
+
+            const fullPriceInBase =
+              product.fullPriceInINR ??
+              product.fullPrice ??
+              product.priceInINR ??
+              product.price ??
+              0;
+
+            const depositAmountInBase =
+              product.depositAmountInINR ??
+              product.depositAmount ??
+              (fullPriceInBase ? fullPriceInBase * 0.5 : 0);
 
             return (
               <div
@@ -295,7 +347,45 @@ const Waitlist = () => {
                 </div>
 
                 <div className="p-4 space-y-3">
-                  <h2 className="text-lg font-semibold text-gray-800">{product.name}</h2>
+                  <h2 className="text-lg font-semibold text-gray-800">
+                    {productName}
+                  </h2>
+
+                  {/* Price / deposit info */}
+                  {(fullPriceInBase || depositAmountInBase) && (
+                    <div className="text-sm text-gray-700 space-y-1">
+                      {fullPriceInBase ? (
+                        <p>
+                          Full Price:{" "}
+                          <span className="font-semibold">
+                            {formatDisplayPrice(fullPriceInBase, "INR")}
+                          </span>
+                          {currency !== "INR" && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              (~
+                              {formatDisplayPrice(fullPriceInBase, currency)} in your
+                              currency)
+                            </span>
+                          )}
+                        </p>
+                      ) : null}
+                      {depositAmountInBase ? (
+                        <p>
+                          50% Deposit:{" "}
+                          <span className="font-semibold">
+                            {formatDisplayPrice(depositAmountInBase, "INR")}
+                          </span>
+                          {currency !== "INR" && (
+                            <span className="text-xs text-gray-500 ml-1">
+                              (~
+                              {formatDisplayPrice(depositAmountInBase, currency)} in your
+                              currency)
+                            </span>
+                          )}
+                        </p>
+                      ) : null}
+                    </div>
+                  )}
 
                   {product.status === "Available" ? (
                     <p className="mt-1 text-sm text-gray-700">
@@ -303,9 +393,13 @@ const Waitlist = () => {
                     </p>
                   ) : (
                     <div className="mt-1 p-3 bg-indigo-50 border rounded-md">
-                      <p className="text-sm text-gray-700">You are on the waitlist for:</p>
-                      <p className="font-bold text-indigo-700">{product.name}</p>
-                      <p className="text-xs text-gray-500">Status: {product.status}</p>
+                      <p className="text-sm text-gray-700">
+                        You are on the waitlist for:
+                      </p>
+                      <p className="font-bold text-indigo-700">{productName}</p>
+                      <p className="text-xs text-gray-500">
+                        Status: {product.status}
+                      </p>
                     </div>
                   )}
 
@@ -340,7 +434,9 @@ const Waitlist = () => {
 
                   <p className="mt-1 text-xs text-gray-400">
                     ⏱ Last updated:{" "}
-                    {product.updated ? new Date(product.updated).toLocaleString() : "—"}
+                    {product.updated
+                      ? new Date(product.updated).toLocaleString()
+                      : "—"}
                   </p>
                 </div>
               </div>

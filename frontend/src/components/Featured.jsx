@@ -1,35 +1,46 @@
+// src/components/Featured.jsx
 import { motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiWithCurrency } from "../supabase/axios"; // Import apiWithCurrency
+import { apiWithCurrency } from "../supabase/axios";
 import { toast } from "react-toastify";
 import placeholderImg from "../assets/products/coat.jpg";
-import { useCurrency } from "../supabase/CurrencyContext"; // Import CurrencyContext
+import { useCurrency } from "../supabase/CurrencyContext";
 
 function Featured() {
   const navigate = useNavigate();
-  const { currency, loading: currencyLoading } = useCurrency(); // Get currency and loading state
-  const [products, setProducts] = useState([]);
-  const [isLoading, setIsLoading] = useState(true); // For product fetch
 
-  // Fetch top 4 latest products with currency
+  const {
+    currency,              // detected currency (USD/EUR/INR/etc.)
+    loading: currencyLoading,
+    convertFromINR,
+    baseCurrency = "INR",
+  } = useCurrency();
+
+  const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch top 4 latest products (prices assumed in INR in DB)
   const fetchLatestProducts = async () => {
     try {
       const api = apiWithCurrency(currency);
       const response = await api.get("/api/products/getLatestProducts");
-      setProducts(response.data || []); // Ensure array even if empty
+      setProducts(response.data || []);
     } catch (error) {
       toast.dismiss();
-      toast.error(error.response?.data?.message || "Failed to fetch latest products");
-      setProducts([]); // Set empty on error
+      toast.error(
+        error.response?.data?.message || "Failed to fetch latest products"
+      );
+      setProducts([]);
     } finally {
       setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    if (currencyLoading) return; // Wait for currency detection
+    if (currencyLoading) return; // wait until currency detection + FX ready
     fetchLatestProducts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currency, currencyLoading]);
 
   const SkeletonCard = () => (
@@ -41,14 +52,16 @@ function Featured() {
     </div>
   );
 
-  const showSkeletons = isLoading || currencyLoading || products.length === 0;
+  const showSkeletons =
+    isLoading || currencyLoading || products.length === 0;
 
   // Price formatting helper
-  const formatPrice = (value, currency) => {
+  const formatPrice = (value, currencyCode) => {
     return new Intl.NumberFormat("en-US", {
       style: "currency",
-      currency,
-    }).format(value);
+      currency: currencyCode,
+      maximumFractionDigits: 2,
+    }).format(Number(value || 0));
   };
 
   return (
@@ -69,45 +82,85 @@ function Featured() {
         {showSkeletons ? (
           Array.from({ length: 4 }).map((_, i) => <SkeletonCard key={i} />)
         ) : (
-          products.map((product, i) => (
-            <motion.div
-              key={product.ProductId}
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.2, duration: 0.6 }}
-              whileHover={{ y: -8, scale: 1.02 }}
-              className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer"
-              onClick={() => navigate(`/products/${product.ProductId}`)}
-            >
-              {product.is_new && (
-                <span className="absolute top-4 left-4 text-xs bg-[#E3BDB4] text-[#4B2C20] px-3 py-1 rounded-full shadow">
-                  New
-                </span>
-              )}
+          products.map((product, i) => {
+            // Assume product.Price & product.old_price are in INR
+            const basePriceINR = Number(product.Price || 0);
+            const baseOldPriceINR = Number(product.old_price || 0);
 
-              <div className="w-28 h-28 mx-auto mb-6 flex items-center justify-center rounded-full bg-[#F1E6E1] shadow-inner overflow-hidden">
-                <img
-                  src={
-                    product.product_images?.find((img) => img.is_hero === true)?.image_url ||
-                    placeholderImg
-                  }
-                  alt={product.Name}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+            const displayPrice = convertFromINR
+              ? convertFromINR(basePriceINR)
+              : basePriceINR;
 
-              <h3 className="text-lg font-semibold text-[#4B2C20] mb-2">{product.Name}</h3>
+            const displayOldPrice =
+              baseOldPriceINR > 0
+                ? convertFromINR
+                  ? convertFromINR(baseOldPriceINR)
+                  : baseOldPriceINR
+                : null;
 
-              <p className="text-[#4B2C20] font-semibold text-base">
-                {formatPrice(product.Price, product.currency || currency)}
-                {product.old_price && (
-                  <span className="text-sm text-[#4B2C20]/50 line-through ml-1">
-                    {formatPrice(product.old_price, product.currency || currency)}
+            const showBaseNote =
+              currency &&
+              baseCurrency &&
+              currency !== baseCurrency &&
+              basePriceINR > 0;
+
+            return (
+              <motion.div
+                key={product.ProductId}
+                initial={{ opacity: 0, y: 40 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.2, duration: 0.6 }}
+                whileHover={{ y: -8, scale: 1.02 }}
+                className="relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-md hover:shadow-2xl border border-[#E4D5C9] p-6 transition cursor-pointer"
+                onClick={() => navigate(`/products/${product.ProductId}`)}
+              >
+                {product.is_new && (
+                  <span className="absolute top-4 left-4 text-xs bg-[#E3BDB4] text-[#4B2C20] px-3 py-1 rounded-full shadow">
+                    New
                   </span>
                 )}
-              </p>
-            </motion.div>
-          ))
+
+                <div className="w-28 h-28 mx-auto mb-6 flex items-center justify-center rounded-full bg-[#F1E6E1] shadow-inner overflow-hidden">
+                  <img
+                    src={
+                      product.product_images?.find(
+                        (img) => img.is_hero === true
+                      )?.image_url || placeholderImg
+                    }
+                    alt={product.Name}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <h3 className="text-lg font-semibold text-[#4B2C20] mb-2">
+                  {product.Name}
+                </h3>
+
+                <div className="text-[#4B2C20] font-semibold text-base">
+                  {/* converted price in user currency */}
+                  <span>
+                    {formatPrice(displayPrice, currency || baseCurrency)}
+                  </span>
+
+                  {/* strike-through old price in user currency if present */}
+                  {displayOldPrice && (
+                    <span className="text-sm text-[#4B2C20]/50 line-through ml-1">
+                      {formatPrice(displayOldPrice, currency || baseCurrency)}
+                    </span>
+                  )}
+
+                  {/* small INR note if user currency ≠ INR */}
+                  {showBaseNote && (
+                    <span className="block text-xs text-[#4B2C20]/60 mt-1">
+                      Approx.{" "}
+                      {formatPrice(basePriceINR, baseCurrency)} (charged in{" "}
+                      {baseCurrency})
+                    </span>
+                  )}
+                </div>
+              </motion.div>
+            );
+          })
         )}
       </div>
 
