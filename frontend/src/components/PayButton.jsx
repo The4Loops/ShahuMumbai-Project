@@ -1,10 +1,10 @@
-import axios from 'axios';
+import api from '../supabase/axios';
 
 export default function PayButton({ orderNumber }) {
   const payNow = async () => {
     try {
-      const { data } = await axios.post(
-        "http://localhost:5000/api/payments/create-order",
+      const { data } = await api.post(
+        "/api/payments/create-order",
         { order_number: orderNumber },
         { withCredentials: true }
       );
@@ -19,8 +19,8 @@ export default function PayButton({ orderNumber }) {
         description: `Order ${orderNumber}`,
         order_id: rzp.order_id,
         handler: async (response) => {
-          const verifyRes = await axios.post(
-            "http://localhost:5000/api/payments/verify",
+          const verifyRes = await api.post(
+            "/api/payments/verify",
             {
               razorpay_order_id: response.razorpay_order_id,
               razorpay_payment_id: response.razorpay_payment_id,

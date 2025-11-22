@@ -88,9 +88,6 @@ const BannerCards = () => {
                 src={banner.image_url}
                 alt={banner.title}
                 className="w-full h-40 object-cover rounded-lg"
-                onError={(e) => {
-                  e.target.src = "https://via.placeholder.com/300x160?text=Image+Not+Found";
-                }}
               />
               <div className="mt-3 flex-1">
                 <h3 className="text-lg font-semibold">{banner.title}</h3>
