@@ -59,16 +59,9 @@ function Profile() {
   // Fetch profile data on mount
   useEffect(() => {
     const fetchProfile = async () => {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        navigate("/");
-        return;
-      }
       setLoading(true);
       try {
-        const response = await api.get("/api/users/profile", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        const response = await api.get("/api/users/profile");
         const { user } = response.data;
 
         let formattedJoined = "";
@@ -211,9 +204,16 @@ function Profile() {
     setIsEditing(!isEditing);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    navigate("/");
+  const handleLogout = async () => {
+    try {
+      await api.post("/api/auth/logout");
+    } catch (err) {
+      toast.dismiss();
+      toast.error(err.response?.data?.message || "Logout failed");
+    } finally {
+      toast.success("Logged out successfully");
+      navigate("/");
+    }
   };
 
   const getInitials = (name) =>

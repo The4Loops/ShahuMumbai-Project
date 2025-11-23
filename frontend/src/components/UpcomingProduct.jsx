@@ -3,7 +3,7 @@ import React, { useState, useEffect } from "react";
 import Slider from "react-slick";
 import "slick-carousel/slick/slick.css";
 import { toast } from "react-toastify";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import placeholder from "../assets/products/coat.jpg";
 import { useCurrency } from "../supabase/CurrencyContext";
 import { useNavigate } from "react-router-dom";
@@ -45,7 +45,6 @@ function UpcomingCarousel() {
     const fetchUpcomingProducts = async () => {
       try {
         setLoading(true);
-        const api = apiWithCurrency(currency);
         const { data } = await api.get("/api/products/upcomingProducts");
         setProducts(data.products || []);
       } catch (err) {

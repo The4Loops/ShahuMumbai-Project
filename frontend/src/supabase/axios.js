@@ -11,20 +11,5 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-const withCurrency = (config, currency) => {
-  if (currency) {
-    config.params = { ...config.params, currency };
-  }
-  return config;
-};
-
-export const apiWithCurrency = (currency) => ({
-  get: (url, config = {}) => {
-    return api.get(url, withCurrency(config, currency));
-  },
-  post: (url, data, config = {}) => api.post(url, data, config),
-  put: (url, data, config = {}) => api.put(url, data, config),
-  delete: (url, config = {}) => api.delete(url, config),
-});
 
 export default api;

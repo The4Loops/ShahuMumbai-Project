@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import { useCurrency } from "../supabase/CurrencyContext";
 import { toast } from "react-toastify";
 import { useLoading } from "../context/LoadingContext";
@@ -71,7 +71,6 @@ const Waitlist = () => {
 
     setLoading(true);
     try {
-      const api = apiWithCurrency(currency);
       const res = await api.get(`/api/waitlist?email=${encodeURIComponent(email)}`);
       const data = res.data || [];
 

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { AiOutlineShoppingCart, AiOutlineDelete } from "react-icons/ai";
 import Layout from "../layout/Layout";
 import { Ecom, UX } from "../analytics";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { jwtDecode } from "jwt-decode";
 import { Helmet } from "react-helmet-async";
@@ -36,28 +36,26 @@ const Wishlist = () => {
   const [cartSubmitting, setCartSubmitting] = useState(false);
   const [removeSubmitting, setRemoveSubmitting] = useState(false);
   const [clearSubmitting, setClearSubmitting] = useState(false);
+  const [user, setUser] = useState(null);
 
-  const token = localStorage.getItem("token");
-  let decoded = "";
-  if (token) {
-    try {
-      decoded = jwtDecode(token);
-    } catch {
-      decoded = "";
-    }
-  }
-  const userId = decoded?.id;
+  useEffect(() => {
+      const fetchUser = async () => {
+        try {
+          const res = await api.get("/api/auth/me");
+          setUser(res.data.user);
+        } catch (err) {
+          setUser(null); // Guest user
+        }
+      };
+      fetchUser();
+    }, []);
+    
+  const userId = user?.id;
 
   useEffect(() => {
     const fetchWishlist = async () => {
-      if (!token || !userId || currencyLoading) {
-        setError("Please log in to view your wishlist");
-        setLoading(false);
-        return;
-      }
       try {
         setLoading(true);
-        const api = apiWithCurrency(currency);
         const { data } = await api.get("/api/wishlist");
         setWishlistItems(data.data || []);
       } catch (err) {
@@ -68,14 +66,13 @@ const Wishlist = () => {
       }
     };
     fetchWishlist();
-  }, [token, userId, currency, currencyLoading,setLoading]);
+  }, [userId, currency, currencyLoading,setLoading]);
 
   const handleAddToCart = async (item) => {
     if (item.products.stock <= 0 || cartSubmitting) return;
     setLoading(true);
     try {
       setCartSubmitting(true);
-      const api = apiWithCurrency(currency);
       const payload = {
         user_id: userId,
         product_id: item.product_id,
@@ -107,7 +104,6 @@ const Wishlist = () => {
     if (removeSubmitting) return;
     try {
       setRemoveSubmitting(true);
-      const api = apiWithCurrency(currency);
       await api.delete(`/api/wishlist/${itemId}`);
       setWishlistItems(wishlistItems.filter((i) => i.id !== itemId));
       toast.success("Removed from wishlist");
@@ -134,7 +130,6 @@ const Wishlist = () => {
     if (clearSubmitting) return;
     try {
       setClearSubmitting(true);
-      const api = apiWithCurrency(currency);
       await api.delete("/api/wishlist");
       const itemsToRemove = [...wishlistItems];
       setWishlistItems([]);

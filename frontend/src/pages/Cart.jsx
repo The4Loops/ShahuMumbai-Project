@@ -5,7 +5,7 @@ import { FaTrashAlt } from "react-icons/fa";
 import { LuShieldCheck, LuTruck, LuRotateCcw } from "react-icons/lu";
 import Layout from "../layout/Layout";
 import { useNavigate } from "react-router-dom";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
@@ -79,7 +79,6 @@ function Cart() {
       setLoading(true);
       setLocalLoading(true);
       try {
-        const api = apiWithCurrency(currency);
         const response = await api.get("/api/cartById");
 
         const formattedItems = (response.data || []).map((item) => {
@@ -149,7 +148,6 @@ function Cart() {
       const item = cartItems.find((item) => item.id === id);
       const newQuantity = Math.max(1, item.quantity + delta);
 
-      const api = apiWithCurrency(currency);
       await api.put(`/api/cart/${id}`, { quantity: newQuantity });
 
       setCartItems((items) =>
@@ -175,7 +173,6 @@ function Cart() {
 
   const handleRemove = async (id) => {
     try {
-      const api = apiWithCurrency(currency);
       await api.delete(`/api/cart/${id}`);
       const removed = cartItems.find((it) => it.id === id);
       setCartItems((items) => items.filter((item) => item.id !== id));

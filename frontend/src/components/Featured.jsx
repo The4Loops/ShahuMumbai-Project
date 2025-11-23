@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import placeholderImg from "../assets/products/coat.jpg";
 import { useCurrency } from "../supabase/CurrencyContext";
@@ -23,7 +23,6 @@ function Featured() {
   // Fetch top 4 latest products (prices assumed in INR in DB)
   const fetchLatestProducts = async () => {
     try {
-      const api = apiWithCurrency(currency);
       const response = await api.get("/api/products/getLatestProducts");
       setProducts(response.data || []);
     } catch (error) {

@@ -1,7 +1,7 @@
 // src/pages/Products.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import ProductCard from "../components/ProductCard";
 import Layout from "../layout/Layout";
 import { toast } from "react-toastify";
@@ -110,7 +110,6 @@ const Products = () => {
 
       const minDelay = new Promise((resolve) => setTimeout(resolve, 600));
 
-      const api = apiWithCurrency(currency);
       const category =
         searchParams.get("name") || Array.from(selectedCategories)[0] || "";
       const response = await api.get(`/api/products`, {

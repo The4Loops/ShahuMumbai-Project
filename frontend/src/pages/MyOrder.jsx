@@ -11,7 +11,7 @@ import {
 } from "react-icons/fa";
 import Layout from "../layout/Layout";
 import { Helmet } from "react-helmet-async";
-import { apiWithCurrency } from "../supabase/axios";
+import api from "../supabase/axios";
 import { useCurrency } from "../supabase/CurrencyContext";
 import { toast } from "react-toastify";
 import { useLoading } from "../context/LoadingContext";
@@ -63,7 +63,6 @@ const MyOrders = () => {
     const fetchOrders = async () => {
       try {
         setLoading(true);
-        const api = apiWithCurrency(currency || "INR");
         const res = await api.get("/api/orders/user");
         setOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
       } catch (err) {
