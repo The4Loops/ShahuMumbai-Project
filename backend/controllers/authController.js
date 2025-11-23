@@ -269,7 +269,6 @@ exports.login = async (req, res) => {
 // SSO LOGIN
 exports.ssoLogin = async (req, res) => {
   try {
-    // Extract token from Authorization header
     const token = req.headers.authorization?.split(' ')[1];
     if (!token) {
       console.error('No token provided in Authorization header');

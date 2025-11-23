@@ -136,13 +136,7 @@ exports.login = async (req, res) => {
 
 exports.getInviteRequests = async (req, res) => {
   try {
-    // Verify JWT token
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'Unauthorized: No token provided' });
-    }
-
-    const token = authHeader.split(' ')[1];
+    const token = req.cookies.auth_token;
     let decoded;
     try {
       decoded = jwt.verify(token, process.env.JWT_SECRET);

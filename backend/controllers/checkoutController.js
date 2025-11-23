@@ -15,7 +15,7 @@ function devFakeAllowed() {
 const getExchangeRate = async (_dbPool, _currency = 'INR') => 1;
 
 exports.createOrder = async (req, res) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.cookies.auth_token;
   const owner = currentCartOwner(req);
   var decoded={};
   if(token){

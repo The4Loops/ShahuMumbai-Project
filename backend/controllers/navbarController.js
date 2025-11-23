@@ -1,24 +1,9 @@
 const jwt = require("jsonwebtoken");
 const sql = require('mssql');
-const { translateText } = require('../utils/translate');
-
-// VERIFY ADMIN
-const verifyAdmin = (req) => {
-  const token = req.headers.authorization?.split(" ")[1];
-  if (!token) return { error: "Unauthorized: Token missing" };
-
-  try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    if (decoded.role !== "Admin") return { error: "Forbidden: Admins only" };
-    return { decoded };
-  } catch (err) {
-    return { error: "Invalid Token" };
-  }
-};
 
 // VERIFY AUTHENTICATED USER
 const verifyUser = (req) => {
-  const token = req.headers.authorization?.split(" ")[1];
+  const token = req.cookies.auth_token;
   if (!token) return { error: "Unauthorized: Token missing" };
 
   try {

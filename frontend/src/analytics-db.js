@@ -1,4 +1,5 @@
 // Save user events to your Node API (MSSQL), not Supabase
+import { toast } from "react-toastify";
 import api from "./supabase/axios"; // your axios instance (baseURL http://localhost:5000)
 
 const ANON_KEY = "anon_id";
@@ -49,11 +50,11 @@ export async function trackDB(name, properties = {}, userId = null) {
     utm: getUTM(),
     properties
   };
-  console.log("trackDB", payload);
   try {
     await sendViaAxios(payload);
   } catch(e) {
-    console.warn("trackDB axios failed",e);
+    toast.dismiss();
+    toast.error("Analytics tracking failed");
     sendViaBeacon(payload);
   }
 }

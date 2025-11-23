@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 
 // Helper: Verify JWT & Admin Role
 const verifyAdmin = (req) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.cookies.auth_token;
   if (!token) return { error: 'Unauthorized: Token missing' };
 
   try {

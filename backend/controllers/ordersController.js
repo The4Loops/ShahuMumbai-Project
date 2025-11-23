@@ -231,12 +231,12 @@ exports.updateTracking = async (req, res) => {
 /* GET /api/user/orders (Bearer) */
 exports.getUserOrders = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
+    const authHeader = req.cookies.auth_token;
     let userId;
     let isGuest = true; 
 
-    if (authHeader && authHeader.startsWith('Bearer ')) {
-      const token = authHeader.split(' ')[1];
+    if (authHeader) {
+      const token = authHeader;
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       userId = decoded.id;
       isGuest = false;

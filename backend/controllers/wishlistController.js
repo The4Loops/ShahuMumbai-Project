@@ -17,7 +17,7 @@ const getExchangeRate = async (dbPool, currency = 'USD') => {
 
 // Verify User
 const verifyUser = (req) => {
-  const token = req.headers.authorization?.split(' ')[1];
+  const token = req.cookies.auth_token;
   if (!token) return { error: 'Unauthorized: Token missing' };
 
   try {

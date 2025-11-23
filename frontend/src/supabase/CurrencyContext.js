@@ -34,7 +34,7 @@ export const CurrencyProvider = ({ children }) => {
     const detectCurrency = async () => {
       try {
         setDetecting(true);
-        const response = await axios.get("https://ipapi.co/json/");
+        const response = await axios.get("https://geolocation-db.com/json/");
         const countryCode = response.data.country_code;
         const detectedCurrency = countryToCurrency[countryCode] || "INR";
         setCurrency(detectedCurrency);

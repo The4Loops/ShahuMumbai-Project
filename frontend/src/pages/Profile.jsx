@@ -130,7 +130,6 @@ function Profile() {
       const response = await api.post("/api/upload/single", formData, {
         headers: {
           "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
       setProfile((prev) => ({ ...prev, image: response.data.url }));

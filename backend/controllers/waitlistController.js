@@ -275,8 +275,7 @@ exports.addToWaitlist = async (req, res) => {
 
     let userId = null;
     try {
-      const auth = req.headers.authorization || '';
-      const token = auth.split(' ')[1];
+      const token = req.cookies.auth_token;
       if (token) {
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
         userId = decoded.id || decoded.userId || null;
@@ -333,11 +332,7 @@ exports.removeFromWaitlist = async (req, res) => {
 
 exports.createWaitlistDepositOrder = async (req, res) => {
   try {
-    // --- 1) Require auth (must be logged in) ---
-    const authHeader = req.headers.authorization || "";
-    const token = authHeader.startsWith("Bearer ")
-      ? authHeader.slice(7)
-      : null;
+    const token = req.cookies.auth_token;
 
     if (!token) {
       return res.status(401).json({ error: "Unauthorized: missing token" });

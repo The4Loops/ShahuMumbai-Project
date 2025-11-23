@@ -2,8 +2,7 @@ const jwt = require("jsonwebtoken");
 
 
 function optional(req, _res, next) {
-  const hdr = req.headers.authorization || "";
-  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
+  const token = req.cookies.auth_token;
   if (!token) return next();
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET); // e.g., { id, role, ... }
@@ -14,8 +13,7 @@ function optional(req, _res, next) {
 
 // Require any logged-in user
 function required(req, res, next) {
-  const hdr = req.headers.authorization || "";
-  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
+  const token = req.cookies.auth_token;
   if (!token) return res.status(401).json({ error: "Unauthorized: token missing" });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);
@@ -27,8 +25,7 @@ function required(req, res, next) {
 
 // Require Admin role
 function admin(req, res, next) {
-  const hdr = req.headers.authorization || "";
-  const token = hdr.startsWith("Bearer ") ? hdr.slice(7) : null;
+  const token = req.cookies.auth_token;
   if (!token) return res.status(401).json({ error: "Unauthorized: token missing" });
   try {
     req.user = jwt.verify(token, process.env.JWT_SECRET);

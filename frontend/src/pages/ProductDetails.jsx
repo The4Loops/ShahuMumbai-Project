@@ -13,8 +13,7 @@ import {
 import { IoMdShareAlt } from "react-icons/io";
 import { AiFillStar, AiOutlineStar } from "react-icons/ai";
 import RelatedCard from "../components/RelatedCard";
-import { apiWithCurrency } from "../supabase/axios";
-import { jwtDecode } from "jwt-decode";
+import api from "../supabase/axios";
 import { toast } from "react-toastify";
 import { Ecom } from "../analytics";
 import { Helmet } from "react-helmet-async";
@@ -165,23 +164,23 @@ const ProductDetails = () => {
   const [wishlistSubmitting, setWishlistSubmitting] = useState(false);
   const [buyNowSubmitting, setBuyNowSubmitting] = useState(false);
   const sliderRef = useRef();
-
-  const token = localStorage.getItem("token");
-  let decoded = "";
-  if (token) {
-    try {
-      decoded = jwtDecode(token);
-    } catch {
-      decoded = "";
-    }
-  }
-  const userid = decoded?.id;
-  const fullName = decoded?.fullname || "Anonymous";
-
-  // reviews
+  const [user, setUser] = useState(null);
   const [reviews, setReviews] = useState([]);
   const [avgRating, setAvgRating] = useState(0);
   const [reviewCount, setReviewCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await api.get("/api/auth/me");
+        setUser(res.data.user);
+      } catch (err) {
+        setUser(null); // Guest user
+      }
+    };
+    fetchUser();
+  }, []);
+
 
   // thank‑you modal
   const [thankOpen, setThankOpen] = useState(false);
@@ -197,7 +196,6 @@ const ProductDetails = () => {
     setLoading(true);
     setError(null);
     try {
-      const api = apiWithCurrency("INR");
       const { data: p } = await api.get(`/api/products/${id}`);
       setProduct(p);
 
@@ -230,7 +228,6 @@ const ProductDetails = () => {
 
   const fetchReviews = async () => {
     try {
-      const api = apiWithCurrency("INR");
       const res = await api.get(`/api/reviews/${id}`);
       const list = Array.isArray(res.data) ? res.data : res.data?.data || [];
       setReviews(list);
@@ -246,12 +243,11 @@ const ProductDetails = () => {
   };
 
   const checkWishlist = async () => {
-    if (!token || !userid) {
+    if (!user) {
       setIsInWishlist(false);
       return;
     }
     try {
-      const api = apiWithCurrency("INR");
       const { data } = await api.get("/api/wishlist");
       const isWishlisted = (data.data || []).some(
         (item) => String(item.product_id) === String(id)
@@ -269,11 +265,11 @@ const ProductDetails = () => {
       checkWishlist();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, token, userid, currencyLoading]);
+  }, [id,user, currencyLoading]);
 
   /* ────────────────────── WISHLIST ────────────────────── */
   const handleToggleWishlist = async () => {
-    if (!token || !userid) {
+    if (!user) {
       toast.error("Please log in to manage your wishlist");
       return;
     }
@@ -281,7 +277,6 @@ const ProductDetails = () => {
 
     try {
       setWishlistSubmitting(true);
-      const api = apiWithCurrency("INR");
       if (isInWishlist) {
         const { data } = await api.get("/api/wishlist");
         const item = (data.data || []).find(
@@ -305,22 +300,29 @@ const ProductDetails = () => {
   };
 
   /* ────────────────────── REVIEW FORM ────────────────────── */
-  const [reviewName, setReviewName] = useState(fullName);
+  const [reviewName, setReviewName] = useState("");
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewText, setReviewText] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [cartSubmitting, setCartSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (user?.fullname) {
+      setReviewName(user.fullname);
+    } else {
+      setReviewName("");
+    }
+  }, [user]);
 
   const submitReview = async (e) => {
     e.preventDefault();
     if (!reviewText.trim()) return;
     try {
       setSubmitting(true);
-      const api = apiWithCurrency("INR");
       await api.post(`/api/reviews`, {
         rating: Number(reviewRating),
         productid: id,
-        userid: parseInt(userid),
+        userid: parseInt(user.id),
         comment: reviewText.trim(),
       });
       toast.success("Review submitted successfully!");
@@ -338,7 +340,6 @@ const ProductDetails = () => {
     if (Number(product.Stock) === 0 || cartSubmitting) return;
     try {
       setCartSubmitting(true);
-      const api = apiWithCurrency("INR");
       await api.post("/api/cart", {
         product_id: product.ProductId,
         quantity: qty,
@@ -367,8 +368,6 @@ const ProductDetails = () => {
     try {
       setLoading(true);
       setBuyNowSubmitting(true);
-
-      const api = apiWithCurrency("INR");
 
       // Option 1: Just add to cart (will accumulate if already in cart)
       await api.post("/api/cart", {
@@ -404,6 +403,7 @@ const ProductDetails = () => {
         },
       });
     } catch (err) {
+      console.error("Buy Now error:", err);
       toast.error(
         err?.response?.data?.error || "Could not start checkout. Please try again."
       );
@@ -905,8 +905,8 @@ const ProductDetails = () => {
                   value={reviewName}
                   onChange={(e) => setReviewName(e.target.value)}
                   className="w-full border border-[#D4A5A5] rounded-md px-3 py-2 mb-3 bg-white focus:outline-none focus:ring-2 focus:ring-[#D4A5A5]"
-                  placeholder="e.g., Arjun"
-                  readOnly
+                  placeholder="Enter your name"
+                  readOnly={!!user}
                 />
 
                 <label className="block text-sm text-[#3E2C23] mb-1">

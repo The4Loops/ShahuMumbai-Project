@@ -302,11 +302,7 @@ exports.sendNewsletterMail = async (req, res) => {
 
 exports.getNewsletterStatus = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const token = authHeader.split(' ')[1];
+    const token = req.cookies.auth_token;
     const decoded = jwt.verify(token, process.env.JWT_SECRET); // Ensure JWT_SECRET is set in env
     const userId = decoded.id; // Assuming 'id' is the UserId in token payload
 
@@ -333,11 +329,7 @@ exports.getNewsletterStatus = async (req, res) => {
 
 exports.optOutNewsletter = async (req, res) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) {
-      return res.status(401).json({ error: 'Unauthorized' });
-    }
-    const token = authHeader.split(' ')[1];
+    const token = req.cookies.auth_token;
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id;
 

@@ -1,5 +1,4 @@
-import { Routes, Route, useLocation } from "react-router-dom";
-import React, { useEffect, useState } from "react";
+import { Routes, Route } from "react-router-dom";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import { CurrencyProvider } from "./supabase/CurrencyContext";
 import "./App.css";
@@ -37,52 +36,9 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 import AddBlogPost from "./admin/AddBlogPost";
-import api from "./supabase/axios";
-import { trackDB } from "./analytics-db";
-
-
-function useTrackSiteVisit(userId) {
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    if (!sessionStorage.getItem("site_visit_tracked")) {
-      trackDB("site_visit", { path: window.location.pathname + window.location.search }, userId);
-      sessionStorage.setItem("site_visit_tracked", "1");
-    }
-  }, [userId]);
-}
-
-
-function useTrackPageViews(userId) {
-  const { pathname, search } = useLocation();
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-
-    trackDB("page_view", { path: pathname + search, title: document.title || null }, userId);
-  }, [pathname, search, userId]);
-}
 
 function App() {
   useAutoLogout();
-
-  const [userId, setUserId] = useState(null);
-
-  useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await api.get("/api/auth/me");
-        setUserId(res.data.user?.id || null);
-      } catch (err) {
-        setUserId(null);
-      }
-    };
-
-    fetchUser();
-  }, []);
-
-  useTrackSiteVisit(userId);
-  useTrackPageViews(userId);
 
   const siteUrl = typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
 

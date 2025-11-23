@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Helmet } from "react-helmet-async";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
-import { jwtDecode } from "jwt-decode";
 import { useNavigate } from "react-router-dom";
 import Layout from "../layout/Layout";
 import { useLoading } from "../context/LoadingContext"; 

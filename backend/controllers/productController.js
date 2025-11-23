@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 /* ------------------------------ Create -------------------------------- */
 exports.createProduct = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.cookies.auth_token;
     if (!token) return res.status(401).json({ message: 'Unauthorized: Token missing' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -234,7 +234,7 @@ exports.getProductById = async (req, res) => {
 /* ------------------------------ Update --------------------------------- */
 exports.updateProduct = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.cookies.auth_token;
     if (!token) return res.status(401).json({ message: 'Unauthorized: Token missing' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
@@ -337,7 +337,7 @@ exports.updateProduct = async (req, res) => {
 /* ------------------------------ Delete --------------------------------- */
 exports.deleteProduct = async (req, res) => {
   try {
-    const token = req.headers.authorization?.split(' ')[1];
+    const token = req.cookies.auth_token;
     if (!token) return res.status(401).json({ message: 'Unauthorized: Token missing' });
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
