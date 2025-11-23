@@ -43,13 +43,10 @@ function MenuManagement() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const roleResponse = await api.get("/api/roles", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const roleResponse = await api.get("/api/roles");
       setRoles(roleResponse.data.roles);
 
       const menuResponse = await api.get("/api/menus", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         params: {
           search: search || undefined,
           role: roleFilter !== "All" ? roleFilter : undefined,
@@ -57,9 +54,7 @@ function MenuManagement() {
       });
       setMenus(menuResponse.data.menus);
 
-      const dropdownResponse = await api.get("/api/menus/dropdown", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const dropdownResponse = await api.get("/api/menus/dropdown");
       setDropdownMenus(dropdownResponse.data.menus);
     } catch (error) {
       toast.dismiss();
@@ -104,19 +99,19 @@ function MenuManagement() {
     }
 
     try {
-      const commonHeaders = { Authorization: `Bearer ${localStorage.getItem("token")}` };
+
 
       if (editingMenuId !== null) {
         await api.put(`/api/menus/${editingMenuId}`, {
           label: newMenu.label,
           href: newMenu.href || null,
           order_index: parseInt(newMenu.order_index) || 0,
-        }, { headers: commonHeaders });
+        });
         await api.post("/api/menu-roles", {
           menu_id: editingMenuId,
           role_ids: newMenu.role_ids,
           order_index: parseInt(newMenu.order_index) || 0,
-        }, { headers: commonHeaders });
+        });
         toast.dismiss();
         toast.success("Menu updated successfully");
       } else {
@@ -124,13 +119,13 @@ function MenuManagement() {
           label: newMenu.label,
           href: newMenu.href || null,
           order_index: parseInt(newMenu.order_index) || 0,
-        }, { headers: commonHeaders });
+        });
         if (newMenu.role_ids.length > 0) {
           await api.post("/api/menu-roles", {
             menu_id: menu.menu.MenuId,
             role_ids: newMenu.role_ids,
             order_index: parseInt(newMenu.order_index) || 0,
-          }, { headers: commonHeaders });
+          });
         }
         toast.dismiss();
         toast.success("Menu created successfully");
@@ -151,7 +146,6 @@ function MenuManagement() {
     }
 
     try {
-      const commonHeaders = { Authorization: `Bearer ${localStorage.getItem("token")}` };
 
       if (editingMenuItemId !== null) {
         await api.put(`/api/menu-items/${editingMenuItemId}`, {
@@ -159,12 +153,12 @@ function MenuManagement() {
           href: newMenuItem.href,
           order_index: parseInt(newMenuItem.order_index) || 0,
           role_ids: newMenuItem.role_ids,
-        }, { headers: commonHeaders });
+        });
         await api.post("/api/menu-item-roles", {
           menu_item_id: editingMenuItemId,
           role_ids: newMenuItem.role_ids,
           order_index: parseInt(newMenuItem.order_index) || 0,
-        }, { headers: commonHeaders });
+        });
         toast.dismiss();
         toast.success("Menu item updated successfully");
       } else {
@@ -174,13 +168,13 @@ function MenuManagement() {
           href: newMenuItem.href,
           order_index: parseInt(newMenuItem.order_index) || 0,
           role_ids: newMenuItem.role_ids,
-        }, { headers: commonHeaders });
+        });
         if (newMenuItem.role_ids.length > 0) {
           await api.post("/api/menu-item-roles", {
             menu_item_id: menuItem.menu_item.MenuItemId,
             role_ids: newMenuItem.role_ids,
             order_index: parseInt(newMenuItem.order_index) || 0,
-          }, { headers: commonHeaders });
+          });
         }
         toast.dismiss();
         toast.success("Menu item created successfully");
@@ -196,9 +190,7 @@ function MenuManagement() {
   const handleDeleteMenu = async (menuId) => {
     if (window.confirm(`Are you sure you want to delete this menu?`)) {
       try {
-        await api.delete(`/api/menus/${menuId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        await api.delete(`/api/menus/${menuId}`);
         toast.dismiss();
         toast.success("Menu deleted successfully");
         fetchData();
@@ -213,9 +205,7 @@ function MenuManagement() {
   const handleDeleteMenuItem = async (menuItemId) => {
     if (window.confirm(`Are you sure you want to delete this menu item?`)) {
       try {
-        await api.delete(`/api/menu-items/${menuItemId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        await api.delete(`/api/menu-items/${menuItemId}`);
         toast.dismiss();
         toast.success("Menu item deleted successfully");
         fetchData();

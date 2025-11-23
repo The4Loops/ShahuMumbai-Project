@@ -14,7 +14,6 @@ const BannerManager = () => {
   // Handle image upload to /api/upload/single
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
-    console.log("Selected file:", file);
     if (!file) return;
 
     const formDataToUpload = new FormData();

@@ -1,9 +1,8 @@
 // src/pages/AuthCallback.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../supabase/axios";
 import { toast } from "react-toastify";
-import { jwtDecode } from "jwt-decode";
 import Layout from "../layout/Layout";
 import { useLoading } from "../context/LoadingContext";   // <-- NEW
 
@@ -24,77 +23,31 @@ const CallbackSkeleton = () => (
 const AuthCallback = () => {
   const { setLoading } = useLoading();                 // <-- NEW
   const navigate = useNavigate();
-  const [processing, setProcessing] = useState(true);  // local flag
 
   useEffect(() => {
-    // Turn the global spinner ON immediately
     setLoading(true);
-    setProcessing(true);
 
-    const params = new URLSearchParams(window.location.hash.substring(1));
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
     const idToken = params.get("id_token");
     const error = params.get("error");
 
-    // ---------- ERROR FROM GOOGLE ----------
-    if (error) {
-      toast.error(`Google login failed: ${error}`);
+    if (error || !idToken) {
+      toast.error(error ? `Google login failed: ${error}` : "No token received from Google");
       setLoading(false);
-      setProcessing(false);
-      navigate("/account");
-      return;
-    }
-
-    // ---------- NO TOKEN ----------
-    if (!idToken) {
-      toast.error("Google login failed: No ID token received.");
-      setLoading(false);
-      setProcessing(false);
       navigate("/account");
       return;
     }
 
     // ---------- EXCHANGE TOKEN ----------
-    api
-      .post(
-        "/api/auth/ssoLogin",
-        {},
-        { headers: { Authorization: `Bearer ${idToken}` } }
-      )
+    api.post("/api/auth/ssoLogin",{},{ headers: { Authorization: `Bearer ${idToken}` } })
       .then((res) => {
-        const { token } = res.data;
+        const { user } = res.data;
 
-        // Store token
-        try {
-          localStorage.setItem("token", token);
-        } catch (storageError) {
-          toast.error("Failed to store authentication token.");
-          setLoading(false);
-          setProcessing(false);
-          navigate("/account");
-          return;
-        }
-
-        // Decode & route
-        let decoded;
-        try {
-          decoded = jwtDecode(token);
-        } catch (decodeError) {
-          localStorage.removeItem("token");
-          toast.error("Invalid token format.");
-          setLoading(false);
-          setProcessing(false);
-          navigate("/account");
-          return;
-        }
-
-        const userRole = decoded.role;
         toast.dismiss();
-        toast.success("Google login successful!");
+        toast.success("Welcome back");
 
-        setLoading(false);
-        setProcessing(false);
-
-        if (userRole === "Admin") {
+        if (user?.role === "Admin") {
           navigate("/admin");
         } else {
           navigate("/profile");
@@ -103,9 +56,10 @@ const AuthCallback = () => {
       .catch((err) => {
         toast.dismiss();
         toast.error(err.response?.data?.error || err.message || "Google login failed.");
-        setLoading(false);
-        setProcessing(false);
         navigate("/account");
+      })
+      .finally(() => {
+        setLoading(false);
       });
   }, [navigate, setLoading]);
 
@@ -113,7 +67,7 @@ const AuthCallback = () => {
   return (
     <Layout>
       <div className="min-h-screen bg-[#F1E7E5]">
-        {processing ? <CallbackSkeleton /> : null}
+        <CallbackSkeleton />
       </div>
     </Layout>
   );

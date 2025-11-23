@@ -404,7 +404,6 @@ const ProductDetails = () => {
         },
       });
     } catch (err) {
-      console.error("Buy Now error:", err);
       toast.error(
         err?.response?.data?.error || "Could not start checkout. Please try again."
       );

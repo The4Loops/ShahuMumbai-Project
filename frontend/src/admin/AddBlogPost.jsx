@@ -85,12 +85,9 @@ const AddBlogPost = () => {
       if (!id || editingBlog) return;
       setLoading(true);
       try {
-        const response = await api.get(`/api/blogs/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        const response = await api.get(`/api/blogs/${id}`);
         prefillForm(normalizeBlog(response.data));
       } catch (err) {
-        console.error("Error fetching blog:", err);
         toast.error("Failed to load blog for editing.");
       } finally {
         setLoading(false);
@@ -136,7 +133,6 @@ const AddBlogPost = () => {
       const response = await api.get("/api/blogs/drafts");
       setDrafts(response.data);
     } catch (err) {
-      console.error("Error fetching drafts:", err);
       toast.error("Failed to fetch drafts.");
     }
   };
@@ -162,7 +158,6 @@ const AddBlogPost = () => {
       });
       return response.data.url;
     } catch (err) {
-      console.error("Error uploading cover image:", err);
       toast.error("Failed to upload cover image.");
       throw new Error("Failed to upload cover image");
     }

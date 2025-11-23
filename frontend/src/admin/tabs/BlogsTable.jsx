@@ -19,9 +19,7 @@ function BlogsTable() {
     setLoading(true);
     toast.dismiss();
     try {
-      const response = await api.get("/api/blogs", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      const response = await api.get("/api/blogs");
       const blogList = Array.isArray(response.data) ? response.data : response.data?.blogs || [];
       setBlogs(
         blogList.map((blog) => ({
@@ -42,7 +40,6 @@ function BlogsTable() {
         }))
       );
     } catch (error) {
-      console.error("Error fetching blogs:", error);
       toast.error(error.response?.data?.message || "Failed to fetch blogs");
       setBlogs([]);
     } finally {
@@ -57,14 +54,11 @@ function BlogsTable() {
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this blog?")) return;
     try {
-      await api.delete(`/api/admin/blogs/${id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      await api.delete(`/api/admin/blogs/${id}`);
       toast.success("Blog deleted successfully!");
       fetchBlogs();
       setSelectedBlog(null);
     } catch (error) {
-      console.error("Error deleting blog:", error);
       toast.error(error.response?.data?.message || "Failed to delete blog");
     }
   };

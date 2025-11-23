@@ -147,7 +147,6 @@ export default function OrderDashboard() {
       setOrdersTotal(total);
     } catch (e) {
       if (isCanceled(e)) return; // ✅ ignore cancellations
-      console.error("[Orders] ERROR", e);
       toast.error(e?.response?.data?.error || e?.message || "Failed to load orders");
       setOrders([]);
       setOrdersTotal(0);
@@ -179,7 +178,6 @@ export default function OrderDashboard() {
       setWlTotal(total);
     } catch (e) {
       if (isCanceled(e)) return; // ✅ ignore cancellations
-      console.error("[Waitlist] ERROR", e);
       toast.error("Failed to load waitlist");
       setWaitlist([]);
       setWlTotal(0);

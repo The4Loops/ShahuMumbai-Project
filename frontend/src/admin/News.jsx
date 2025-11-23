@@ -64,7 +64,6 @@ function NewsletterEmail() {
         heroImage: heroURL,
       }));
     } catch (err) {
-      console.error("Error uploading initial images:", err);
       toast.error("Failed to load initial images.");
     }
   };

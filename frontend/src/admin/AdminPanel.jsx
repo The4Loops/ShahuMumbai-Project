@@ -47,6 +47,7 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import { toast } from "react-toastify";
 
 const API_BASE = process.env.REACT_APP_SERVER_API_BASE_URL || "";
 const apiUrl = (path, params) => `${API_BASE}${path}${params ? `?${params}` : ""}`;
@@ -504,7 +505,7 @@ const Dashboard = ({ onOpen, favorites, toggleFavorite }) => {
           }))
         );
       } catch (e) {
-        console.error(e);
+        toast.error("Failed to load dashboard data.");
         setError("Failed to load dashboard data.");
       } finally {
         setLoading(false);

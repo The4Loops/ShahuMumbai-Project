@@ -230,18 +230,12 @@ const AddProduct = ({ editId = null, onSaved }) => {
           imageUrls = extractImageUrls(uploadResponse);
 
           if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
-            // Show server payload for diagnosis
-            // eslint-disable-next-line no-console
-            console.error(
-              "Upload endpoint returned no URLs. Raw payload:",
-              uploadResponse?.data
-            );
-            throw new Error("Image upload failed: no URL from server");
+            toast.error("Image upload failed: No URLs returned");
           }
         } catch (e) {
-          const msg =
-            e?.response?.data?.message || e?.message || "Image upload failed";
-          throw new Error(msg);
+          toast.error(
+            e?.response?.data?.message || "Image upload failed"
+          );
         }finally{
           setLoading(false);
         }

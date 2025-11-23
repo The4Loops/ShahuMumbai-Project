@@ -1,3 +1,4 @@
+import { toast } from 'react-toastify';
 import api from '../supabase/axios';
 
 export default function PayButton({ orderNumber }) {
@@ -36,8 +37,7 @@ export default function PayButton({ orderNumber }) {
       const rzpInstance = new window.Razorpay(options);
       rzpInstance.open();
     } catch (err) {
-      console.error(err);
-      alert("Could not start payment");
+    toast.error(err.response?.data?.message || "Payment initiation failed");
     }
   };
 

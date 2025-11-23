@@ -96,36 +96,40 @@ export default function Navbar() {
   const [searchQuery, setSearchQuery] = useState("");
   const refs = useRef({});
   const navigate = useNavigate();
+  const [user, setUser] = useState(null);
 
-  const token = localStorage.getItem("token");
-  let userRole = null;
-  if (token) {
+  useEffect(() => {
+  const checkAuth = async () => {
     try {
-      const decoded = jwtDecode(token);
-      userRole = decoded.role || null;
-    } catch {
-      localStorage.removeItem("token");
+      setIsLoading(true);
+      const res = await api.get("/api/auth/me");  // This reads HttpOnly cookie
+      setUser(res.data.user);                     // { id, fullname, email, role }
+    } catch (err) {
+      setUser(null);                              // Not logged in
+    } finally {
+      setIsLoading(false);
     }
-  }
+  };
+
+  checkAuth();
+}, []);
 
   // Menus
   const fetchMenuData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const res = await api.get(`/api/navbar/menus`, {
-        headers: { Authorization: token ? `Bearer ${token}` : undefined },
-      });
+      const res = await api.get(`/api/navbar/menus`);
 
       let sorted = res.data.menus.sort((a, b) => a.OrderIndex - b.OrderIndex);
 
       sorted = sorted.map((menu) => {
         const filtered = {
           ...menu,
-          DropdownItems: userRole
+          DropdownItems: user?.role
             ? menu.DropdownItems.filter(
                 (item) =>
                   item.Roles.length === 0 ||
-                  item.Roles.split(",").includes(userRole)
+                  item.Roles.split(",").includes(user?.role)
               )
             : menu.DropdownItems,
         };
@@ -143,7 +147,7 @@ export default function Navbar() {
         return filtered;
       });
 
-      if (userRole !== "Admin") {
+      if (user?.role !== "Admin") {
         sorted = sorted.filter(
           (m) => m.Label.toLowerCase() !== "admin".toLowerCase()
         );
@@ -158,7 +162,7 @@ export default function Navbar() {
     } finally {
       setIsLoading(false);
     }
-  }, [userRole, token]);
+  }, [user?.role]);
 
   // Always fetch count (guest OR logged-in). Guest carts use the signed cookie; no JWT required.
   const fetchCartItemCount = useCallback(async () => {
@@ -211,13 +215,20 @@ export default function Navbar() {
     setMobileMenuOpen(false);
   };
 
-  const handleLogout = () => {
-    localStorage.removeItem("token");
+  const handleLogout = async () => {
+  try {
+    await api.post("/api/auth/logout");
+  } catch (err) {
+    toast.dismiss();
+    toast.error(err.response?.data?.message || "Logout failed");
+  } finally {
+    setUser(null);
+    toast.success("Logged out successfully");
     navigate("/");
     setMobileMenuOpen(false);
-    // after logout, fetch guest cart count (it may be different now)
     fetchCartItemCount();
-  };
+  }
+};
 
   const handleSearchSubmit = (e) => {
     if (e.key === "Enter" && searchQuery.trim()) {
@@ -352,7 +363,7 @@ export default function Navbar() {
               <button
                 aria-label="Account"
                 onClick={() =>
-                  !token
+                  !user
                     ? navigate("/account")
                     : setDropdown((prev) => {
                         const closedAll = Object.keys(prev).reduce(
@@ -367,7 +378,7 @@ export default function Navbar() {
                 <FaUser size={20} />
               </button>
               <AnimatePresence>
-                {token && dropdown.account && (
+                {user && dropdown.account && (
                   <motion.div
                     initial={{ opacity: 0, y: -5 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -530,7 +541,7 @@ export default function Navbar() {
                 <button
                   className="w-full flex justify-between items-center py-2"
                   onClick={() =>
-                    !token
+                    !user
                       ? (navigate("/account"), setMobileMenuOpen(false))
                       : setMobileDropdownOpen((prev) =>
                           prev === "account" ? null : "account"
@@ -542,7 +553,7 @@ export default function Navbar() {
                 </button>
 
                 <AnimatePresence>
-                  {mobileDropdownOpen === "account" && token && (
+                  {mobileDropdownOpen === "account" && user && (
                     <motion.div
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}

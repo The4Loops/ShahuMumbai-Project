@@ -30,17 +30,17 @@ export const CurrencyProvider = ({ children }) => {
 
   // --- Detect currency from IP or localStorage ---
   useEffect(() => {
+    localStorage.removeItem("currency");
     const detectCurrency = async () => {
       try {
         setDetecting(true);
         const response = await axios.get("https://ipapi.co/json/");
         const countryCode = response.data.country_code;
-        const detectedCurrency = countryToCurrency[countryCode] || "USD";
+        const detectedCurrency = countryToCurrency[countryCode] || "INR";
         setCurrency(detectedCurrency);
         localStorage.setItem("currency", detectedCurrency);
       } catch (error) {
-        console.error("Failed to detect country:", error);
-        setCurrency("USD");
+        setCurrency("INR");
       } finally {
         setDetecting(false);
       }
@@ -75,11 +75,11 @@ export const CurrencyProvider = ({ children }) => {
     const fetchRate = async () => {
       try {
         setFxLoading(true);
-        const res = await axios.get("https://api.exchangerate.host/latest", {
+        const res = await axios.get("https://api.frankfurter.app/latest", {
           params: {
-            base: BASE_CURRENCY,
-            symbols: currency,
-          },
+            from: BASE_CURRENCY,
+            to: currency,
+          }
         });
 
         const rate = res?.data?.rates?.[currency];
@@ -91,7 +91,17 @@ export const CurrencyProvider = ({ children }) => {
           setLastFetched(Date.now());
         }
       } catch (err) {
-        console.error("Failed to fetch FX rate:", err);
+        const fallbackRates = {
+          USD: 0.01190,
+          EUR: 0.01120,
+          GBP: 0.00980,
+          CAD: 0.01650,
+          AUD: 0.01810,
+        };
+        if (fallbackRates[currency]) {
+          setRates(prev => ({ ...prev, [currency]: fallbackRates[currency] }));
+          setLastFetched(Date.now());
+        }
       } finally {
         setFxLoading(false);
       }

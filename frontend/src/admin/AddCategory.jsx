@@ -82,7 +82,6 @@ const AddCategory = ({ editId = null, onSaved }) => {
 
         const uploadResponse = await api.post('/api/upload/single', formData, {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
             'Content-Type': 'multipart/form-data',
           },
         });
@@ -102,9 +101,7 @@ const AddCategory = ({ editId = null, onSaved }) => {
 
       if (!editId) {
         // CREATE
-        const response = await api.post('/api/category', payload, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
+        const response = await api.post('/api/category', payload);
 
         if (response.status === 201) {
           toast.success('Category created successfully!');
@@ -115,9 +112,7 @@ const AddCategory = ({ editId = null, onSaved }) => {
         }
       } else {
         // UPDATE
-        const response = await api.put(`/api/category/${editId}`, payload, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        });
+        const response = await api.put(`/api/category/${editId}`, payload);
 
         if (response.status >= 200 && response.status < 300) {
           toast.success('Category updated successfully!');

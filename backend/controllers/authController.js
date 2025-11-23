@@ -4,6 +4,16 @@ const nodemailer = require('nodemailer');
 const sql = require('mssql');
 const { OAuth2Client } = require('google-auth-library');
 
+const setAuthCookie = (res, token) => {
+  res.cookie("auth_token", token, {
+    httpOnly: true, 
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 2 * 60 * 60 * 1000, 
+    path: "/",
+  });
+};
+
 // SEND OTP
 exports.sendOtp = async (req, res) => {
   try {
@@ -239,9 +249,16 @@ exports.login = async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    res.status(200).json({
-      message: 'Login successful',
-      token,
+    setAuthCookie(res, token);
+
+    return res.status(200).json({
+      message: "Login successful",
+      user: {
+        id: user.UserId,
+        fullname: user.FullName,
+        email: user.Email,
+        role: user.Label,
+      },
     });
   } catch (err) {
     console.error('Error in login:', err);
@@ -371,7 +388,17 @@ exports.ssoLogin = async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    return res.status(200).json({ token: appToken });
+    setAuthCookie(res, appToken);
+
+    return res.status(200).json({
+      message: "SSO login successful",
+      user: {
+        id: userId,
+        fullname: payload.name || payload.email,
+        email: payload.email,
+        role: roleLabel,
+      },
+    });
   } catch (err) {
     console.error('Error in ssoLogin:', err.message, err.stack);
     return res.status(500).json({ error: err.message || 'Internal server error' });
@@ -480,5 +507,29 @@ exports.verifyResetPasswordOtp = async (req, res) => {
   } catch (err) {
     console.error('Error in verifyResetPasswordOtp:', err);
     res.status(500).json({ error: err.message || 'Internal server error' });
+  }
+};
+
+// LOGOUT
+exports.logout = (req, res) => {
+  res.clearCookie("auth_token", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+  });
+  return res.status(200).json({ message: "Logged out successfully" });
+};
+
+// GET CURRENT USER
+exports.me = async (req, res) => {
+  try {
+    const token = req.cookies.auth_token;
+    if (!token) return res.status(401).json({ error: "Not authenticated" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    res.json({ user: decoded }); // { id, fullname, email, role }
+  } catch (err) {
+    res.status(401).json({ error: "Invalid token" });
   }
 };

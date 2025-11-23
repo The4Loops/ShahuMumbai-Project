@@ -5,6 +5,7 @@ import useSearch from "./useSearch";
 import api from "../../supabase/axios";
 import { useNavigate } from "react-router-dom";
 import { useAdminActions } from "../AdminActionsContext";
+import { toast } from "react-toastify";
 
 function ProductsTab() {
   const [products, setProducts] = useState([]);
@@ -62,8 +63,7 @@ function ProductsTab() {
       }
       setModalProduct(null);
     } catch (e) {
-      console.error("Save failed:", e);
-      alert("Failed to save product.");
+      toast.error(e?.response?.data?.message || "Failed to save product");
     }
   };
 
@@ -73,8 +73,7 @@ function ProductsTab() {
       setProducts((prev) => prev.filter((p) => p.id !== deleteProduct.id));
       setDeleteProduct(null);
     } catch (e) {
-      console.error("Delete failed:", e);
-      alert("Failed to delete product.");
+      toast.error(e?.response?.data?.message || "Failed to delete product");
     }
   };
 
@@ -133,24 +132,9 @@ function ProductsTab() {
           : collectionData?.items || [];
         setCollections(collectionList);
       } catch (e) {
-        if (!alive) return;
-
-        // Log full details for debugging
-        console.error("Load failed:", {
-          url: e?.response?.config?.url,
-          status: e?.response?.status,
-          payload: e?.response?.data,
-          message: e?.message,
-        });
-
-        const url = e?.response?.config?.url || "";
-        if (url.includes("/api/products")) {
-          setProductsError(e?.response?.data?.message || e?.message || "Failed to load products");
-        } else if (url.includes("/api/collections")) {
-          setCollectionsError(e?.response?.data?.message || e?.message || "Failed to load collections");
-        } else {
-          // Generic surface so silent mapping/runtime errors show up
-          setProductsError(e?.message || "Failed to load products");
+        if (alive) {
+          setProductsError("Failed to load products");
+          setCollectionsError("Failed to load collections");
         }
       } finally {
         if (alive) {

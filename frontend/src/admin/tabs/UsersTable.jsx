@@ -94,8 +94,7 @@ function UserTab() {
           search: searchQuery || undefined,
           page,
           limit,
-        },
-        headers: { Authorization: `Bearer ${localStorage.getItem('adminToken')}` }
+        }
       });
 
       const raw = response?.data;

@@ -142,7 +142,6 @@ const AddCollections = ({ editId = null, onSaved }) => {
         const { data } = await api.post('/api/upload/single', fd, {
           headers: {
             'Content-Type': 'multipart/form-data',
-            Authorization: `Bearer ${localStorage.getItem('token')}`,
           },
         });
         cover_url = data.url;

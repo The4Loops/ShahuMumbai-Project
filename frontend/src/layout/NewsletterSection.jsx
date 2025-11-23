@@ -11,22 +11,17 @@ export default function NewsletterPopup() {
   const [dontShowAgain, setDontShowAgain] = useState(false);
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
     const hasSeenPopup = localStorage.getItem("newsletterPopupShown");
     if (hasSeenPopup) return;
 
     const checkStatus = async () => {
       let shouldShow = true;
-      if (token) {
         try {
-          const response = await api.get("/api/newsletter/status", {
-            headers: { Authorization: `Bearer ${token}` },
-          });
+          const response = await api.get("/api/newsletter/status");
           if (response.data.dontShow) shouldShow = false;
-        } catch {
+        } catch(e) {
           // ignore
         }
-      }
 
       if (!shouldShow) return;
       setTimeout(() => setShow(true), 200);
@@ -51,14 +46,10 @@ export default function NewsletterPopup() {
     setShow(false);
     if (dontShowAgain) {
       localStorage.setItem("newsletterPopupShown", "true");
-      const token = localStorage.getItem("token");
-      if (token) {
-        api.post("/api/newsletter/optout", {}, {
-          headers: { Authorization: `Bearer ${token}` },
-        }).catch((err) => {
-          console.error("Failed to opt out:", err);
+
+        api.post("/api/newsletter/optout", {}).catch((err) => {
+          toast.error("Failed to update newsletter preferences");
         });
-      }
     }
   };
 

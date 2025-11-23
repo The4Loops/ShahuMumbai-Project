@@ -178,28 +178,11 @@ const AuthForm = () => {
           Password: formData.password,
         });
 
-        const { token } = res.data;
-
-        try {
-          localStorage.setItem("token", token);
-          api.defaults.headers.common.Authorization = `Bearer ${token}`;
-        } catch (storageError) {
-          toast.error("Failed to store authentication token. Please try again.");
-          return;
-        }
-
-        let decoded;
-        try {
-          decoded = jwtDecode(token);
-        } catch (decodeError) {
-          throw new Error("Invalid token format");
-        }
-
-        const userRole = decoded.role;
+        const { user } = res.data;
         toast.dismiss();
-        toast.success(res.data.message || "Login successful!");
+        toast.success("Login successful!");
 
-        if (userRole === "Admin") {
+        if (user.role === "Admin") {
           navigate("/admin");
         } else {
           navigate("/profile");

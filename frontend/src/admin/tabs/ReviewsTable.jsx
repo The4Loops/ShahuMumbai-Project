@@ -33,7 +33,6 @@ export default function ReviewsTable() {
         }
       } catch (err) {
         setError("Failed to load reviews");
-        console.error(err);
       } finally {
         setLoading(false);
       }

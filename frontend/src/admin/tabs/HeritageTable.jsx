@@ -3,6 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, Edit, Trash2, Plus, X } from "lucide-react";
 import api from "../../supabase/axios";
+import { toast } from "react-toastify";
 
 // (Optional) if you already have a shared hook, swap this inline hook
 // to: import useSearch from "./useSearch";
@@ -135,8 +136,7 @@ function HeritageTable() {
       setModalItem(null);
       loadRows();
     } catch (e) {
-      console.error("Save failed:", e);
-      alert(e?.response?.data?.error || "Failed to save milestone");
+      toast.error(e?.response?.data?.error || "Failed to save milestone");
     }
   };
 
@@ -147,8 +147,7 @@ function HeritageTable() {
       setDeleteItem(null);
       loadRows();
     } catch (e) {
-      console.error("Delete failed:", e);
-      alert(e?.response?.data?.error || "Failed to delete milestone");
+      toast.error(e?.response?.data?.error || "Failed to delete milestone");
     }
   };
 

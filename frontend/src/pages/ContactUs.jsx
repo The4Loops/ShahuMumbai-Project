@@ -14,16 +14,38 @@ import { useLoading } from "../context/LoadingContext";
 
 function ContactPage() {
   const { setLoading } = useLoading();
-  const token = localStorage.getItem("token");
-  let decoded = {};
-  if (token) {
-    try {
-      decoded = jwtDecode(token);
-    } catch (e) {
-      console.error("Invalid token", e);
-      localStorage.removeItem("token");
+  const [user,setUser] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    subject: "",
+    message: "",
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+
+    const fetchUser = async () => {
+      try {
+        const res = await api.get("/api/auth/me");
+        setUser(res.data.user);
+      } catch (err) {
+        toast.dismiss();
+        toast.error("Failed to fetch user data.");
+      }
+    };
+    fetchUser();
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      setForm(prev => ({
+        ...prev,
+        name: user.fullname || "",
+        email: user.email || "",
+      }));
     }
-  }
+  }, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -34,14 +56,6 @@ function ContactPage() {
 
     return () => clearTimeout(timer);
   }, [setLoading]);
-
-  const [form, setForm] = useState({
-    name: decoded.fullname || "",
-    email: decoded.email || "",
-    subject: "",
-    message: "",
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -66,13 +80,7 @@ function ContactPage() {
       });
       toast.dismiss();
       toast.success("Message sent successfully!");
-      setForm({
-        name: decoded.fullname || "",
-        email: decoded.email || "",
-        subject: "",
-        message: "",
-      });
-      setLoading(false);
+      setForm(prev => ({ ...prev, subject: "", message: "" }));
     } catch (error) {
       toast.dismiss();
       toast.error(error.response?.data?.error || "Failed to send message.");
@@ -211,7 +219,7 @@ function ContactPage() {
                 value={form.name}
                 onChange={handleChange}
                 required
-                readOnly={!!token}
+                readOnly={!!user}
               />
               <input
                 type="email"
@@ -221,7 +229,7 @@ function ContactPage() {
                 value={form.email}
                 onChange={handleChange}
                 required
-                readOnly={!!token}
+                readOnly={!!user}
               />
               <input
                 className="w-full p-3 border border-gray-200 rounded"

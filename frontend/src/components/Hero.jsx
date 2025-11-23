@@ -27,7 +27,6 @@ function Hero() {
         }
         setIsLoading(false);
       } catch (err) {
-        console.error("Error fetching banner:", err);
         setError("Failed to load banner");
         setIsLoading(false);
       }

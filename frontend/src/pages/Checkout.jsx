@@ -10,6 +10,7 @@ import { jwtDecode } from "jwt-decode";
 import { trackDB } from "../analytics-db";
 import { useLocation } from "react-router-dom";
 import { useCurrency } from "../supabase/CurrencyContext";
+import { toast } from "react-toastify";
 
 const API = process.env.REACT_APP_API_BASE_URL || "";
 
@@ -77,18 +78,21 @@ function Checkout() {
     !!waitlistState?.fromWaitlist && waitlistState?.mode === "waitlistDeposit";
   const waitlistProduct = isWaitlistDeposit ? waitlistState?.product : null;
   const waitlistEmail = isWaitlistDeposit ? waitlistState?.waitlistEmail : null;
+  const [userId, setUserId] = useState(null);
 
-  // decode logged-in user (for DB tracking)
-  const authToken = typeof window !== "undefined" ? localStorage.getItem("token") : null;
-  let decodedUser = "";
-  if (authToken) {
-    try {
-      decodedUser = jwtDecode(authToken);
-    } catch {
-      decodedUser = "";
-    }
-  }
-  const userId = decodedUser?.id || null;
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await api.get("/api/auth/me");
+
+        setUserId(res.data.user.id);
+      } catch (err) {
+        toast.dismiss();
+        toast.error("Failed to fetch user data.");
+      }
+    };
+    fetchUser();
+  }, []);
 
   // totals (INR)
   const totals = useMemo(() => {
@@ -154,7 +158,7 @@ function Checkout() {
         setCart(Array.isArray(data) ? data : []);
         setLineCurrency(data?.[0]?.product?.currency || "INR");
       } catch (e) {
-        console.error("Checkout: load cart failed", e);
+        toast.error("Could not load your cart. Please go back to Cart and try again.");
         setErrBanner("Could not load your cart. Please go back to Cart and try again.");
       } finally {
         setLoadingCart(false);
@@ -273,8 +277,7 @@ function Checkout() {
         const response = await api.get(`${API}/api/cartById`);
         serverCart = response.data || [];
       } catch (e) {
-        console.error("Failed to reload cart:", e);
-        alert("Could not load your cart. Please refresh and try again.");
+        toast.error("Could not load your cart. Please go back to Cart and try again.");
         trackDB(
           "checkout_failed",
           {
@@ -371,20 +374,12 @@ function Checkout() {
           {
             productId: waitlistProduct.id,
             email: formData.email,
-          },
-          authToken
-            ? {
-                headers: {
-                  Authorization: `Bearer ${authToken}`,
-                },
-              }
-            : {}
+          }
         );
 
         const wlData = wlResp.data;
         if (!wlData?.ok || !wlData?.order_number) {
-          console.error("Waitlist deposit order failed", wlData);
-          alert("Could not create waitlist deposit order. Please try again.");
+          toast.error("Could not create waitlist deposit order. Please try again.");
           trackDB(
             "checkout_failed",
             {
@@ -399,8 +394,7 @@ function Checkout() {
 
         orderNumber = wlData.order_number;
       } catch (err) {
-        console.error("Waitlist deposit order network error:", err);
-        alert("Network error while creating waitlist deposit order. Please try again.");
+        toast.error("Network error creating waitlist deposit order. Please try again.");
         trackDB(
           "checkout_failed",
           {
@@ -442,17 +436,7 @@ function Checkout() {
         const text = resp.data;
 
         if (!text?.ok) {
-          console.error("Checkout failed", text);
-          if (text?.missing?.length)
-            alert(
-              `Order create failed: missing product IDs ${text.missing.join(", ")}`
-            );
-          else if (text?.error === "product_inactive")
-            alert(
-              "One of your cart items is inactive. Please remove it and try again."
-            );
-          else alert("Something went wrong creating your order. Please try again.");
-
+          toast.error(text?.error || "Could not create order. Please try again.");
           trackDB(
             "checkout_failed",
             {
@@ -467,8 +451,7 @@ function Checkout() {
         }
         orderNumber = text.order_number;
       } catch (err) {
-        console.error("Order create network error:", err);
-        alert("Network error during checkout (order create).");
+        toast.error("Network error creating order. Please try again.");
         trackDB(
           "checkout_failed",
           {
@@ -494,10 +477,7 @@ function Checkout() {
       rz = response.data;
 
       if (!rz?.rzp?.order_id) {
-        console.error("Razorpay order creation failed", rz);
-        alert(
-          `Unable to start payment: ${rz?.message || rz?.error || "Unknown error"}`
-        );
+        alert("Could not initiate payment. Please try again.");
         trackDB(
           "checkout_failed",
           {
@@ -616,7 +596,7 @@ function Checkout() {
               );
             }
           } catch (e) {
-            console.error("Verify error:", e);
+            toast.error("Payment verification failed due to a network error. Please try again.");
             setErrBanner(
               "Payment verification failed due to a network error. Please try again."
             );
@@ -633,7 +613,6 @@ function Checkout() {
         },
         modal: {
           ondismiss: () => {
-            console.log("Razorpay modal closed");
             trackDB(
               "checkout_failed",
               {
@@ -649,8 +628,7 @@ function Checkout() {
 
       new window.Razorpay(options).open();
     } catch (err) {
-      console.error("Payment start error:", err);
-      alert("Network error during payment start.");
+      toast.error("Could not start payment due to a network error. Please try again.");
       trackDB(
         "checkout_failed",
         {

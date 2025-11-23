@@ -66,20 +66,20 @@ const Blog = () => {
 
   /* ----------------------- USER INIT ----------------------- */
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    if (token) {
+    const fetchUser = async () => {
       try {
-        const decoded = jwtDecode(token);
-        const name = decoded.fullname || decoded.email || "Anonymous";
+        const res = await api.get("/api/auth/me");
+
+        const name = res.data.user.fullname || res.data.user.email;
         setFullName(name);
-        setUserId(decoded.id);
+        setUserId(res.data.user.id);
       } catch (err) {
-        console.error("Error decoding token:", err);
+        toast.dismiss();
+        toast.error("Failed to fetch user data.");
         setFullName(null);
       }
-    } else {
-      setFullName(null);
-    }
+    };
+    fetchUser();
   }, []);
 
   /* ----------------------- FETCH BLOGS ----------------------- */

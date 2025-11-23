@@ -41,20 +41,15 @@ function RoleManagement() {
     try {
       // Fetch roles
       const roleResponse = await api.get("/api/roles", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+
         params: { search: search || undefined },
       });
-      console.log("Frontend roles response:", roleResponse.data); // Debug log
       setRoles(roleResponse.data.roles);
 
       // Fetch users for assignment dropdown
-      const userResponse = await api.get("/api/users", {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
-      console.log("Frontend users response:", userResponse.data); // Debug log
+      const userResponse = await api.get("/api/users");
       setUsers(userResponse.data.users);
     } catch (error) {
-      console.error("Fetch error:", error.response?.data); // Debug log
       toast.dismiss();
       toast.error(error.response?.data?.error || "Failed to fetch data");
     } finally {
@@ -128,9 +123,7 @@ function RoleManagement() {
   const handleDeleteRole = async (roleId) => {
     if (window.confirm(`Are you sure you want to delete this role?`)) {
       try {
-        await api.delete(`/api/roles/${roleId}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-        });
+        await api.delete(`/api/roles/${roleId}`);
         toast.dismiss();
         toast.success("Role deleted successfully");
         fetchData();
@@ -150,9 +143,7 @@ function RoleManagement() {
     }
 
     try {
-      await api.post("/api/roles/assign", assignRoleData, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      await api.post("/api/roles/assign", assignRoleData);
       toast.dismiss();
       toast.success("Role assigned successfully");
       fetchData();

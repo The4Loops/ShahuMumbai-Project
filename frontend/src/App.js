@@ -1,10 +1,9 @@
 import { Routes, Route, useLocation } from "react-router-dom";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Helmet, HelmetProvider } from "react-helmet-async";
 import { CurrencyProvider } from "./supabase/CurrencyContext";
 import "./App.css";
 import { LoadingProvider } from './context/LoadingContext';
-
 import HomePage from "./pages/HomePage";
 import Account from "./pages/Account";
 import Products from "./pages/Products";
@@ -25,7 +24,7 @@ import MyOrder from "./pages/MyOrder";
 import Wishlist from "./pages/Wishlist";
 import Profile from "./pages/Profile";
 import Checkout from "./pages/Checkout";
-import useAutoLogout from "./AutoLogout";
+import useAutoLogout from "./AutoLogout"; // ← Make sure path is correct
 import Blog from "./pages/Blog";
 import Returns from "./pages/Returns";
 import NewsletterPopup from "./layout/NewsletterSection";
@@ -38,63 +37,54 @@ import TermsAndConditions from "./pages/TermsAndConditions";
 import ShippingPolicy from "./pages/ShippingPolicy";
 import CancellationRefundPolicy from "./pages/CancellationRefundPolicy";
 import AddBlogPost from "./admin/AddBlogPost";
-
+import api from "./supabase/axios";
 import { trackDB } from "./analytics-db";
 
-// ---- ANALYTICS HOOKS ----
 
-// Track a single "site_visit" per tab/session
 function useTrackSiteVisit(userId) {
   useEffect(() => {
     if (typeof window === "undefined") return;
 
     if (!sessionStorage.getItem("site_visit_tracked")) {
-      trackDB(
-        "site_visit",
-        {
-          path: window.location.pathname + window.location.search,
-        },
-        userId
-      );
+      trackDB("site_visit", { path: window.location.pathname + window.location.search }, userId);
       sessionStorage.setItem("site_visit_tracked", "1");
     }
   }, [userId]);
 }
 
-// Track a "page_view" on every route change
+
 function useTrackPageViews(userId) {
   const { pathname, search } = useLocation();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    trackDB(
-      "page_view",
-      {
-        path: pathname + search,
-        title: document.title || null,
-      },
-      userId
-    );
+    trackDB("page_view", { path: pathname + search, title: document.title || null }, userId);
   }, [pathname, search, userId]);
 }
 
 function App() {
   useAutoLogout();
 
-  const userId =
-    JSON.parse(localStorage.getItem("user") || "null")?.id || null;
+  const [userId, setUserId] = useState(null);
 
-  // 🔹 fire once-per-tab site_visit
+  useEffect(() => {
+    const fetchUser = async () => {
+      try {
+        const res = await api.get("/api/auth/me");
+        setUserId(res.data.user?.id || null);
+      } catch (err) {
+        setUserId(null);
+      }
+    };
+
+    fetchUser();
+  }, []);
+
   useTrackSiteVisit(userId);
-
-  // 🔹 fire on every route change
   useTrackPageViews(userId);
 
-  const siteUrl =
-    typeof window !== "undefined"
-      ? window.location.origin
-      : "https://www.shahumumbai.com";
+  const siteUrl = typeof window !== "undefined" ? window.location.origin : "https://www.shahumumbai.com";
 
   return (
     <LoadingProvider>
@@ -124,7 +114,6 @@ function App() {
           </Helmet>
 
           <PageTracker />
-
           <ToastContainer
             position="top-right"
             autoClose={4000}

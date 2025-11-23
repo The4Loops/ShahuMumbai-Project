@@ -1,39 +1,52 @@
+// src/hooks/useAutoLogout.js
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import {jwtDecode} from "jwt-decode";
+import api from "./supabase/axios"; // your axios with withCredentials: true
+import { toast } from "react-toastify";
 
 const useAutoLogout = () => {
   const navigate = useNavigate();
+
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    let interval = null;
 
-    if (token) {
-      const decoded = jwtDecode(token);
-      const expiryTime = decoded.exp * 1000; // convert to milliseconds
-      const currentTime = Date.now();
-      const timeLeft = expiryTime - currentTime;
-
-      if (timeLeft <= 0) {
-        // Token already expired
-        handleLogout();
-      } else {
-        // Set timeout for logout when token expires
-        const timer = setTimeout(() => {
-          handleLogout();
-        }, timeLeft);
-
-        // Cleanup on component unmount
-        return () => clearTimeout(timer);
+    const checkAuthStatus = async () => {
+      try {
+        // This will fail with 401 if token expired or invalid
+        await api.get("/api/auth/me");
+        // If successful → user still logged in → do nothing
+      } catch (err) {
+        if (err.response?.status === 401) {
+          // Token expired or invalid → log out
+          await handleLogout();
+        }
       }
-    }
-  }, []);
+    };
 
-   const handleLogout = () => {
-    localStorage.removeItem('token');
-    // Clear other local storage or session storage if needed
-    navigate('/');
-    window.location.reload(); // Optional: to reset app state
-  };
+    const handleLogout = async () => {
+      try {
+        await api.post("/api/auth/logout"); // clears HttpOnly cookie
+      } catch (e) {
+        // ignore network errors — we’re logging out anyway
+      } finally {
+        toast.info("Session expired. Please log in again.");
+        navigate("/account");
+        // Optional: reload to fully reset app state
+        setTimeout(() => window.location.reload(), 500);
+      }
+    };
+
+    // Check every 30 seconds (safe & lightweight)
+    interval = setInterval(checkAuthStatus, 30_000);
+
+    // Initial check on mount
+    checkAuthStatus();
+
+    // Cleanup
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [navigate]);
 };
 
 export default useAutoLogout;

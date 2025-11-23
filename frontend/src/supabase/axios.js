@@ -11,15 +11,6 @@ const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem("token");
-    if (token) config.headers.Authorization = `Bearer ${token}`;
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
 const withCurrency = (config, currency) => {
   if (currency) {
     config.params = { ...config.params, currency };
@@ -35,5 +26,18 @@ export const apiWithCurrency = (currency) => ({
   put: (url, data, config = {}) => api.put(url, data, config),
   delete: (url, config = {}) => api.delete(url, config),
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem("token");
+      if (window.location.pathname !== "/account") {
+        window.location.href = "/account";
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 export default api;

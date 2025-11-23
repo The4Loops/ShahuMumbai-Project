@@ -67,7 +67,6 @@ const MyOrders = () => {
         const res = await api.get("/api/orders/user");
         setOrders(Array.isArray(res.data?.orders) ? res.data.orders : []);
       } catch (err) {
-        console.error("Failed to load orders:", err);
         toast.error("Could not load your orders.");
       } finally {
         setLoading(false);

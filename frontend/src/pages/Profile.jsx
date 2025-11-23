@@ -105,7 +105,7 @@ function Profile() {
           image: user.image || null,
         });
       } catch (err) {
-        console.error("Failed to fetch profile:", err);
+        toast.error("Failed to load profile. Please log in again.");
         setError("Failed to load profile");
       }finally{
         setLoading(false);
@@ -135,7 +135,7 @@ function Profile() {
       });
       setProfile((prev) => ({ ...prev, image: response.data.url }));
     } catch (err) {
-      console.error("Image upload failed:", err);
+      toast.error("Failed to upload image");
       setError("Failed to upload image");
     }finally{
       setLoading(false);
@@ -204,7 +204,7 @@ function Profile() {
         toast.dismiss();
         toast.success("Edit profile successfully");
       } catch (err) {
-        console.error("Profile update failed:", err);
+        toast.error("Failed to save profile changes");
       }finally{
         setLoading(false);  
       }

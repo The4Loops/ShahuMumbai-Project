@@ -38,9 +38,7 @@ export default function CategoriesTable() {
   // Delete
   const confirmDelete = async () => {
     try {
-      await api.delete(`/api/category/${deleteCategory.categoryid}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
-      });
+      await api.delete(`/api/category/${deleteCategory.categoryid}`);
       setCategories((prev) =>
         prev.filter((c) => c.categoryid !== deleteCategory.categoryid)
       );
