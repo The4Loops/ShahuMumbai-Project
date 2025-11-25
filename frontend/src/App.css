@@ -19,3 +19,19 @@ body{
     margin: 0 !important; /* Remove default margins */
   }
 }
+
+/* Hide number input arrows in all browsers */
+.hide-number-arrows {
+  -moz-appearance: textfield; /* Firefox */
+}
+
+.hide-number-arrows::-webkit-outer-spin-button,
+.hide-number-arrows::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Optional: for better mobile experience */
+.hide-number-arrows {
+  appearance: textfield;
+}

@@ -121,7 +121,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [setLoading]);
 
   // Load collections
   useEffect(() => {
@@ -138,7 +138,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [setLoading]);
 
   // If editing: fetch product and prefill
   useEffect(() => {
@@ -153,7 +153,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
           name: p.Name ?? "",
           description: p.Description ?? "",
           shortdescription: p.ShortDescription ?? "",
-          categoryid: p.categoryid ?? "",
+          categoryid: p.CategoryId ?? "",
           branddesigner: p.BrandDesigner ?? "",
           price: p.Price ?? "",
           discountprice: p.DiscountPrice ?? "",
@@ -179,7 +179,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId, reset]);
+  }, [editId, reset,setLoading]);
 
   // Previews
   useEffect(() => {
@@ -291,7 +291,6 @@ const AddProduct = ({ editId = null, onSaved }) => {
           setSelectedImages([]);
           setExistingImages([]);
           setHeroImageIndex(null);
-          onSaved?.();
         }
       } else {
         // For edit: if no new images provided, keep existing ones and ensure one is hero
@@ -316,13 +315,13 @@ const AddProduct = ({ editId = null, onSaved }) => {
         const res = await api.put(PRODUCT_UPDATE_URL(editId), payload);
         if (res.status >= 200 && res.status < 300) {
           toast.success("Product updated successfully!");
-          onSaved?.();
         }
       }
     } catch (err) {
       toast.error(
         err?.response?.data?.message || err.message || "Failed to save product"
       );
+      setLoading(false);
     } finally {
       setIsSubmitting(false);
       setLoading(false);
@@ -547,14 +546,21 @@ const AddProduct = ({ editId = null, onSaved }) => {
           <input
             type="number"
             step="0.01"
+            min="0"
             placeholder="0.00"
             className={`${inputBase} ${
               errors.price ? "border-red-500 ring-red-200" : ""
-            }`}
+            } hide-number-arrows`}
             {...register("price", {
               required: "Price is required",
               min: { value: 0, message: "Price must be positive" },
             })}
+            onKeyDown={(e) => {
+            // Prevent: '-', 'e', 'E', '+'
+            if (["e", "E", "-", "+"].includes(e.key)) {
+              e.preventDefault();
+            }
+          }}
             onBlur={() => trigger("discountprice")}
           />
           {errors.price && (
@@ -570,10 +576,11 @@ const AddProduct = ({ editId = null, onSaved }) => {
           <input
             type="number"
             step="0.01"
+            min="0"
             placeholder="Optional"
             className={`${inputBase} ${
               errors.discountprice ? "border-red-500 ring-red-200" : ""
-            }`}
+            } hide-number-arrows`}
             {...register("discountprice", {
               min: { value: 0, message: "Discount price must be positive" },
               validate: (v) =>
@@ -581,6 +588,12 @@ const AddProduct = ({ editId = null, onSaved }) => {
                 Number(v) <= Number(price || 0) ||
                 "Discount cannot exceed price",
             })}
+            onKeyDown={(e) => {
+              // Prevent: '-', 'e', 'E', '+'
+              if (["e", "E", "-", "+"].includes(e.key)) {
+                e.preventDefault();
+              }
+            }}
           />
           {errors.discountprice && (
             <p className="text-red-600 text-xs mt-1">

@@ -183,7 +183,6 @@ exports.getProductById = async (req, res) => {
           pi.ProductImageid AS image_id,
           pi.ImageUrl AS image_url,
           pi.isHero AS is_hero,
-          c.CategoryId,
           c.Name AS category_name
         FROM products p
         LEFT JOIN ProductImages pi ON p.ProductId = pi.ProductId
