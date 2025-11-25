@@ -73,21 +73,16 @@ function CustomerServicePopup({ onClose }) {
           </p>
 
           {/* Contact Info */}
-          <div className="grid gap-8 md:grid-cols-3 mb-12">
+          <div className="grid gap-8 md:grid-cols-2 mb-12">
             <div className="bg-gray-50 rounded-xl shadow p-4 text-center">
               <FaPhoneAlt className="mx-auto text-3xl text-gray-700 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Phone</h3>
-              <p className="text-gray-600">+1 (929)715-5118 and +91 9594545119 </p>
+              <p className="text-gray-600">+1 (929)715-5118 | +91 9594545119 </p>
             </div>
             <div className="bg-gray-50 rounded-xl shadow p-4 text-center">
               <FaEnvelope className="mx-auto text-3xl text-gray-700 mb-3" />
               <h3 className="text-lg font-semibold mb-2">Email</h3>
               <button onClick={handleEmailClick} className="text-gray-600 underline-none hover:text-blue-600 transition-colors">bhumi.founder@shahumumbai.com</button>
-            </div>
-            <div className="bg-gray-50 rounded-xl shadow p-4 text-center">
-              <FaMapMarkerAlt className="mx-auto text-3xl text-gray-700 mb-3" />
-              <h3 className="text-lg font-semibold mb-2">Address</h3>
-              <p className="text-gray-600">123 Main Street, Mumbai, India</p>
             </div>
           </div>
 

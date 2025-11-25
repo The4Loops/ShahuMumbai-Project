@@ -398,10 +398,10 @@ function Cart() {
                   <span>Subtotal</span>
                   <span>{formatDisplayPrice(subtotalINR, currency)}</span>
                 </div>
-                <div className="flex justify-between">
+                {/* <div className="flex justify-between">
                   <span>Shipping</span>
                   <span className="text-green-500 font-medium">Free</span>
-                </div>
+                </div> */}
                 <div className="flex justify-between">
                   <span>Tax</span>
                   <span>{formatDisplayPrice(taxINR, currency)}</span>
@@ -446,7 +446,7 @@ function Cart() {
         )}
 
         {/* Feature Banner */}
-        <motion.div
+         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
@@ -456,17 +456,17 @@ function Cart() {
             <LuShieldCheck className="text-green-600 text-2xl" />
             <p className="font-medium text-sm">Secure Checkout</p>
           </div>
-          <div className="flex flex-col items-center gap-2">
+          {/* <div className="flex flex-col items-center gap-2">
             <LuTruck className="text-blue-600 text-2xl" />
             <p className="font-medium text-sm">
               Free Shipping Over {formatDisplayPrice(1000, currency)}
             </p>
-          </div>
+          </div> */}
           <div className="flex flex-col items-center gap-2">
             <LuRotateCcw className="text-purple-600 text-2xl" />
-            <p className="font-medium text-sm">30-Day Returns</p>
+            <p className="font-medium text-sm">2-Day Returns</p>
           </div>
-        </motion.div>
+        </motion.div> 
       </div>
     </Layout>
   );
