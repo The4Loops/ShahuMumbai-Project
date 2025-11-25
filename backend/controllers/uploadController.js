@@ -13,8 +13,8 @@ const storage = new CloudinaryStorage({
 });
 
 // Multer Upload Middleware
-const uploadSingle = multer({ storage: storage,limits: {fileSize: 5 * 1024 * 1024}, }).single("image");
-const uploadMultiple = multer({ storage: storage,limits: {fileSize: 5 * 1024 * 1024,files: 10,}, }).array("images", 10); // Max 10 files
+const uploadSingle = multer({ storage: storage,limits: {fileSize: 10 * 1024 * 1024}, }).single("image");
+const uploadMultiple = multer({ storage: storage,limits: {fileSize: 10 * 1024 * 1024,files: 10,}, }).array("images", 10); // Max 10 files
 
 // Controller Functions
 const uploadFile = (req, res) => {

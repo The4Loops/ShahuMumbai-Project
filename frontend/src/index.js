@@ -7,7 +7,7 @@ import { BrowserRouter } from "react-router-dom";
 import "react-datepicker/dist/react-datepicker.css";
 import disableInspect from './disableInspect';
 
-disableInspect();
+//disableInspect();
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>

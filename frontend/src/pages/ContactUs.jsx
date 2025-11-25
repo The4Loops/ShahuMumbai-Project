@@ -31,7 +31,6 @@ function ContactPage() {
         setUser(res.data.user);
       } catch (err) {
         toast.dismiss();
-        toast.error("Failed to fetch user data.");
       }
     };
     fetchUser();
