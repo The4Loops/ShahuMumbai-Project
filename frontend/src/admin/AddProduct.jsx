@@ -542,7 +542,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         {/* Price */}
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">
-            Price ($) *
+            Price (₹) *
           </label>
           <input
             type="number"
@@ -565,7 +565,7 @@ const AddProduct = ({ editId = null, onSaved }) => {
         {/* Discount Price */}
         <div>
           <label className="block text-sm font-medium text-[#6B4226] mb-1">
-            Discount Price ($)
+            Discount Price (₹)
           </label>
           <input
             type="number"
