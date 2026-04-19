@@ -8,6 +8,7 @@ import UpcomingProducts from "../components/UpcomingProduct";
 import { Link, useLocation } from "react-router-dom";
 import api from "../supabase/axios";
 import { useLoading } from "../context/LoadingContext";
+import Logo from "../assets/ShahuLogo.png";
 
 function HomePage() {
   const location = useLocation();
@@ -95,7 +96,7 @@ function HomePage() {
             "@type": "Organization",
             name: "Shahu Mumbai",
             url: "https://www.shahumumbai.com/",
-            logo: "https://www.shahumumbai.com/static/logo-300.png",
+            logo: {Logo},
           })}
         </script>
 
