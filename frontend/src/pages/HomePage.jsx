@@ -85,7 +85,7 @@ function HomePage() {
         <meta property="og:title" content="Shahu" />
         <meta
           property="og:description"
-          content="Authentic handwoven sarees crafted by artisans. Sustainable, made-to-order luxury."
+          content="Artisan-led sustainable luxury fashion from India."
         />
         <meta property="og:url" content={url} />
         <meta property="og:image" content="https://www.shahumumbai.com/og/homepage.jpg" />

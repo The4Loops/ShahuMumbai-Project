@@ -52,7 +52,7 @@ function About() {
         <meta name="robots" content="index,follow,max-image-preview:large" />
         <meta
           name="keywords"
-          content="Shahu Mumbai, about Shahu, Indian luxury fashion, artisan-made, sustainable fashion India, handcrafted sarees, ethical fashion brand, Mumbai fashion house"
+          content="Shahu Mumbai, about Shahu, Indian luxury fashion, artisan-made, sustainable fashion India, ethical fashion brand, Mumbai fashion house"
         />
 
         {/* Canonical + hreflang (adjust locales if needed) */}

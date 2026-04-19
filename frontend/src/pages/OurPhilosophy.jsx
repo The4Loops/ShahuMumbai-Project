@@ -73,7 +73,7 @@ function OurPhilosophy() {
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta
     name="keywords"
-    content="Shahu Mumbai philosophy, brand values, craftsmanship, sustainable luxury, ethical fashion, pre-order model, artisan-made sarees"
+    content="Shahu philosophy, brand values, craftsmanship, sustainable luxury, ethical fashion, pre-order model, artisan-made sarees"
   />
 
   {/* Canonical + hreflang */}
@@ -83,16 +83,16 @@ function OurPhilosophy() {
 
   {/* Open Graph */}
   <meta property="og:type" content="website" />
-  <meta property="og:site_name" content="Shahu Mumbai" />
+  <meta property="og:site_name" content="Shahu" />
   <meta property="og:locale" content="en_IN" />
-  <meta property="og:title" content="Our Philosophy — Shahu Mumbai" />
+  <meta property="og:title" content="Our Philosophy — Shahu" />
   <meta
     property="og:description"
     content="Discover the values that shape every Shahu creation: craftsmanship, sustainability, and timeless stories."
   />
   <meta property="og:url" content={canonical} />
   <meta property="og:image" content={`${baseUrl}/og/philosophy.jpg`} />
-  <meta property="og:image:alt" content="Shahu Mumbai — Our Philosophy" />
+  <meta property="og:image:alt" content="Shahu — Our Philosophy" />
 
   {/* Twitter */}
   {/* <meta name="twitter:card" content="summary_large_image" />
