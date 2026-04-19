@@ -80,7 +80,7 @@ function HomePage() {
 
         {/* Open Graph */}
         <meta property="og:type" content="website" />
-        <meta property="og:site_name" content="Shahu Mumbai" />
+        <meta property="og:site_name" content="Shahu" />
         <meta property="og:locale" content="en_IN" />
         <meta property="og:title" content="Shahu" />
         <meta
@@ -89,7 +89,7 @@ function HomePage() {
         />
         <meta property="og:url" content={url} />
         <meta property="og:image" content="https://www.shahumumbai.com/og/homepage.jpg" />
-        <meta property="og:image:alt" content="Shahu Mumbai — Authentic Handwoven Sarees" />
+        <meta property="og:image:alt" content="Shahu" />
 
         {/* Structured Data: Organization */}
         <script type="application/ld+json">
