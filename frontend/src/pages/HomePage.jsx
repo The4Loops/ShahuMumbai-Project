@@ -69,7 +69,8 @@ function HomePage() {
         <meta name="robots" content="index,follow,max-image-preview:large" />
         <meta
           name="keywords"
-          content="Shahu, ethnic wear Mumbai, designer ethnic wear, Indian fashion, premium ethnic clothing, traditional and modern styles"
+          //content="Shahu Mumbai, ethnic wear Mumbai, designer ethnic wear, sarees, Indian fashion, premium ethnic clothing, traditional and modern styles"
+          content="Shahu, ethnic wear Mumbai, designer ethnic wear, sarees, Indian fashion, premium ethnic clothing, traditional and modern styles"
         />
 
         {/* Canonical + hreflang */}
@@ -88,7 +89,7 @@ function HomePage() {
         />
         <meta property="og:url" content={url} />
         <meta property="og:image" content="https://www.shahumumbai.com/og/homepage.jpg" />
-        <meta property="og:image:alt" content="Shahu" />
+        <meta property="og:image:alt" content="Shahu Mumbai — Authentic Handwoven Sarees" />
 
         {/* Structured Data: Organization */}
         <script type="application/ld+json">
@@ -106,7 +107,7 @@ function HomePage() {
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "WebSite",
-            name: "Shahu Mumbai",
+            name: "Shahu",
             url: "https://www.shahumumbai.com/",
             potentialAction: {
               "@type": "SearchAction",
