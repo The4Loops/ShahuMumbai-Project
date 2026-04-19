@@ -52,13 +52,13 @@ function App() {
             <meta name="viewport" content="width=device-width, initial-scale=1" />
             <meta name="robots" content="index,follow" />
             <meta name="theme-color" content="#ffffff" />
-            <meta property="og:site_name" content="Shahu Mumbai" />
+            <meta property="og:site_name" content="Shahu" />
             <link rel="canonical" href={siteUrl} />
             <script type="application/ld+json">
               {JSON.stringify({
                 "@context": "https://schema.org",
                 "@type": "Organization",
-                name: "Shahu Mumbai",
+                name: "Shahu",
                 url: siteUrl,
                 logo: `${siteUrl}/ShahuLogo.png`,
                 sameAs: [
