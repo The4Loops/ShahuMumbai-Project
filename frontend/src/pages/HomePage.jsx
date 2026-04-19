@@ -59,15 +59,15 @@ function HomePage() {
     <Layout location={location}>
       <Helmet>
         {/* Core SEO */}
-        <title>Shahu Mumbai — Authentic Handwoven Sarees</title>
+        <title>Shahu</title>
         <meta
           name="description"
-          content="Explore Shahu Mumbai's authentic handwoven sarees — timeless craftsmanship with contemporary elegance. Made-to-order, sustainable luxury."
+          content="Explore Shahu Mumbai’s premium ethnic wear collection, where traditional craftsmanship meets contemporary design for every occasion."
         />
         <meta name="robots" content="index,follow,max-image-preview:large" />
         <meta
           name="keywords"
-          content="Shahu Mumbai, handwoven sarees, Indian sarees, artisan-made, sustainable luxury, handmade sarees Mumbai, designer sarees India"
+          content="Shahu Mumbai, ethnic wear Mumbai, designer ethnic wear, sarees, Indian fashion, premium ethnic clothing, traditional and modern styles"
         />
 
         {/* Canonical + hreflang */}
