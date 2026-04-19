@@ -63,12 +63,13 @@ function HomePage() {
         <title>Shahu</title>
         <meta
           name="description"
-          content="Explore Shahu Mumbai’s premium ethnic wear collection, where traditional craftsmanship meets contemporary design for every occasion."
+          //content="Explore Shahu Mumbai’s premium ethnic wear collection, where traditional craftsmanship meets contemporary design for every occasion."
+          content="Explore Shahu's premium ethnic wear collection, where traditional craftsmanship meets contemporary design for every occasion."
         />
         <meta name="robots" content="index,follow,max-image-preview:large" />
         <meta
           name="keywords"
-          content="Shahu Mumbai, ethnic wear Mumbai, designer ethnic wear, sarees, Indian fashion, premium ethnic clothing, traditional and modern styles"
+          content="Shahu, ethnic wear Mumbai, designer ethnic wear, Indian fashion, premium ethnic clothing, traditional and modern styles"
         />
 
         {/* Canonical + hreflang */}
@@ -80,21 +81,21 @@ function HomePage() {
         <meta property="og:type" content="website" />
         <meta property="og:site_name" content="Shahu Mumbai" />
         <meta property="og:locale" content="en_IN" />
-        <meta property="og:title" content="Shahu Mumbai — Authentic Handwoven Sarees" />
+        <meta property="og:title" content="Shahu" />
         <meta
           property="og:description"
           content="Authentic handwoven sarees crafted by artisans. Sustainable, made-to-order luxury."
         />
         <meta property="og:url" content={url} />
         <meta property="og:image" content="https://www.shahumumbai.com/og/homepage.jpg" />
-        <meta property="og:image:alt" content="Shahu Mumbai — Authentic Handwoven Sarees" />
+        <meta property="og:image:alt" content="Shahu" />
 
         {/* Structured Data: Organization */}
         <script type="application/ld+json">
           {JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
-            name: "Shahu Mumbai",
+            name: "Shahu",
             url: "https://www.shahumumbai.com/",
             logo: {Logo},
           })}
